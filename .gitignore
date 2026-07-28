@@ -1,0 +1,9 @@
+node_modules/
+dist/
+out/
+*.log
+.DS_Store
+# SQLite dev database (created at runtime)
+*.db
+*.db-journal
+prisma/dev.db*
