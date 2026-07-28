@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { DEFAULT_PRICING_TIERS } from '../src/shared/pricingEngine'
+import { seedDefaultSettings } from '../src/main/db/queries/settingsQueries'
 
 const prisma = new PrismaClient()
 
@@ -86,7 +87,9 @@ async function main() {
     })
   }
 
-  console.log('Database seeded successfully with Stage 1+2 data.')
+  await seedDefaultSettings(prisma)
+
+  console.log('Database seeded successfully with Stage 1+2+3+4 data.')
 }
 
 main()
