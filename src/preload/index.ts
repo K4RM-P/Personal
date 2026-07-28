@@ -10,7 +10,14 @@ import type {
   BarcodeScanResult,
   PrintReceiptResult,
   PrinterConfig,
-  StoreInfo
+  StoreInfo,
+  ChargeOptions,
+  ChargeResult,
+  RefundResult,
+  VoidResult,
+  ReaderStatus,
+  PaymentConfigView,
+  SavePaymentConfigInput
 } from '../shared/types'
 
 const api = {
@@ -53,12 +60,24 @@ const api = {
     testNetwork: (ipAddress: string, port?: number): Promise<{ ok: boolean; message: string }> =>
       ipcRenderer.invoke(IPC.RECEIPT_TEST_NETWORK, { ipAddress, port })
   },
+  payment: {
+    charge: (amountCents: number, orderRef: string, options?: ChargeOptions): Promise<ChargeResult> =>
+      ipcRenderer.invoke(IPC.PAYMENT_CHARGE, { amountCents, orderRef, options }),
+    refund: (transactionId: string, amountCents?: number): Promise<RefundResult> =>
+      ipcRenderer.invoke(IPC.PAYMENT_REFUND, { transactionId, amountCents }),
+    void: (transactionId: string): Promise<VoidResult> =>
+      ipcRenderer.invoke(IPC.PAYMENT_VOID, { transactionId }),
+    getReaderStatus: (): Promise<ReaderStatus> => ipcRenderer.invoke(IPC.PAYMENT_GET_READER_STATUS)
+  },
   settings: {
     getPrinter: (): Promise<PrinterConfig> => ipcRenderer.invoke(IPC.SETTINGS_GET_PRINTER),
     savePrinter: (config: PrinterConfig): Promise<PrinterConfig> =>
       ipcRenderer.invoke(IPC.SETTINGS_SAVE_PRINTER, config),
     getStore: (): Promise<StoreInfo> => ipcRenderer.invoke(IPC.SETTINGS_GET_STORE),
-    saveStore: (info: StoreInfo): Promise<StoreInfo> => ipcRenderer.invoke(IPC.SETTINGS_SAVE_STORE, info)
+    saveStore: (info: StoreInfo): Promise<StoreInfo> => ipcRenderer.invoke(IPC.SETTINGS_SAVE_STORE, info),
+    getPayment: (): Promise<PaymentConfigView> => ipcRenderer.invoke(IPC.SETTINGS_GET_PAYMENT),
+    savePayment: (input: SavePaymentConfigInput): Promise<PaymentConfigView> =>
+      ipcRenderer.invoke(IPC.SETTINGS_SAVE_PAYMENT, input)
   }
 }
 

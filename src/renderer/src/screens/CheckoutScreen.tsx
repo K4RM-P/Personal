@@ -1,6 +1,12 @@
 import * as React from 'react'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
-import { Product, CartItem, TransactionWithItems } from '@shared/types'
+import {
+  Product,
+  CartItem,
+  TransactionWithItems,
+  ChargeResult,
+  PaymentInteractionMode
+} from '@shared/types'
 import { formatCurrency } from '@shared/formatCurrency'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
 
@@ -17,6 +23,13 @@ export function CheckoutScreen() {
   const [parkedCarts, setParkedCarts] = React.useState<{ id: string; name: string; items: CartItem[] }[]>([])
   const [managerOverride, setManagerOverride] = React.useState<boolean>(false)
   const [recentTransactions, setRecentTransactions] = React.useState<TransactionWithItems[]>([])
+
+  // Payment (Stage 5). `paymentMode` drives checkout without knowing the processor.
+  const [paymentMode, setPaymentMode] = React.useState<PaymentInteractionMode>('automatic')
+  const [cardProcessing, setCardProcessing] = React.useState<boolean>(false)
+  const [cardStatus, setCardStatus] = React.useState<{ ok: boolean; message: string } | null>(null)
+  const [manualPrompt, setManualPrompt] = React.useState<{ amountCents: number; orderRef: string } | null>(null)
+  const [manualRef, setManualRef] = React.useState<string>('')
 
   const searchRef = React.useRef<HTMLInputElement>(null)
   const tenderRef = React.useRef<HTMLInputElement>(null)
@@ -43,9 +56,21 @@ export function CheckoutScreen() {
     }
   }
 
+  const loadPaymentMode = async () => {
+    try {
+      if (window.api?.settings?.getPayment) {
+        const cfg = await window.api.settings.getPayment()
+        setPaymentMode(cfg.interactionMode)
+      }
+    } catch (err) {
+      console.error('Failed to load payment mode:', err)
+    }
+  }
+
   React.useEffect(() => {
     loadProducts()
     loadTransactions()
+    loadPaymentMode()
   }, [])
 
   const filteredProducts = products.filter(
@@ -119,13 +144,9 @@ export function CheckoutScreen() {
   const tenderedCents = Math.round((parseFloat(tenderedDollars) || 0) * 100)
   const changeCents = Math.max(0, tenderedCents - totalCents)
 
-  const handleCheckout = async (tenderType: 'CASH' | 'CARD' = 'CASH') => {
-    if (cart.length === 0) return
-    if (tenderType === 'CASH' && tenderedCents < totalCents) {
-      alert('Tendered amount is less than total amount due!')
-      return
-    }
-
+  // Records the finished sale + prints the receipt. Card sales only reach here
+  // after the PaymentProvider returned "approved".
+  const completeSale = async (tenderType: 'CASH' | 'CARD'): Promise<void> => {
     try {
       const payload = {
         items: cart.map((item) => ({
@@ -154,6 +175,76 @@ export function CheckoutScreen() {
       }
     } catch (err: any) {
       alert(`Checkout Error: ${err?.message || 'Transaction failed'}`)
+    }
+  }
+
+  const handleCashCheckout = () => {
+    if (cart.length === 0) return
+    if (tenderedCents < totalCents) {
+      alert('Tendered amount is less than total amount due!')
+      return
+    }
+    completeSale('CASH')
+  }
+
+  // Applies a card charge result: approved → record the sale; otherwise abort
+  // and surface the reason. Provider-agnostic — same for Stripe, Moneris, manual…
+  const applyChargeResult = (result: ChargeResult): void => {
+    if (result.status === 'approved') {
+      const detail = [result.cardLast4 && `card •••• ${result.cardLast4}`, result.authCode && `auth ${result.authCode}`]
+        .filter(Boolean)
+        .join(' · ')
+      setCardStatus({ ok: true, message: `Card approved${detail ? ` (${detail})` : ''}` })
+      completeSale('CARD')
+    } else {
+      setCardStatus({ ok: false, message: result.message || 'Card was not approved' })
+    }
+  }
+
+  // "Pay Card" entry point. Automatic providers charge inline; manual/external
+  // terminals open a confirmation prompt so the cashier can record the outcome.
+  const startCardCheckout = async () => {
+    if (cart.length === 0 || cardProcessing) return
+    setCardStatus(null)
+    const orderRef = `SALE-${Date.now()}`
+
+    if (!window.api?.payment) {
+      alert('Payment service unavailable')
+      return
+    }
+
+    if (paymentMode === 'manual') {
+      setManualRef('')
+      setManualPrompt({ amountCents: totalCents, orderRef })
+      return
+    }
+
+    setCardProcessing(true)
+    try {
+      const result = await window.api.payment.charge(totalCents, orderRef)
+      applyChargeResult(result)
+    } catch (err: any) {
+      setCardStatus({ ok: false, message: err?.message || 'Payment failed' })
+    } finally {
+      setCardProcessing(false)
+    }
+  }
+
+  const confirmManualPayment = async (outcome: 'approved' | 'declined') => {
+    if (!manualPrompt || !window.api?.payment) return
+    const { amountCents, orderRef } = manualPrompt
+    setCardProcessing(true)
+    try {
+      const result = await window.api.payment.charge(amountCents, orderRef, {
+        manualOutcome: outcome,
+        manualReference: manualRef.trim() || undefined
+      })
+      setManualPrompt(null)
+      applyChargeResult(result)
+    } catch (err: any) {
+      setCardStatus({ ok: false, message: err?.message || 'Payment failed' })
+    } finally {
+      setCardProcessing(false)
     }
   }
 
@@ -383,25 +474,39 @@ export function CheckoutScreen() {
                 )}
               </div>
 
+              {/* Card charge status (approved / declined / error) */}
+              {cardStatus && (
+                <div
+                  className={`text-xs rounded px-2 py-1.5 border ${
+                    cardStatus.ok
+                      ? 'text-emerald-300 border-emerald-500/40 bg-emerald-950/30'
+                      : 'text-red-300 border-red-500/40 bg-red-950/30'
+                  }`}
+                >
+                  {cardStatus.message}
+                </div>
+              )}
+
               {/* Action Buttons */}
               <div className="grid grid-cols-3 gap-2 pt-2">
                 <button
                   onClick={handleParkSale}
-                  disabled={cart.length === 0}
+                  disabled={cart.length === 0 || cardProcessing}
                   className="px-3 py-2 bg-[#334155] hover:bg-[#475569] text-white rounded font-medium text-xs disabled:opacity-50"
                 >
                   Park Sale
                 </button>
                 <button
-                  onClick={() => handleCheckout('CARD')}
-                  disabled={cart.length === 0}
+                  onClick={startCardCheckout}
+                  disabled={cart.length === 0 || cardProcessing}
                   className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded font-medium text-xs disabled:opacity-50"
+                  title={paymentMode === 'manual' ? 'Run card on external terminal, then confirm' : undefined}
                 >
-                  Pay Card
+                  {cardProcessing ? 'Processing…' : paymentMode === 'manual' ? 'Pay Card (External)' : 'Pay Card'}
                 </button>
                 <button
-                  onClick={() => handleCheckout('CASH')}
-                  disabled={cart.length === 0}
+                  onClick={handleCashCheckout}
+                  disabled={cart.length === 0 || cardProcessing}
                   className="px-3 py-2 bg-[#0d9488] hover:bg-[#0f766e] text-white rounded font-bold text-xs disabled:opacity-50"
                 >
                   Pay Cash
@@ -411,6 +516,57 @@ export function CheckoutScreen() {
           </Card>
         </div>
       </div>
+
+      {/* Manual / External Terminal confirmation — a first-class flow, not an error state */}
+      {manualPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <Card className="w-[420px] border-[#0d9488] bg-[#0f172a] p-6 space-y-4">
+            <div>
+              <CardTitle className="text-white">External Terminal Payment</CardTitle>
+              <CardDescription className="text-[#94a3b8]">
+                Charge this amount on your standalone card terminal, then confirm the result below.
+              </CardDescription>
+            </div>
+            <div className="text-center py-2">
+              <div className="text-xs text-[#94a3b8]">Amount to charge</div>
+              <div className="text-3xl font-bold text-[#0d9488]">{formatCurrency(manualPrompt.amountCents)}</div>
+            </div>
+            <div>
+              <label className="text-xs text-[#94a3b8] block mb-1">Terminal reference # (optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. receipt / approval number"
+                value={manualRef}
+                onChange={(e) => setManualRef(e.target.value)}
+                className="w-full bg-[#0f172a] border border-[#334155] rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-[#0d9488]"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                onClick={() => confirmManualPayment('declined')}
+                disabled={cardProcessing}
+                className="px-3 py-2 bg-red-900/60 hover:bg-red-800 text-red-100 rounded font-medium text-sm disabled:opacity-50"
+              >
+                Declined
+              </button>
+              <button
+                onClick={() => confirmManualPayment('approved')}
+                disabled={cardProcessing}
+                className="px-3 py-2 bg-[#0d9488] hover:bg-[#0f766e] text-white rounded font-bold text-sm disabled:opacity-50"
+              >
+                Approved
+              </button>
+            </div>
+            <button
+              onClick={() => setManualPrompt(null)}
+              disabled={cardProcessing}
+              className="w-full text-xs text-[#94a3b8] hover:text-white disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </Card>
+        </div>
+      )}
 
       {/* On-Screen Receipt Modal */}
       {activeReceipt && (

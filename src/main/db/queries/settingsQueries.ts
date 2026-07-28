@@ -7,7 +7,12 @@ const DEFAULTS = {
   'store.phone': '(555) 019-2831',
   'printer.type': 'PDF',
   'printer.networkIp': '',
-  'printer.networkPort': '9100'
+  'printer.networkPort': '9100',
+  // Payment (Stage 5): default to Manual/External terminal until setup is run.
+  'payment.provider': 'manual',
+  'payment.environment': 'sandbox',
+  'payment.terminalId': '',
+  'payment.apiKeyEnc': ''
 } as const
 
 async function getSetting(db: PrismaClient, key: string): Promise<string> {

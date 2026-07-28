@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { FeatureFlag, PrinterConfig, StoreInfo } from '@shared/types'
 import { FeatureFlagCard } from '../components/FeatureFlagCard'
+import { PaymentSettingsCard } from '../components/PaymentSettingsCard'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
 import { Switch } from '../components/ui/Switch'
 
@@ -257,6 +258,9 @@ export function SettingsScreen() {
           Save Hardware Settings
         </button>
       </Card>
+
+      {/* Payment provider setup (Stage 5) */}
+      <PaymentSettingsCard />
 
       {/* Force Reject Testing Utility */}
       <Card className="border border-amber-500/30 bg-amber-950/20">

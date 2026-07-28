@@ -27,11 +27,19 @@ export const IPC = {
   RECEIPT_PRINT: 'receipt:print',
   RECEIPT_TEST_NETWORK: 'receipt:testNetwork',
 
+  // Payment Channels (Stage 5)
+  PAYMENT_CHARGE: 'payment:charge',
+  PAYMENT_REFUND: 'payment:refund',
+  PAYMENT_VOID: 'payment:void',
+  PAYMENT_GET_READER_STATUS: 'payment:getReaderStatus',
+
   // Settings Channels
   SETTINGS_GET_PRINTER: 'settings:getPrinter',
   SETTINGS_SAVE_PRINTER: 'settings:savePrinter',
   SETTINGS_GET_STORE: 'settings:getStore',
-  SETTINGS_SAVE_STORE: 'settings:saveStore'
+  SETTINGS_SAVE_STORE: 'settings:saveStore',
+  SETTINGS_GET_PAYMENT: 'settings:getPayment',
+  SETTINGS_SAVE_PAYMENT: 'settings:savePayment'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]
