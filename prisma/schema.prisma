@@ -27,29 +27,74 @@ model Role {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  name      String
-  pin       String
-  roleId    Int
-  role      Role     @relation(fields: [roleId], references: [id])
-  createdAt DateTime @default(now())
+  id           Int           @id @default(autoincrement())
+  name         String
+  pin          String
+  roleId       Int
+  role         Role          @relation(fields: [roleId], references: [id])
+  createdAt    DateTime      @default(now())
+  transactions Transaction[]
 }
 
 model Product {
-  id         Int      @id @default(autoincrement())
-  sku        String   @unique
+  id         Int               @id @default(autoincrement())
+  sku        String            @unique
   name       String
   costCents  Int
   priceCents Int
-  barcode    String?  @unique
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  barcode    String?           @unique
+  isPinned   Boolean           @default(false) // If true, ignore pricing tier auto-calculation
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  orderItems TransactionItem[]
 }
 
 model Customer {
-  id        Int      @id @default(autoincrement())
-  name      String
-  phone     String?
-  email     String?
-  createdAt DateTime @default(now())
+  id           Int           @id @default(autoincrement())
+  name         String
+  phone        String?
+  email        String?
+  createdAt    DateTime      @default(now())
+  transactions Transaction[]
+}
+
+model PricingTier {
+  id            String  @id @default(uuid())
+  minCostCents  Int
+  maxCostCents  Int?
+  markupPercent Float
+  orderIndex    Int     @default(0)
+}
+
+model Transaction {
+  id             String            @id @default(uuid())
+  receiptNumber  String            @unique
+  status         String            @default("COMPLETED") // COMPLETED, PARKED, VOIDED, REFUNDED
+  subtotalCents Int
+  taxCents       Int
+  totalCents     Int
+  tenderType     String            @default("CASH") // CASH, CARD, SPLIT
+  tenderedCents  Int
+  changeCents    Int
+  voidReason     String?
+  customerId     Int?
+  customer       Customer?         @relation(fields: [customerId], references: [id])
+  userId         Int?
+  user           User?             @relation(fields: [userId], references: [id])
+  items          TransactionItem[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+}
+
+model TransactionItem {
+  id            String      @id @default(uuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  productId     Int
+  product       Product     @relation(fields: [productId], references: [id])
+  quantity      Int
+  costCents     Int
+  unitPriceCents Int
+  totalCents    Int
+  isVoided      Boolean     @default(false)
 }
