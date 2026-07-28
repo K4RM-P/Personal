@@ -2,17 +2,24 @@ import * as React from 'react'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
 import { Product, CartItem, TransactionWithItems } from '@shared/types'
 import { formatCurrency } from '@shared/formatCurrency'
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
 
 export function CheckoutScreen() {
   const [products, setProducts] = React.useState<Product[]>([])
   const [searchQuery, setSearchQuery] = React.useState('')
   const [cart, setCart] = React.useState<CartItem[]>([])
-  const [taxRatePercent] = React.useState<number>(13) // Default 13% HST/tax
+  const [taxRatePercent] = React.useState<number>(13)
   const [tenderedDollars, setTenderedDollars] = React.useState<string>('')
   const [activeReceipt, setActiveReceipt] = React.useState<TransactionWithItems | null>(null)
+  const [printStatus, setPrintStatus] = React.useState<string | null>(null)
+  const [receiptPdfUrl, setReceiptPdfUrl] = React.useState<string | null>(null)
+  const [scanFeedback, setScanFeedback] = React.useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [parkedCarts, setParkedCarts] = React.useState<{ id: string; name: string; items: CartItem[] }[]>([])
   const [managerOverride, setManagerOverride] = React.useState<boolean>(false)
   const [recentTransactions, setRecentTransactions] = React.useState<TransactionWithItems[]>([])
+
+  const searchRef = React.useRef<HTMLInputElement>(null)
+  const tenderRef = React.useRef<HTMLInputElement>(null)
 
   const loadProducts = async () => {
     try {
@@ -48,7 +55,7 @@ export function CheckoutScreen() {
       (p.barcode && p.barcode.includes(searchQuery))
   )
 
-  const addToCart = (product: Product) => {
+  const addToCart = React.useCallback((product: Product) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id)
       if (existing) {
@@ -58,7 +65,30 @@ export function CheckoutScreen() {
       }
       return [...prev, { product, quantity: 1 }]
     })
-  }
+  }, [])
+
+  const handleBarcodeScan = React.useCallback(async (barcode: string) => {
+    try {
+      if (window.api?.barcode) {
+        const result = await window.api.barcode.scan(barcode)
+        if (result.product) {
+          addToCart(result.product)
+          setScanFeedback({ type: 'success', message: `Scanned: ${result.product.name}` })
+        } else {
+          setScanFeedback({ type: 'error', message: `No product found for barcode ${barcode}` })
+        }
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Scan failed'
+      setScanFeedback({ type: 'error', message: msg })
+    }
+    window.setTimeout(() => setScanFeedback(null), 3000)
+  }, [addToCart])
+
+  const { scanInputProps } = useBarcodeScanner({
+    onScan: handleBarcodeScan,
+    pauseRefs: [searchRef, tenderRef]
+  })
 
   const updateQuantity = (productId: number, delta: number) => {
     setCart((prev) =>
@@ -115,6 +145,12 @@ export function CheckoutScreen() {
         setCart([])
         setTenderedDollars('')
         loadTransactions()
+
+        if (window.api.receipt) {
+          const printResult = await window.api.receipt.print(tx)
+          setPrintStatus(printResult.message)
+          setReceiptPdfUrl(printResult.pdfDataUrl ?? null)
+        }
       }
     } catch (err: any) {
       alert(`Checkout Error: ${err?.message || 'Transaction failed'}`)
@@ -160,6 +196,25 @@ export function CheckoutScreen() {
 
   return (
     <div className="space-y-6">
+      {/* Hidden keyboard-wedge barcode scanner input — always refocused unless search/tender active */}
+      <input
+        {...scanInputProps}
+        className="sr-only"
+        tabIndex={-1}
+      />
+
+      {scanFeedback && (
+        <div
+          className={`rounded-lg border p-3 text-sm ${
+            scanFeedback.type === 'success'
+              ? 'border-emerald-500/50 bg-emerald-950/40 text-emerald-200'
+              : 'border-red-500/50 bg-red-950/40 text-red-200'
+          }`}
+        >
+          {scanFeedback.message}
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Core Checkout Register</h1>
@@ -184,6 +239,7 @@ export function CheckoutScreen() {
           <Card>
             <div className="flex items-center space-x-3 mb-4">
               <input
+                ref={searchRef}
                 type="text"
                 placeholder="Search products by SKU, Name, or Barcode..."
                 value={searchQuery}
@@ -311,6 +367,7 @@ export function CheckoutScreen() {
               <div className="pt-2">
                 <label className="text-xs text-[#94a3b8] block mb-1">Cash Tendered ($):</label>
                 <input
+                  ref={tenderRef}
                   type="number"
                   step="0.01"
                   placeholder="0.00"
@@ -362,13 +419,31 @@ export function CheckoutScreen() {
             <div>
               <h2 className="text-lg font-bold text-white">Receipt Summary</h2>
               <p className="text-xs text-[#94a3b8]">Transaction #{activeReceipt.receiptNumber}</p>
+              {printStatus && (
+                <p className="text-xs text-emerald-400 mt-1">{printStatus}</p>
+              )}
             </div>
-            <button
-              onClick={() => setActiveReceipt(null)}
-              className="text-xs bg-[#334155] hover:bg-[#475569] px-3 py-1 text-white rounded"
-            >
-              Close Receipt
-            </button>
+            <div className="flex items-center gap-2">
+              {receiptPdfUrl && (
+                <a
+                  href={receiptPdfUrl}
+                  download={`receipt-${activeReceipt.receiptNumber}.pdf`}
+                  className="text-xs bg-[#0d9488] hover:bg-[#0f766e] px-3 py-1 text-white rounded"
+                >
+                  Download PDF
+                </a>
+              )}
+              <button
+                onClick={() => {
+                  setActiveReceipt(null)
+                  setPrintStatus(null)
+                  setReceiptPdfUrl(null)
+                }}
+                className="text-xs bg-[#334155] hover:bg-[#475569] px-3 py-1 text-white rounded"
+              >
+                Close Receipt
+              </button>
+            </div>
           </div>
 
           <div className="space-y-2 text-xs">

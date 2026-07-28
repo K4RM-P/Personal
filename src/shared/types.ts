@@ -43,3 +43,37 @@ export type TransactionWithItems = DBTransaction & {
   items: (DBTransactionItem & { product: Product })[]
   customer?: Customer | null
 }
+
+export interface StoreInfo {
+  name: string
+  address: string
+  phone: string
+}
+
+export type PrinterType = 'NETWORK' | 'SYSTEM' | 'PDF'
+
+export interface PrinterConfig {
+  type: PrinterType
+  ipAddress?: string
+  port?: number
+}
+
+export interface BarcodeScanResult {
+  barcode: string
+  product: Product | null
+  found: boolean
+}
+
+export interface PrintReceiptOptions {
+  transaction: TransactionWithItems
+  storeInfo?: StoreInfo
+  printerConfig?: PrinterConfig
+  rxFooter?: string
+}
+
+export interface PrintReceiptResult {
+  success: boolean
+  message: string
+  pdfDataUrl?: string
+  pdfPath?: string
+}

@@ -6,7 +6,11 @@ import type {
   PricingTier,
   CreateTransactionPayload,
   BulkImportProductInput,
-  TransactionWithItems
+  TransactionWithItems,
+  BarcodeScanResult,
+  PrintReceiptResult,
+  PrinterConfig,
+  StoreInfo
 } from '../shared/types'
 
 const api = {
@@ -17,6 +21,8 @@ const api = {
   },
   product: {
     getAll: (): Promise<Product[]> => ipcRenderer.invoke(IPC.PRODUCT_GET_ALL),
+    getByBarcode: (barcode: string): Promise<Product | null> =>
+      ipcRenderer.invoke(IPC.PRODUCT_GET_BY_BARCODE, barcode),
     create: (data: { sku: string; name: string; costCents: number; priceCents?: number; barcode?: string; isPinned?: boolean }): Promise<Product> =>
       ipcRenderer.invoke(IPC.PRODUCT_CREATE, data),
     update: (id: number, data: { sku?: string; name?: string; costCents?: number; priceCents?: number; barcode?: string; isPinned?: boolean }): Promise<Product> =>
@@ -24,6 +30,10 @@ const api = {
     delete: (id: number): Promise<Product> => ipcRenderer.invoke(IPC.PRODUCT_DELETE, id),
     bulkImport: (inputs: BulkImportProductInput[]): Promise<{ count: number }> =>
       ipcRenderer.invoke(IPC.PRODUCT_BULK_IMPORT, inputs)
+  },
+  barcode: {
+    scan: (barcode: string): Promise<BarcodeScanResult> =>
+      ipcRenderer.invoke(IPC.BARCODE_SCAN, barcode)
   },
   pricingTier: {
     getAll: (): Promise<PricingTier[]> => ipcRenderer.invoke(IPC.PRICING_TIER_GET_ALL),
@@ -36,6 +46,19 @@ const api = {
     getAll: (): Promise<TransactionWithItems[]> => ipcRenderer.invoke(IPC.TRANSACTION_GET_ALL),
     void: (id: string, reason: string): Promise<TransactionWithItems> =>
       ipcRenderer.invoke(IPC.TRANSACTION_VOID, { id, reason })
+  },
+  receipt: {
+    print: (transaction: TransactionWithItems): Promise<PrintReceiptResult> =>
+      ipcRenderer.invoke(IPC.RECEIPT_PRINT, transaction),
+    testNetwork: (ipAddress: string, port?: number): Promise<{ ok: boolean; message: string }> =>
+      ipcRenderer.invoke(IPC.RECEIPT_TEST_NETWORK, { ipAddress, port })
+  },
+  settings: {
+    getPrinter: (): Promise<PrinterConfig> => ipcRenderer.invoke(IPC.SETTINGS_GET_PRINTER),
+    savePrinter: (config: PrinterConfig): Promise<PrinterConfig> =>
+      ipcRenderer.invoke(IPC.SETTINGS_SAVE_PRINTER, config),
+    getStore: (): Promise<StoreInfo> => ipcRenderer.invoke(IPC.SETTINGS_GET_STORE),
+    saveStore: (info: StoreInfo): Promise<StoreInfo> => ipcRenderer.invoke(IPC.SETTINGS_SAVE_STORE, info)
   }
 }
 

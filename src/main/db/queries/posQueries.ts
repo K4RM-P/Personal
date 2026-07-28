@@ -9,6 +9,14 @@ export async function getAllProducts(db: PrismaClient): Promise<Product[]> {
   })
 }
 
+export async function getProductByBarcode(db: PrismaClient, barcode: string): Promise<Product | null> {
+  return db.product.findFirst({
+    where: {
+      OR: [{ barcode: barcode }, { sku: barcode }]
+    }
+  })
+}
+
 export async function createProduct(
   db: PrismaClient,
   data: { sku: string; name: string; costCents: number; priceCents?: number; barcode?: string; isPinned?: boolean }
