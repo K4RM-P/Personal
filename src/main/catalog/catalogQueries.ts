@@ -7,7 +7,7 @@
  * hits `CatalogProduct`.
  */
 
-import { PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
 import type {
   CatalogDealRow,
   CatalogScanResult,
@@ -376,4 +376,134 @@ export async function promoteCatalogProduct(
  */
 export async function countDiscontinuedProducts(db: PrismaClient): Promise<number> {
   return db.product.count({ where: { origin: 'CATALOG', discontinued: true } })
+}
+
+
+export interface PromoteAllResult {
+  total: number
+  created: number
+  skipped: number
+  errors: number
+  barcodeSkipped: number
+  zeroCostPinned: number
+}
+
+/**
+ * Promote EVERY unstocked catalogue item from the active batch into sellable
+ * inventory in one pass. Items already linked to a Product are skipped.
+ *
+ * This is the bulk counterpart to promoteCatalogProduct — same pricing/barcode
+ * rules, but tiers are loaded once and products are created in batches.
+ */
+export async function promoteAllCatalogProducts(db: PrismaClient): Promise<PromoteAllResult> {
+  const activeBatchId = await getActiveBatchId(db)
+  if (activeBatchId === null) {
+    return { total: 0, created: 0, skipped: 0, errors: 0, barcodeSkipped: 0, zeroCostPinned: 0 }
+  }
+
+  const [catalogItems, existingProducts, tiers] = await Promise.all([
+    db.catalogProduct.findMany({
+      where: { importBatchId: activeBatchId },
+      select: {
+        id: true,
+        itemNumber: true,
+        description: true,
+        displayName: true,
+        costPriceCents: true,
+        listPriceCents: true,
+        gtinPrimaryNorm: true,
+        importBatchId: true
+      }
+    }),
+    db.product.findMany({
+      where: { origin: 'CATALOG' },
+      select: { id: true, sourceItemNumber: true, barcode: true, sku: true }
+    }),
+    getAllPricingTiers(db)
+  ])
+
+  const stockedByItemNumber = new Map(existingProducts.map((p) => [p.sourceItemNumber, p]))
+  const existingBarcodes = new Set(existingProducts.map((p) => p.barcode).filter((b): b is string => b !== null))
+  const existingSkus = new Set(existingProducts.map((p) => p.sku))
+
+  let created = 0
+  let skipped = 0
+  let errors = 0
+  let barcodeSkipped = 0
+  let zeroCostPinned = 0
+
+  const CREATE_CHUNK = 500
+  let buffer: Prisma.ProductCreateManyInput[] = []
+
+  const flush = async (): Promise<void> => {
+    if (buffer.length === 0) return
+    await db.product.createMany({ data: buffer, skipDuplicates: false })
+    buffer = []
+  }
+
+  for (const item of catalogItems) {
+    if (stockedByItemNumber.has(item.itemNumber)) {
+      skipped++
+      continue
+    }
+
+    const costCents = item.costPriceCents
+    const pricePinnedForZeroCost = costCents <= 0
+    if (pricePinnedForZeroCost) zeroCostPinned++
+    const priceCents = pricePinnedForZeroCost ? item.listPriceCents : calculateRetailPriceCents(costCents, tiers)
+
+    let barcode: string | null = item.gtinPrimaryNorm
+    if (barcode) {
+      if (existingBarcodes.has(barcode)) {
+        barcode = null
+        barcodeSkipped++
+      } else {
+        existingBarcodes.add(barcode)
+      }
+    }
+
+    let sku = `MCK-${item.itemNumber}`
+    if (existingSkus.has(sku)) {
+      sku = `MCK-${item.itemNumber}-${Date.now().toString().slice(-5)}`
+    }
+    existingSkus.add(sku)
+
+    buffer.push({
+      sku,
+      name: item.displayName || item.description,
+      costCents,
+      priceCents,
+      barcode,
+      isPinned: pricePinnedForZeroCost,
+      origin: 'CATALOG',
+      sourceItemNumber: item.itemNumber,
+      lastSeenBatchId: item.importBatchId,
+      lastCatalogSyncAt: new Date()
+    })
+    created++
+
+    if (buffer.length >= CREATE_CHUNK) {
+      try {
+        await flush()
+      } catch {
+        errors += buffer.length
+        buffer = []
+      }
+    }
+  }
+
+  try {
+    await flush()
+  } catch {
+    errors += buffer.length
+  }
+
+  return {
+    total: catalogItems.length,
+    created,
+    skipped,
+    errors,
+    barcodeSkipped,
+    zeroCostPinned
+  }
 }

@@ -44,6 +44,7 @@ export const IPC = {
   CATALOG_SCAN_LOOKUP: 'catalog:scanLookup',
   CATALOG_GET_DEALS: 'catalog:getDeals',
   CATALOG_PROMOTE: 'catalog:promote',
+  CATALOG_PROMOTE_ALL: 'catalog:promoteAll',
   CATALOG_GET_PROVINCE: 'catalog:getProvince',
   CATALOG_SET_PROVINCE: 'catalog:setProvince',
   /** main -> renderer stream */
