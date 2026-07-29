@@ -23,7 +23,7 @@ export function SettingsScreen() {
   const [settingsSaved, setSettingsSaved] = React.useState<string | null>(null)
   const [testResult, setTestResult] = React.useState<{ ok: boolean; message: string } | null>(null)
   const [testing, setTesting] = React.useState(false)
-  const [creditSettings, setCreditSettings] = React.useState({ allowShortPayToTab: false, defaultCreditLimitCents: 0, loyaltyPointsPerDollar: 1 })
+  const [creditSettings, setCreditSettings] = React.useState({ loyaltyPointsPerDollar: 1 })
 
   const loadFlags = async () => {
     try {
@@ -278,10 +278,8 @@ export function SettingsScreen() {
       </div>
 
       <Card>
-        <CardHeader><CardTitle>Customer Credit & Loyalty</CardTitle><CardDescription>Controls new tab charges and the earn rate. Loyalty redemption remains intentionally unavailable at checkout.</CardDescription></CardHeader>
+        <CardHeader><CardTitle>Customer Credit & Loyalty</CardTitle><CardDescription>Tab shortfalls are allowed for an attached customer. Set the loyalty earn rate here.</CardDescription></CardHeader>
         <div className="grid gap-3 mt-2">
-          <label className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] p-3 text-sm"><span><span className="font-semibold block">Allow short-pay to tab</span><span className="text-xs text-[var(--muted-foreground)]">Permit a remaining balance to become a tab charge, subject to the credit limit.</span></span><Switch checked={creditSettings.allowShortPayToTab} onCheckedChange={(allowShortPayToTab) => setCreditSettings(s => ({ ...s, allowShortPayToTab }))}/></label>
-          <div><label className="mb-1 block text-xs text-[var(--muted-foreground)]">Default credit limit (dollars)</label><input type="number" min="0" step="0.01" value={(creditSettings.defaultCreditLimitCents / 100).toFixed(2)} onChange={e => setCreditSettings(s => ({ ...s, defaultCreditLimitCents: Math.round(Number(e.target.value) * 100) }))} className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"/></div>
           <div><label className="mb-1 block text-xs text-[var(--muted-foreground)]">Loyalty points earned per dollar spent</label><input type="number" min="0" step="0.1" value={creditSettings.loyaltyPointsPerDollar} onChange={e => setCreditSettings(s => ({ ...s, loyaltyPointsPerDollar: Number(e.target.value) }))} className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"/></div>
           <button onClick={() => void saveCreditSettings()} className="w-fit rounded-[var(--radius)] bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-foreground)]">Save customer settings</button>
         </div>

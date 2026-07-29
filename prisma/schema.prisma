@@ -159,7 +159,6 @@ model Customer {
   phoneNormalized  String
   address          String
   email            String?
-  creditLimitCents Int?
   loyaltyEnabled   Boolean             @default(true)
   notes            String?
   createdAt        DateTime            @default(now())

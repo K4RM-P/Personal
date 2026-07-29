@@ -16,6 +16,7 @@ import { createInterface } from 'node:readline'
 import { basename, join } from 'node:path'
 import { Prisma, PrismaClient } from '@prisma/client'
 import type {
+  AutoImportResult,
   CatalogCommitResult,
   CatalogImportPhase,
   CatalogImportProgress,
@@ -32,6 +33,7 @@ import {
 } from './reconcile'
 import { getAllPricingTiers } from '../db/queries/posQueries'
 import { getCatalogProvince } from '../db/queries/settingsQueries'
+import { promoteAllCatalogProducts } from './catalogQueries'
 
 const WRITE_CHUNK = 1000
 const PROGRESS_EVERY = 500
@@ -726,4 +728,115 @@ export async function rebuildSearchIndex(db: PrismaClient): Promise<void> {
        JOIN CatalogImportBatch b ON b.id = cp.importBatchId
       WHERE b.isActive = 1`
   )
+}
+
+// ---------------------------------------------------------------- auto import (one-shot)
+
+/**
+ * Full automated import pipeline: parse file → commit → promote all to inventory.
+ *
+ * This is the one-click "Upload catalogue" flow that the pharmacy uses on a
+ * regular basis. It skips the multi-step preview/commit/approve workflow and
+ * does everything in one shot.
+ *
+ * Returns a list of products that are *new* — items present in this catalogue
+ * that were NOT in the previous active catalogue — plus summary counts.
+ */
+export async function autoImportCatalog(
+  db: PrismaClient,
+  filePath: string,
+  onProgress: ProgressCallback
+): Promise<AutoImportResult> {
+  // 1. Parse the file into a new batch (same as startImport)
+  const fileSizeBytes = statSync(filePath).size
+  const batch = await db.catalogImportBatch.create({
+    data: {
+      filename: basename(filePath),
+      fileSizeBytes,
+      status: 'pending',
+      isActive: false
+    }
+  })
+
+  let acc: ParseAccumulator
+  try {
+    onProgress({ batchId: batch.id, phase: 'reading', linesRead: 0, totalLines: 0, percent: 0 })
+    acc = await streamIntoBatch(db, filePath, batch.id, onProgress)
+    onProgress({ batchId: batch.id, phase: 'analyzing', linesRead: acc.totalLines, totalLines: acc.totalLines, percent: 50 })
+  } catch (error) {
+    await db.catalogImportBatch.delete({ where: { id: batch.id } }).catch(() => undefined)
+    onProgress({ batchId: batch.id, phase: 'failed', linesRead: 0, totalLines: 0, percent: 0, message: error instanceof Error ? error.message : String(error) })
+    throw error
+  }
+
+  // 2. Determine which items are new (not in the previous active catalogue)
+  const activeBatchId = await getActiveBatchId(db)
+  let previousItemNumbers = new Set<string>()
+  if (activeBatchId !== null) {
+    const previous = await db.catalogProduct.findMany({
+      where: { importBatchId: activeBatchId },
+      select: { itemNumber: true }
+    })
+    previousItemNumbers = new Set(previous.map((r) => r.itemNumber))
+  }
+
+  // 3. Commit the batch (pointer flip + reconcile existing products)
+  onProgress({ batchId: batch.id, phase: 'committing', linesRead: acc.totalLines, totalLines: acc.totalLines, percent: 75 })
+
+  // Bypass guard checks for auto-import — the pharmacy trusts the file.
+  const preview = await refreshPreview(db, batch.id)
+  const confirmations = preview.guards
+    .filter((g) => g.severity === 'confirm' && g.confirmPhrase)
+    .map((g) => g.confirmPhrase!)
+
+  await commitImport(db, batch.id, { confirmations })
+
+  // 4. Promote all catalogue items to Products (auto-stock everything)
+  onProgress({ batchId: batch.id, phase: 'writingProducts', linesRead: acc.totalLines, totalLines: acc.totalLines, percent: 90 })
+
+  let errors = 0
+  try {
+    await promoteAllCatalogProducts(db)
+  } catch {
+    errors = 1
+  }
+
+  // 5. Query new items — Products created from items that weren't in the previous catalogue
+  const newProducts = await db.product.findMany({
+    where: {
+      origin: 'CATALOG',
+      lastSeenBatchId: batch.id,
+      sourceItemNumber: { notIn: [...previousItemNumbers] }
+    },
+    select: {
+      id: true,
+      sku: true,
+      name: true,
+      costCents: true,
+      priceCents: true,
+      barcode: true,
+      sourceItemNumber: true
+    },
+    orderBy: { name: 'asc' }
+  })
+
+  onProgress({ batchId: batch.id, phase: 'done', linesRead: acc.totalLines, totalLines: acc.totalLines, percent: 100 })
+
+  return {
+    batchId: batch.id,
+    filename: basename(filePath),
+    catalogProductsTotal: acc.productCount,
+    newItems: newProducts.map((p) => ({
+      productId: p.id,
+      sku: p.sku,
+      name: p.name,
+      costCents: p.costCents,
+      priceCents: p.priceCents,
+      barcode: p.barcode,
+      itemNumber: p.sourceItemNumber ?? ''
+    })),
+    repricedCount: preview.reference.priceChanged,
+    discontinuedCount: preview.reference.removed,
+    errors
+  }
 }

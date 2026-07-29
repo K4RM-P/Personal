@@ -30,6 +30,8 @@ export interface CreateTransactionPayload {
   customerId?: number
   /** Total amount applied from the customer's Pharmacy Credit ledger. */
   tabAmountCents?: number
+  /** Cash overpayment deposited to the attached customer's credit instead of returned as change. */
+  cashOverageToCreditCents?: number
 }
 
 export interface BulkImportProductInput {

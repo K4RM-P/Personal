@@ -16,8 +16,6 @@ const DEFAULTS = {
   // Catalogue (McKesson WEBCAT import)
   'catalog.province': 'ONT',
   'catalog.staleThresholdDays': '90',
-  'customer.allowShortPayToTab': 'false',
-  'customer.defaultCreditLimitCents': '0',
   'customer.loyaltyPointsPerDollar': '1'
 } as const
 

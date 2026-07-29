@@ -62,6 +62,8 @@ export const IPC = {
   CATALOG_SET_PROVINCE: 'catalog:setProvince',
   /** main -> renderer stream */
   CATALOG_IMPORT_PROGRESS: 'catalog:importProgress',
+  /** Upload a WEBCAT file, commit it, and auto-promote all items to inventory. */
+  CATALOG_AUTO_IMPORT: 'catalog:autoImport',
 
   // Settings Channels
   SETTINGS_GET_PRINTER: 'settings:getPrinter',

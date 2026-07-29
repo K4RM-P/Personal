@@ -8,30 +8,55 @@ interface UseBarcodeScannerOptions {
   enabled?: boolean
 }
 
+interface UseBarcodeScannerResult {
+  inputRef: React.RefObject<HTMLInputElement | null>
+  scanInputProps: {
+    ref: React.RefObject<HTMLInputElement | null>
+    type: 'text'
+    autoComplete: string
+    'aria-label': string
+    onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void
+    onBlur: () => void
+  }
+}
+
 /**
  * Keyboard-wedge barcode scanner hook for checkout screens.
  * Keeps a hidden input focused and detects fast keystroke bursts ending in Enter.
  */
-export function useBarcodeScanner({ onScan, pauseRefs = [], enabled = true }: UseBarcodeScannerOptions) {
+export function useBarcodeScanner({
+  onScan,
+  pauseRefs = [],
+  enabled = true
+}: UseBarcodeScannerOptions): UseBarcodeScannerResult {
   const inputRef = React.useRef<HTMLInputElement>(null)
   const bufferRef = React.useRef(new BarcodeScanBuffer())
   const pausedRef = React.useRef(false)
 
+  const isEditableTarget = React.useCallback((el: Element | null): boolean => {
+    if (!el || el === inputRef.current) return false
+    return Boolean(
+      el.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')
+    )
+  }, [])
+
   const isPausedTarget = React.useCallback(
-    (el: Element | null) => pauseRefs.some((ref) => ref.current && ref.current === el),
-    [pauseRefs]
+    (el: Element | null): boolean =>
+      isEditableTarget(el) ||
+      pauseRefs.some((ref) => ref.current && (ref.current === el || ref.current.contains(el))),
+    [isEditableTarget, pauseRefs]
   )
 
   React.useEffect(() => {
     if (!enabled) return
 
-    const refocus = () => {
+    const refocus = (): void => {
       if (pausedRef.current || !inputRef.current) return
       if (isPausedTarget(document.activeElement)) return
       inputRef.current.focus()
     }
 
-    const handleFocusIn = (e: FocusEvent) => {
+    const handleFocusIn = (e: FocusEvent): void => {
       pausedRef.current = isPausedTarget(e.target as Element)
     }
 
@@ -45,7 +70,7 @@ export function useBarcodeScanner({ onScan, pauseRefs = [], enabled = true }: Us
     }
   }, [enabled, isPausedTarget])
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     const result = bufferRef.current.processKey(e.key)
     if (result.type === 'scan') {
       e.preventDefault()

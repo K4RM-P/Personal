@@ -25,6 +25,7 @@ import type {
   BackupBundle
 } from '../shared/types'
 import type {
+  AutoImportResult,
   CatalogCommitResult,
   CatalogDealRow,
   CatalogImportProgress,
@@ -67,20 +68,7 @@ const api = {
       ipcRenderer.invoke(IPC.TRANSACTION_CREATE, payload),
     getAll: (): Promise<TransactionWithItems[]> => ipcRenderer.invoke(IPC.TRANSACTION_GET_ALL),
     void: (id: string, reason: string): Promise<TransactionWithItems> =>
-      ipcRenderer.invoke(IPC.TRANSACTION_VOID, { id, reason }),
-    refundTab: (id: string, amountCents?: number) => ipcRenderer.invoke(IPC.TRANSACTION_REFUND_TAB, { id, amountCents })
-  },
-  customer: {
-    search: (query: string) => ipcRenderer.invoke(IPC.CUSTOMER_SEARCH, query),
-    get: (id: number) => ipcRenderer.invoke(IPC.CUSTOMER_GET, id),
-    create: (input: { firstName: string; lastName: string; phone: string; address: string; email?: string; creditLimitCents?: number | null; loyaltyEnabled?: boolean; notes?: string }) => ipcRenderer.invoke(IPC.CUSTOMER_CREATE, input),
-    update: (id: number, input: { firstName: string; lastName: string; phone: string; address: string; email?: string; creditLimitCents?: number | null; loyaltyEnabled?: boolean; notes?: string }) => ipcRenderer.invoke(IPC.CUSTOMER_UPDATE, { id, input }),
-    findDuplicatePhone: (phone: string, excludeId?: number) => ipcRenderer.invoke(IPC.CUSTOMER_DUPLICATE_PHONE, { phone, excludeId }),
-    addFunds: (customerId: number, amountCents: number, note?: string) => ipcRenderer.invoke(IPC.CUSTOMER_ADD_FUNDS, { customerId, amountCents, note }),
-    adjustCredit: (customerId: number, amountCents: number, note: string, managerGranted: boolean) => ipcRenderer.invoke(IPC.CUSTOMER_ADJUST_CREDIT, { customerId, amountCents, note, managerGranted }),
-    adjustPoints: (customerId: number, points: number, note: string, managerGranted: boolean) => ipcRenderer.invoke(IPC.CUSTOMER_ADJUST_POINTS, { customerId, points, note, managerGranted }),
-    getCreditSettings: () => ipcRenderer.invoke(IPC.CUSTOMER_GET_CREDIT_SETTINGS),
-    saveCreditSettings: (input: { allowShortPayToTab: boolean; defaultCreditLimitCents: number; loyaltyPointsPerDollar: number }) => ipcRenderer.invoke(IPC.CUSTOMER_SAVE_CREDIT_SETTINGS, input)
+      ipcRenderer.invoke(IPC.TRANSACTION_VOID, { id, reason })
   },
   receipt: {
     print: (transaction: TransactionWithItems): Promise<PrintReceiptResult> =>
@@ -125,6 +113,8 @@ const api = {
       pricePinnedForZeroCost: boolean
     }> => ipcRenderer.invoke(IPC.CATALOG_PROMOTE, catalogProductId),
     promoteAll: (): Promise<PromoteAllResult> => ipcRenderer.invoke(IPC.CATALOG_PROMOTE_ALL),
+    autoImport: (filePath: string): Promise<AutoImportResult> =>
+      ipcRenderer.invoke(IPC.CATALOG_AUTO_IMPORT, filePath),
     getProvince: (): Promise<string> => ipcRenderer.invoke(IPC.CATALOG_GET_PROVINCE),
     setProvince: (province: string): Promise<string> =>
       ipcRenderer.invoke(IPC.CATALOG_SET_PROVINCE, province),

@@ -178,3 +178,26 @@ export interface PromoteAllResult {
   barcodeSkipped: number
   zeroCostPinned: number
 }
+
+/** A single new product created from the catalogue during auto-upload. */
+export interface AutoImportNewItem {
+  productId: number
+  sku: string
+  name: string
+  costCents: number
+  priceCents: number
+  barcode: string | null
+  itemNumber: string
+}
+
+/** Result returned after a full auto-import flow (upload → commit → promote). */
+export interface AutoImportResult {
+  batchId: number
+  filename: string
+  catalogProductsTotal: number
+  /** Products that are entirely new — didn't exist in the previous catalogue. */
+  newItems: AutoImportNewItem[]
+  repricedCount: number
+  discontinuedCount: number
+  errors: number
+}

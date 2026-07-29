@@ -8,7 +8,6 @@ export type CustomerInput = {
   phone: string
   address: string
   email?: string | null
-  creditLimitCents?: number | null
   loyaltyEnabled?: boolean
   notes?: string | null
 }
@@ -97,17 +96,12 @@ export async function adjustPoints(db: PrismaClient, customerId: number, points:
 
 export async function getCreditSettings(db: Pick<PrismaClient, 'setting'>) {
   const read = async (key: string, fallback: string) => (await db.setting.findUnique({ where: { key } }))?.value ?? fallback
-  return { allowShortPayToTab: (await read('customer.allowShortPayToTab', 'false')) === 'true', defaultCreditLimitCents: Number(await read('customer.defaultCreditLimitCents', '0')) || 0, loyaltyPointsPerDollar: Number(await read('customer.loyaltyPointsPerDollar', '1')) || 0 }
+  return { loyaltyPointsPerDollar: Number(await read('customer.loyaltyPointsPerDollar', '1')) || 0 }
 }
 
-export async function saveCreditSettings(db: PrismaClient, input: { allowShortPayToTab: boolean; defaultCreditLimitCents: number; loyaltyPointsPerDollar: number }) {
-  if (!Number.isInteger(input.defaultCreditLimitCents) || input.defaultCreditLimitCents < 0) throw new Error('Default credit limit must be a non-negative number of cents.')
+export async function saveCreditSettings(db: PrismaClient, input: { loyaltyPointsPerDollar: number }) {
   if (!Number.isFinite(input.loyaltyPointsPerDollar) || input.loyaltyPointsPerDollar < 0) throw new Error('Loyalty rate must be non-negative.')
-  await Promise.all([
-    db.setting.upsert({ where: { key: 'customer.allowShortPayToTab' }, update: { value: String(input.allowShortPayToTab) }, create: { key: 'customer.allowShortPayToTab', value: String(input.allowShortPayToTab) } }),
-    db.setting.upsert({ where: { key: 'customer.defaultCreditLimitCents' }, update: { value: String(input.defaultCreditLimitCents) }, create: { key: 'customer.defaultCreditLimitCents', value: String(input.defaultCreditLimitCents) } }),
-    db.setting.upsert({ where: { key: 'customer.loyaltyPointsPerDollar' }, update: { value: String(input.loyaltyPointsPerDollar) }, create: { key: 'customer.loyaltyPointsPerDollar', value: String(input.loyaltyPointsPerDollar) } })
-  ])
+  await db.setting.upsert({ where: { key: 'customer.loyaltyPointsPerDollar' }, update: { value: String(input.loyaltyPointsPerDollar) }, create: { key: 'customer.loyaltyPointsPerDollar', value: String(input.loyaltyPointsPerDollar) } })
   return getCreditSettings(db)
 }
 

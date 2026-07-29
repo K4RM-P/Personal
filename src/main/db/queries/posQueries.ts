@@ -178,22 +178,19 @@ export async function createTransaction(
   )
   const taxCents = Math.round((subtotalCents * payload.taxRatePercent) / 100)
   const totalCents = subtotalCents + taxCents
-  const changeCents = Math.max(0, payload.tenderedCents - totalCents)
+  const cashOverageToCreditCents = payload.cashOverageToCreditCents ?? 0
+  const changeCents = cashOverageToCreditCents > 0 ? 0 : Math.max(0, payload.tenderedCents - totalCents)
   const receiptNumber = `RX-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`
 
   const tabAmountCents = payload.tabAmountCents ?? 0
   if (!Number.isInteger(tabAmountCents) || tabAmountCents < 0 || tabAmountCents > totalCents) throw new Error('Invalid Pharmacy Credit amount.')
+  if (!Number.isInteger(cashOverageToCreditCents) || cashOverageToCreditCents < 0 || cashOverageToCreditCents > Math.max(0, payload.tenderedCents - totalCents)) throw new Error('Invalid cash deposit amount.')
   if (tabAmountCents > 0 && !payload.customerId) throw new Error('Attach a customer before using Pharmacy Credit.')
+  if (cashOverageToCreditCents > 0 && !payload.customerId) throw new Error('Attach a customer before depositing cash to Pharmacy Credit.')
 
   return db.$transaction(async (tx) => {
     if (tabAmountCents > 0 && payload.customerId) {
-      const customer = await tx.customer.findUniqueOrThrow({ where: { id: payload.customerId } })
-      const latest = await tx.creditLedgerEntry.findFirst({ where: { customerId: customer.id }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] })
-      const settings = await getCreditSettings(tx)
-      const availableCredit = Math.max(0, latest?.balanceAfterCents ?? 0)
-      if (tabAmountCents > availableCredit && !settings.allowShortPayToTab) throw new Error('Short-pay to Pharmacy Credit is disabled. Use another tender for the remainder.')
-      const limit = customer.creditLimitCents ?? settings.defaultCreditLimitCents
-      if ((latest?.balanceAfterCents ?? 0) - tabAmountCents < -limit) throw new Error(`Pharmacy Credit limit reached. This charge would exceed the ${limit}¢ credit limit.`)
+      await tx.customer.findUniqueOrThrow({ where: { id: payload.customerId } })
     }
     const transaction = await tx.transaction.create({
       data: {
@@ -243,6 +240,9 @@ export async function createTransaction(
         const points = Math.floor((totalCents / 100) * settings.loyaltyPointsPerDollar)
         if (points > 0) await customerLedgerInternals.appendPointEvent(tx, customer.id, 'EARNED', points, { transactionId: transaction.id })
       }
+    }
+    if (cashOverageToCreditCents > 0 && payload.customerId) {
+      await customerLedgerInternals.appendCreditEntry(tx, payload.customerId, 'FUNDS_ADDED', cashOverageToCreditCents, { transactionId: transaction.id, note: `Cash overpayment deposited from ${transaction.receiptNumber}` })
     }
     return transaction
   })

@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client'
 import { IPC } from '../../shared/channels'
 import type { CatalogImportProgress } from '../../shared/catalogTypes'
 import {
+  autoImportCatalog,
   commitImport,
   discardImport,
   ensureSearchIndex,
@@ -128,6 +129,17 @@ export function registerCatalogHandlers(db: PrismaClient): void {
   ipcMain.handle(
     IPC.CATALOG_PROMOTE_ALL,
     guard('Promote all catalogue items', async () => promoteAllCatalogProducts(db))
+  )
+
+  ipcMain.handle(
+    IPC.CATALOG_AUTO_IMPORT,
+    guard('Auto import catalogue', async (event: Electron.IpcMainInvokeEvent, filePath: string) => {
+      const sender = event.sender
+      const onProgress = (progress: CatalogImportProgress): void => {
+        if (!sender.isDestroyed()) sender.send(IPC.CATALOG_IMPORT_PROGRESS, progress)
+      }
+      return autoImportCatalog(db, filePath, onProgress)
+    })
   )
 
   ipcMain.handle(

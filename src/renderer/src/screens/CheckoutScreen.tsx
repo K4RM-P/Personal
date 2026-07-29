@@ -40,7 +40,7 @@ export function CheckoutScreen() {
   const [customerMatches, setCustomerMatches] = React.useState<any[]>([])
   const [attachedCustomer, setAttachedCustomer] = React.useState<any>(null)
   const [tabDollars, setTabDollars] = React.useState('')
-  const [creditSettings, setCreditSettings] = React.useState<{ allowShortPayToTab: boolean }>({ allowShortPayToTab: false })
+  const [cashOveragePrompt, setCashOveragePrompt] = React.useState(false)
   const [quickAdd, setQuickAdd] = React.useState(false)
   const [quickCustomer, setQuickCustomer] = React.useState({ firstName: '', lastName: '', phone: '', address: '', email: '' })
 
@@ -84,7 +84,6 @@ export function CheckoutScreen() {
     loadProducts()
     loadTransactions()
     loadPaymentMode()
-    window.api.customer.getCreditSettings().then(setCreditSettings).catch(console.error)
   }, [])
 
   React.useEffect(() => {
@@ -178,13 +177,14 @@ export function CheckoutScreen() {
 
   // Records the finished sale + prints the receipt. Card sales only reach here
   // after the PaymentProvider returned "approved".
-  const completeSale = async (tenderType: 'CASH' | 'CARD' | 'SPLIT' | 'TAB', cardAmountCents?: number): Promise<void> => {
+  const completeSale = async (tenderType: 'CASH' | 'CARD' | 'SPLIT' | 'TAB', cardAmountCents?: number, cashOverageToCreditCents = 0, tabAmountOverride?: number): Promise<void> => {
     if (dbIssue) {
       setScanFeedback({ type: 'error', message: dbIssue })
       return
     }
 
     try {
+      const appliedTabAmountCents = tabAmountOverride ?? tabAmountCents
       const payload = {
         items: cart.map((item) => ({
           productId: item.product.id,
@@ -196,7 +196,8 @@ export function CheckoutScreen() {
         tenderType,
         tenderedCents: tenderType === 'CASH' || tenderType === 'SPLIT' ? tenderedCents : (cardAmountCents ?? totalCents),
         customerId: attachedCustomer?.id,
-        tabAmountCents
+        tabAmountCents: appliedTabAmountCents,
+        cashOverageToCreditCents
       }
 
       if (window.api && window.api.transaction) {
@@ -205,6 +206,7 @@ export function CheckoutScreen() {
         setCart([])
         setTenderedDollars('')
         setTabDollars('')
+        setCashOveragePrompt(false)
         setAttachedCustomer(null)
         loadTransactions()
 
@@ -225,13 +227,18 @@ export function CheckoutScreen() {
 
   const handleCashCheckout = () => {
     if (cart.length === 0) return
-    const availableCredit = Math.max(0, attachedCustomer?.ledgerEntries?.[0]?.balanceAfterCents ?? 0)
-    if (tabAmountCents > availableCredit && !creditSettings.allowShortPayToTab) {
-      setScanFeedback({ type: 'error', message: 'Pharmacy Credit only has enough available credit for the displayed balance. Use another tender for the remainder.' })
+    if (tenderedCents > totalCents) {
+      setCashOveragePrompt(true)
       return
     }
-    if (tenderedCents + tabAmountCents < totalCents) {
-      setScanFeedback({ type: 'error', message: 'Tendered amount is less than the total due.' })
+    if (tenderedCents < totalCents && !attachedCustomer) {
+      setScanFeedback({ type: 'error', message: `Cash is ${formatCurrency(totalCents - tenderedCents)} short. Attach a customer to put the shortfall on their tab.` })
+      return
+    }
+    if (tenderedCents < totalCents) {
+      const shortfall = totalCents - tenderedCents
+      setTabDollars((shortfall / 100).toFixed(2))
+      completeSale('SPLIT', undefined, 0, shortfall)
       return
     }
     completeSale(tabAmountCents ? 'SPLIT' : 'CASH')
@@ -263,11 +270,6 @@ export function CheckoutScreen() {
   // terminals open a confirmation prompt so the cashier can record the outcome.
   const startCardCheckout = async () => {
     if (cart.length === 0 || cardProcessing) return
-    const availableCredit = Math.max(0, attachedCustomer?.ledgerEntries?.[0]?.balanceAfterCents ?? 0)
-    if (tabAmountCents > availableCredit && !creditSettings.allowShortPayToTab) {
-      setScanFeedback({ type: 'error', message: 'Pharmacy Credit only has enough available credit for the displayed balance. Use another tender for the remainder.' })
-      return
-    }
     setCardStatus(null)
     setPaymentState('awaiting')
     setPaymentMessage('Waiting for terminal response…')
@@ -564,10 +566,8 @@ export function CheckoutScreen() {
                   className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
                 />
                 {tenderedCents > 0 && (
-                  <div className="mt-2 flex justify-between text-xs font-medium text-[var(--success)]">
-                    <span>Change due</span>
-                    <span>{formatCurrency(changeCents)}</span>
-                  </div>
+                  <div className="mt-2 flex justify-between text-xs font-medium text-[var(--success)]"><span>Change due</span><span>{formatCurrency(changeCents)}</span></div>
+                  {tenderedCents > totalCents && <div className="mt-3 rounded-[var(--radius)] border border-[var(--primary)]/30 bg-[var(--muted)] p-3"><div className="mb-2 text-xs font-semibold text-[var(--foreground)]">You gave {formatCurrency(tenderedCents - totalCents)} extra</div><div className="grid grid-cols-2 gap-2"><button onClick={() => completeSale('CASH')} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-white px-2 text-xs font-semibold">Give change</button>{attachedCustomer ? <button onClick={() => completeSale('CASH', undefined, tenderedCents - totalCents)} className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-2 text-xs font-semibold text-[var(--primary-foreground)]">Deposit to pharmacy credit</button> : <button onClick={() => setScanFeedback({ type: 'error', message: 'Attach a customer before depositing the extra cash.' })} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-2 text-xs font-semibold">Deposit to credit</button>}</div></div>}
                 )}
               </div>
 
@@ -576,7 +576,7 @@ export function CheckoutScreen() {
                   <label className="mb-1 block text-xs font-semibold text-[var(--foreground)]">Pharmacy Credit tender</label>
                   <div className="text-xs text-[var(--muted-foreground)]">Current balance: {(attachedCustomer.ledgerEntries?.[0]?.balanceAfterCents ?? 0) >= 0 ? 'Credit available' : 'Customer owes'} {formatCurrency(Math.abs(attachedCustomer.ledgerEntries?.[0]?.balanceAfterCents ?? 0))}</div>
                   <input value={tabDollars} onChange={e => setTabDollars(e.target.value)} type="number" step="0.01" min="0" className="mt-2 min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white px-3 text-sm" placeholder="Amount to charge to tab"/>
-                  {tabAmountCents > 0 && <div className="mt-1 text-xs text-[var(--muted-foreground)]">Remaining after tab: {formatCurrency(Math.max(0, totalCents - tabAmountCents))}{creditSettings.allowShortPayToTab ? ' · Short-pay to tab is enabled' : ''}</div>}
+                  {tabAmountCents > 0 && <div className="mt-1 text-xs text-[var(--muted-foreground)]">Remaining to collect: {formatCurrency(Math.max(0, totalCents - tabAmountCents))}</div>}
                 </div>
               )}
 
