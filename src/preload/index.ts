@@ -3,6 +3,7 @@ import { IPC } from '../shared/channels'
 import type {
   FeatureFlag,
   Product,
+  Customer,
   PricingTier,
   CreateTransactionPayload,
   BulkImportProductInput,
@@ -69,6 +70,18 @@ const api = {
     getAll: (): Promise<TransactionWithItems[]> => ipcRenderer.invoke(IPC.TRANSACTION_GET_ALL),
     void: (id: string, reason: string): Promise<TransactionWithItems> =>
       ipcRenderer.invoke(IPC.TRANSACTION_VOID, { id, reason })
+  },
+  customer: {
+    search: (query: string): Promise<Customer[]> => ipcRenderer.invoke(IPC.CUSTOMER_SEARCH, query),
+    get: (id: number): Promise<Customer> => ipcRenderer.invoke(IPC.CUSTOMER_GET, id),
+    create: (input: { firstName: string; lastName: string; phone: string; address: string; email?: string; loyaltyEnabled?: boolean; notes?: string }) => ipcRenderer.invoke(IPC.CUSTOMER_CREATE, input),
+    update: (id: number, input: { firstName: string; lastName: string; phone: string; address: string; email?: string; loyaltyEnabled?: boolean; notes?: string }) => ipcRenderer.invoke(IPC.CUSTOMER_UPDATE, { id, input }),
+    findDuplicatePhone: (phone: string, excludeId?: number): Promise<Customer | null> => ipcRenderer.invoke(IPC.CUSTOMER_DUPLICATE_PHONE, { phone, excludeId }),
+    addFunds: (customerId: number, amountCents: number, note?: string) => ipcRenderer.invoke(IPC.CUSTOMER_ADD_FUNDS, { customerId, amountCents, note }),
+    adjustCredit: (customerId: number, amountCents: number, note: string, managerGranted: boolean) => ipcRenderer.invoke(IPC.CUSTOMER_ADJUST_CREDIT, { customerId, amountCents, note, managerGranted }),
+    adjustPoints: (customerId: number, points: number, note: string, managerGranted: boolean) => ipcRenderer.invoke(IPC.CUSTOMER_ADJUST_POINTS, { customerId, points, note, managerGranted }),
+    getCreditSettings: (): Promise<{ loyaltyPointsPerDollar: number }> => ipcRenderer.invoke(IPC.CUSTOMER_GET_CREDIT_SETTINGS),
+    saveCreditSettings: (input: { loyaltyPointsPerDollar: number }): Promise<{ loyaltyPointsPerDollar: number }> => ipcRenderer.invoke(IPC.CUSTOMER_SAVE_CREDIT_SETTINGS, input)
   },
   receipt: {
     print: (transaction: TransactionWithItems): Promise<PrintReceiptResult> =>
