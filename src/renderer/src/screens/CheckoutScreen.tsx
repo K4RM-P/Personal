@@ -12,7 +12,6 @@ export function CheckoutScreen(): React.JSX.Element {
   >([])
   const [scanFeedback, setScanFeedback] = React.useState<ScanFeedback>(null)
   const [tenderedDollars, setTenderedDollars] = React.useState('')
-  const [tabDollars, setTabDollars] = React.useState('')
   const [cardProcessing, setCardProcessing] = React.useState(false)
   const [attachedCustomer, setAttachedCustomer] = React.useState<
     (Customer & { ledgerEntries?: { balanceAfterCents: number }[] }) | null
@@ -22,13 +21,13 @@ export function CheckoutScreen(): React.JSX.Element {
   const [customerSearching, setCustomerSearching] = React.useState(false)
 
   const tenderedCents = Math.round(parseFloat(tenderedDollars || '0') * 100)
-  const tabAmountCents = Math.round(parseFloat(tabDollars || '0') * 100)
 
   const subtotalCents = cart.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0)
   const taxRatePercent = 13
   const taxCents = Math.round((subtotalCents * taxRatePercent) / 100)
   const totalCents = subtotalCents + taxCents
   const changeCents = Math.max(0, tenderedCents - totalCents)
+  const shortCents = Math.max(0, totalCents - tenderedCents)
 
   const handleBarcode = React.useCallback(
     async (barcode: string): Promise<void> => {
@@ -68,7 +67,7 @@ export function CheckoutScreen(): React.JSX.Element {
     []
   )
 
-  useBarcodeScanner(handleBarcode)
+  useBarcodeScanner({ onScan: handleBarcode })
 
   const handleQuantityChange = (
     productId: number,
@@ -96,9 +95,9 @@ export function CheckoutScreen(): React.JSX.Element {
   }
 
   const completeSale = async (
-    tenderType: string,
-    _customerId?: number,
-    depositCents?: number
+    tenderType: 'CASH' | 'CARD' | 'SPLIT',
+    tabAmountCents?: number,
+    cashOverageToCreditCents?: number
   ): Promise<void> => {
     if (cart.length === 0) return
     setCardProcessing(true)
@@ -107,8 +106,6 @@ export function CheckoutScreen(): React.JSX.Element {
         setScanFeedback({ type: 'error', message: 'API not available' })
         return
       }
-      const effectiveTabAmountCents = depositCents ?? tabAmountCents
-      const effectiveTenderedCents = depositCents ? totalCents : tenderedCents
       const transaction = await window.api.transaction.create({
         items: cart.map((item) => ({
           productId: item.product.id,
@@ -117,14 +114,14 @@ export function CheckoutScreen(): React.JSX.Element {
           unitPriceCents: item.unitPriceCents
         })),
         taxRatePercent,
-        tenderedCents: effectiveTenderedCents,
+        tenderedCents,
         tenderType,
         customerId: attachedCustomer?.id,
-        tabAmountCents: effectiveTabAmountCents
+        tabAmountCents: tabAmountCents ?? 0,
+        cashOverageToCreditCents: cashOverageToCreditCents ?? 0
       })
       setCart([])
       setTenderedDollars('')
-      setTabDollars('')
       setAttachedCustomer(null)
       setScanFeedback({ type: 'success', message: `Sale complete — ${transaction.receiptNumber}` })
     } catch (err) {
@@ -162,6 +159,8 @@ export function CheckoutScreen(): React.JSX.Element {
       setAttachedCustomer({ ...customer, ledgerEntries: [{ balanceAfterCents: 0 }] })
     }
   }
+
+  const customerBalance = attachedCustomer?.ledgerEntries?.[0]?.balanceAfterCents ?? 0
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-6">
@@ -271,7 +270,7 @@ export function CheckoutScreen(): React.JSX.Element {
           <Card>
             <CardHeader>
               <CardTitle>Customer</CardTitle>
-              <CardDescription>Attach a customer for credit / loyalty.</CardDescription>
+              <CardDescription>Attach a customer for Pharmacy Credit / loyalty.</CardDescription>
             </CardHeader>
             <div className="space-y-2 text-xs">
               {attachedCustomer ? (
@@ -279,6 +278,11 @@ export function CheckoutScreen(): React.JSX.Element {
                   <div>
                     <div className="font-semibold text-[var(--foreground)]">{attachedCustomer.name}</div>
                     <div className="text-[var(--muted-foreground)]">{attachedCustomer.phone}</div>
+                    <div className={customerBalance >= 0 ? 'text-[var(--success)]' : 'text-[var(--owed)]'}>
+                      {customerBalance >= 0
+                        ? `Credit: ${formatCurrency(customerBalance)}`
+                        : `Owes: ${formatCurrency(Math.abs(customerBalance))}`}
+                    </div>
                   </div>
                   <button
                     onClick={() => setAttachedCustomer(null)}
@@ -324,60 +328,96 @@ export function CheckoutScreen(): React.JSX.Element {
             </div>
           </Card>
 
-          {/* Tender */}
+          {/* Payment */}
           <Card>
             <CardHeader>
-              <CardTitle>Tender</CardTitle>
-              <CardDescription>Enter cash amount or use card.</CardDescription>
+              <CardTitle>Payment</CardTitle>
+              <CardDescription>Enter cash amount or charge card.</CardDescription>
             </CardHeader>
             <div className="space-y-3 text-xs">
+              {/* Cash amount input */}
               <div>
-                <label className="mb-1 block font-semibold text-[var(--foreground)]">Cash tendered</label>
+                <label className="mb-1 block font-semibold text-[var(--foreground)]">Cash received</label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
                   value={tenderedDollars}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' && !cardProcessing && cart.length > 0) {
-                      event.preventDefault()
-                      handleCashCheckout()
-                    }
-                  }}
                   onChange={(e) => setTenderedDollars(e.target.value)}
+                  placeholder="0.00"
                   className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
                 />
-                {tenderedCents > 0 && (
-                  <>
-                    <div className="mt-2 flex justify-between text-xs font-medium text-[var(--success)]"><span>Change due</span><span>{formatCurrency(changeCents)}</span></div>
-                    {tenderedCents > totalCents && <div className="mt-3 rounded-[var(--radius)] border border-[var(--primary)]/30 bg-[var(--muted)] p-3"><div className="mb-2 text-xs font-semibold text-[var(--foreground)]">You gave {formatCurrency(tenderedCents - totalCents)} extra</div><div className="grid grid-cols-2 gap-2"><button onClick={() => completeSale('CASH')} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-white px-2 text-xs font-semibold">Give change</button>{attachedCustomer ? <button onClick={() => completeSale('CASH', undefined, tenderedCents - totalCents)} className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-2 text-xs font-semibold text-[var(--primary-foreground)]">Deposit to pharmacy credit</button> : <button onClick={() => setScanFeedback({ type: 'error', message: 'Attach a customer before depositing the extra cash.' })} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-2 text-xs font-semibold">Deposit to credit</button>}</div></div>}
-                  </>
-                )}
               </div>
 
-              {attachedCustomer && (
-                <div className="rounded-[var(--radius)] border border-[var(--primary)]/30 bg-[var(--muted)] p-3">
-                  <label className="mb-1 block text-xs font-semibold text-[var(--foreground)]">Pharmacy Credit tender</label>
-                  <div className="text-xs text-[var(--muted-foreground)]">Current balance: {(attachedCustomer.ledgerEntries?.[0]?.balanceAfterCents ?? 0) >= 0 ? 'Credit available' : 'Customer owes'} {formatCurrency(Math.abs(attachedCustomer.ledgerEntries?.[0]?.balanceAfterCents ?? 0))}</div>
-                  <input value={tabDollars} onChange={e => setTabDollars(e.target.value)} type="number" step="0.01" min="0" className="mt-2 min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white px-3 text-sm" placeholder="Amount to charge to tab"/>
-                  {tabAmountCents > 0 && <div className="mt-1 text-xs text-[var(--muted-foreground)]">Remaining to collect: {formatCurrency(Math.max(0, totalCents - tabAmountCents))}</div>}
+              {/* Overpaid — give change or deposit to credit */}
+              {tenderedCents > totalCents && (
+                <div className="rounded-[var(--radius)] border border-[var(--success)]/30 bg-[var(--muted)] p-3">
+                  <div className="mb-2 text-xs font-semibold text-[var(--foreground)]">
+                    Overpaid by {formatCurrency(tenderedCents - totalCents)}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => void completeSale('CASH')}
+                      className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-white px-2 text-xs font-semibold text-[var(--foreground)]"
+                    >
+                      Give change ({formatCurrency(changeCents)})
+                    </button>
+                    {attachedCustomer ? (
+                      <button
+                        onClick={() => void completeSale('CASH', 0, tenderedCents - totalCents)}
+                        className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-2 text-xs font-semibold text-[var(--primary-foreground)]"
+                      >
+                        Deposit {formatCurrency(tenderedCents - totalCents)} to credit
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setScanFeedback({ type: 'error', message: 'Attach a customer to deposit overpayment to their credit.' })}
+                        className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-white px-2 text-xs font-semibold text-[var(--muted-foreground)]"
+                      >
+                        Deposit to credit
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
 
+              {/* Underpaid — put the rest on customer's tab */}
+              {tenderedCents > 0 && tenderedCents < totalCents && attachedCustomer && (
+                <div className="rounded-[var(--radius)] border border-[var(--primary)]/30 bg-[var(--muted)] p-3">
+                  <div className="mb-2 text-xs font-semibold text-[var(--foreground)]">
+                    Short by {formatCurrency(shortCents)}
+                  </div>
+                  <button
+                    onClick={() => void completeSale('CASH', shortCents)}
+                    className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-2 text-xs font-semibold text-[var(--primary-foreground)]"
+                  >
+                    Put {formatCurrency(shortCents)} on {attachedCustomer.name}'s tab
+                  </button>
+                </div>
+              )}
+
+              {/* Underpaid but no customer attached */}
+              {tenderedCents > 0 && tenderedCents < totalCents && !attachedCustomer && (
+                <div className="rounded-[var(--radius)] border border-[var(--warning)]/30 bg-[var(--warning-bg)] p-3 text-xs text-[var(--foreground)]">
+                  Not enough cash. Attach a customer to put the remaining {formatCurrency(shortCents)} on their tab.
+                </div>
+              )}
+
+              {/* Action buttons */}
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => void completeSale('CASH')}
                   disabled={cart.length === 0 || cardProcessing || tenderedCents < totalCents}
                   className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-xs font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
                 >
-                  {cardProcessing ? 'Processing…' : 'Complete Cash Sale'}
+                  {cardProcessing ? 'Processing…' : 'Pay Cash'}
                 </button>
                 <button
                   onClick={() => void completeSale('CARD')}
                   disabled={cart.length === 0 || cardProcessing}
                   className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-4 text-xs font-semibold text-[var(--foreground)] disabled:opacity-50"
                 >
-                  {cardProcessing ? 'Processing…' : 'Charge Card'}
+                  {cardProcessing ? 'Processing…' : 'Pay Card'}
                 </button>
               </div>
             </div>

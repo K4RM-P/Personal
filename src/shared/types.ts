@@ -24,11 +24,11 @@ export interface CreateTransactionPayload {
     unitPriceCents: number
   }[]
   taxRatePercent: number
-  tenderType: 'CASH' | 'CARD' | 'SPLIT' | 'TAB'
+  tenderType: 'CASH' | 'CARD' | 'SPLIT'
   tenderedCents: number
   status?: 'COMPLETED' | 'PARKED'
   customerId?: number
-  /** Total amount applied from the customer's Pharmacy Credit ledger. */
+  /** Amount charged to the customer's Pharmacy Credit (for short-pay or tab). */
   tabAmountCents?: number
   /** Cash overpayment deposited to the attached customer's credit instead of returned as change. */
   cashOverageToCreditCents?: number

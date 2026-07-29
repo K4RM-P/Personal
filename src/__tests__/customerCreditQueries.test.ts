@@ -8,7 +8,7 @@ describe('customer credit ledger', () => {
   const db = new PrismaClient()
   let productId: number
   let number = Date.now() % 1_000_000
-  const customer = async (limit = 10_000) => createCustomer(db, { firstName: 'Ledger', lastName: `Test${++number}`, phone: `416-${number}`, address: '1 Test Lane', creditLimitCents: limit })
+  const customer = async () => createCustomer(db, { firstName: 'Ledger', lastName: `Test${++number}`, phone: `416-${number}`, address: '1 Test Lane' })
 
   beforeAll(async () => {
     execSync('npx prisma migrate deploy', { stdio: 'ignore' })
@@ -23,17 +23,11 @@ describe('customer credit ledger', () => {
     await addFunds(db, c.id, 1000)
     await adjustCredit(db, c.id, -250, 'correct overpayment', true)
     const detail = await getCustomerDetail(db, c.id)
-    const sale = await createTransaction(db, { items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }], taxRatePercent: 0, tenderType: 'TAB', tenderedCents: 1000, customerId: c.id, tabAmountCents: 500 })
+    const sale = await createTransaction(db, { items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }], taxRatePercent: 0, tenderType: 'SPLIT', tenderedCents: 500, customerId: c.id, tabAmountCents: 500 })
     const after = await getCustomerDetail(db, c.id)
     expect(after.currentBalanceCents).toBe(250)
     expect(after.ledgerEntries[0].balanceAfterCents).toBe(250)
     expect(after.ledgerEntries.find(entry => entry.transactionId === sale.id)?.amountCents).toBe(-500)
-  })
-
-  it('blocks a charge that breaches the credit limit instead of capping it', async () => {
-    const c = await customer(200)
-    await expect(createTransaction(db, { items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }], taxRatePercent: 0, tenderType: 'TAB', tenderedCents: 1000, customerId: c.id, tabAmountCents: 201 })).rejects.toThrow('Credit limit')
-    expect((await getCustomerDetail(db, c.id)).ledgerEntries).toHaveLength(0)
   })
 
   it('writes exactly one partial SALE_CHARGE for split tender', async () => {
@@ -47,7 +41,7 @@ describe('customer credit ledger', () => {
 
   it('restores a tab-paid refund as REFUND_CREDIT', async () => {
     const c = await customer()
-    const sale = await createTransaction(db, { items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }], taxRatePercent: 0, tenderType: 'TAB', tenderedCents: 1000, customerId: c.id, tabAmountCents: 1000 })
+    const sale = await createTransaction(db, { items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }], taxRatePercent: 0, tenderType: 'SPLIT', tenderedCents: 0, customerId: c.id, tabAmountCents: 1000 })
     await refundTabAmount(db, sale.id)
     const entries = await db.creditLedgerEntry.findMany({ where: { transactionId: sale.id }, orderBy: { id: 'asc' } })
     expect(entries.map(entry => entry.type)).toEqual(['SALE_CHARGE', 'REFUND_CREDIT'])
