@@ -118,6 +118,7 @@ export interface CatalogSearchRow {
   itemNumber: string
   description: string
   displayName: string
+  effectiveDate: string | null
   din: string | null
   province: string
   strength: string | null

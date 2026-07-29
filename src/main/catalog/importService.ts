@@ -729,6 +729,14 @@ export async function ensureSearchIndex(db: PrismaClient): Promise<void> {
        genericName,
        din,
        itemNumber,
+       effectiveDate,
+       packSize,
+       dosageForm,
+       strength,
+       vendorCode,
+       gtinPrimary,
+       costPrice,
+       listPrice,
        tokenize = "unicode61"
     )`
   )
@@ -738,13 +746,25 @@ export async function rebuildSearchIndex(db: PrismaClient): Promise<void> {
   await ensureSearchIndex(db)
   await db.$executeRawUnsafe('DELETE FROM catalog_fts')
   await db.$executeRawUnsafe(
-    `INSERT INTO catalog_fts (catalogProductId, description, displayName, genericName, din, itemNumber)
+    `INSERT INTO catalog_fts (
+       catalogProductId, description, displayName, genericName, din, itemNumber,
+       effectiveDate, packSize, dosageForm, strength, vendorCode, gtinPrimary,
+       costPrice, listPrice
+     )
      SELECT cp.id,
             cp.description,
             cp.displayName,
             COALESCE(cp.genericName, ''),
             COALESCE(cp.din, ''),
-            cp.itemNumber
+            cp.itemNumber,
+            COALESCE(cp.effectiveDate, ''),
+            CAST(COALESCE(cp.packSize, 0) AS TEXT),
+            COALESCE(cp.dosageForm, ''),
+            COALESCE(cp.strength, ''),
+            COALESCE(cp.vendorCode, ''),
+            COALESCE(cp.gtinPrimary, ''),
+            CAST(cp.costPriceCents / 100.0 AS TEXT),
+            CAST(cp.listPriceCents / 100.0 AS TEXT)
        FROM CatalogProduct cp
        JOIN CatalogImportBatch b ON b.id = cp.importBatchId
       WHERE b.isActive = 1`

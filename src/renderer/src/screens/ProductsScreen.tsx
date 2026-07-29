@@ -10,10 +10,32 @@ import {
 import { parseImportPreviewCsv } from '../lib/checkoutUi'
 import { McKessonCatalogTab } from '../components/McKessonCatalogTab'
 
-export function ProductsScreen() {
+type CatalogRow = {
+  id: number
+  itemNumber: string
+  description: string
+  displayName: string
+  effectiveDate: string | null
+  packSize: string | null
+  dosageForm: string | null
+  strength: string | null
+  vendorCode: string | null
+  costPriceCents: number
+  listPriceCents: number
+  gtinPrimary: string | null
+  province: string
+  categoryCode: string | null
+  din: string | null
+  genericName: string | null
+}
+
+export function ProductsScreen(): React.JSX.Element {
   const [products, setProducts] = React.useState<Product[]>([])
   const [tiers, setTiers] = React.useState<PricingTier[]>([])
+  const [catalogItems, setCatalogItems] = React.useState<CatalogRow[]>([])
   const [activeTab, setActiveTab] = React.useState<'catalog' | 'tiers' | 'import' | 'mckesson'>('catalog')
+  const [catalogSearch, setCatalogSearch] = React.useState('')
+  const [catalogLoading, setCatalogLoading] = React.useState(false)
 
   // New/Edit Product Form State
   const [sku, setSku] = React.useState('')
@@ -33,28 +55,69 @@ export function ProductsScreen() {
   const [importCount, setImportCount] = React.useState<number | null>(null)
   const importPreview = React.useMemo(() => parseImportPreviewCsv(csvText), [csvText])
 
-  const loadData = async () => {
+  const loadData = async (): Promise<void> => {
     try {
-      if (window.api && window.api.product && window.api.pricingTier) {
+      if (window.api?.product) {
         const prodList = await window.api.product.getAll()
-        const tierList = await window.api.pricingTier.getAll()
         setProducts(prodList)
+      }
+      if (window.api?.pricingTier) {
+        const tierList = await window.api.pricingTier.getAll()
         setTiers(tierList)
         setEditableTiers(tierList)
       }
+      if (window.api?.catalog) {
+        // Use search with empty query to get the first 500 items
+        const catalog = await window.api.catalog.search('', null, 500)
+        setCatalogItems(catalog as CatalogRow[])
+      }
     } catch (err) {
-      console.error('Failed to load products/tiers:', err)
+      console.error('Failed to load data:', err)
     }
   }
 
+  const loadCatalogSearch = async (query: string): Promise<void> => {
+    if (!window.api?.catalog) return
+    setCatalogLoading(true)
+    try {
+      const results = await window.api.catalog.search(query, null, 500)
+      setCatalogItems(results as CatalogRow[])
+    } catch (err) {
+      console.error('Failed to search catalog:', err)
+    } finally {
+      setCatalogLoading(false)
+    }
+  }
+
+  // Initial data load on mount
   React.useEffect(() => {
-    loadData()
+    let active = true
+    loadData().then(() => {
+      if (!active) return
+      // loaded
+    })
+    return () => {
+      active = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Debounced search using server-side FTS5
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      if (catalogSearch.trim().length > 0) {
+        loadCatalogSearch(catalogSearch)
+      } else if (catalogSearch.trim().length === 0) {
+        loadData()
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [catalogSearch])
 
   const costCents = Math.round((parseFloat(costDollars) || 0) * 100)
   const calculatedPriceCents = calculateRetailPriceCents(costCents, tiers)
 
-  const handleSaveProduct = async (e: React.FormEvent) => {
+  const handleSaveProduct = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!sku || !name || !costDollars) {
       alert('Please provide SKU, Name, and Cost Price')
@@ -71,7 +134,7 @@ export function ProductsScreen() {
     }
 
     try {
-      if (window.api && window.api.product) {
+      if (window.api?.product) {
         if (editingProductId) {
           await window.api.product.update(editingProductId, payload)
         } else {
@@ -80,34 +143,13 @@ export function ProductsScreen() {
         resetForm()
         loadData()
       }
-    } catch (err: any) {
-      alert(`Failed to save product: ${err?.message || 'Error occurred'}`)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to save product'
+      alert(message)
     }
   }
 
-  const handleEditClick = (p: Product) => {
-    setEditingProductId(p.id)
-    setSku(p.sku)
-    setName(p.name)
-    setCostDollars((p.costCents / 100).toString())
-    setPriceDollars((p.priceCents / 100).toString())
-    setBarcode(p.barcode || '')
-    setIsPinned(p.isPinned)
-  }
-
-  const handleDeleteProduct = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this product?')) return
-    try {
-      if (window.api && window.api.product) {
-        await window.api.product.delete(id)
-        loadData()
-      }
-    } catch (err: any) {
-      alert(`Delete failed: ${err?.message}`)
-    }
-  }
-
-  const resetForm = () => {
+  const resetForm = (): void => {
     setEditingProductId(null)
     setSku('')
     setName('')
@@ -118,28 +160,29 @@ export function ProductsScreen() {
   }
 
   // Tier Table Handlers
-  const handleTierMarkupChange = (index: number, newMarkup: number) => {
+  const handleTierMarkupChange = (index: number, newMarkup: number): void => {
     const updated = editableTiers.map((t, idx) => (idx === index ? { ...t, markupPercent: newMarkup } : t))
     setEditableTiers(updated)
     const impact = previewTierChangeImpact(products, updated)
     setPreviewImpact(impact)
   }
 
-  const handleSaveTiers = async () => {
+  const handleSaveTiers = async (): Promise<void> => {
     try {
-      if (window.api && window.api.pricingTier) {
+      if (window.api?.pricingTier) {
         await window.api.pricingTier.saveAll(editableTiers)
         alert('Pricing Tiers saved successfully! Live retail prices updated across catalog.')
         loadData()
         setPreviewImpact([])
       }
-    } catch (err: any) {
-      alert(`Failed to save tiers: ${err?.message}`)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to save tiers'
+      alert(message)
     }
   }
 
   // Bulk Import Handler
-  const handleBulkImport = async () => {
+  const handleBulkImport = async (): Promise<void> => {
     if (!csvText.trim()) return
     const inputs: BulkImportProductInput[] = importPreview.map((row) => ({
       sku: row.sku,
@@ -154,16 +197,20 @@ export function ProductsScreen() {
     }
 
     try {
-      if (window.api && window.api.product) {
+      if (window.api?.product) {
         const res = await window.api.product.bulkImport(inputs)
         setImportCount(res.count)
         setCsvText('')
         loadData()
       }
-    } catch (err: any) {
-      alert(`Bulk Import Failed: ${err?.message}`)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Bulk import failed'
+      alert(message)
     }
   }
+
+  // Server-side search results are already filtered; no client-side filtering needed
+  const displayCatalog = catalogItems
 
   return (
     <div className="space-y-6">
@@ -315,57 +362,78 @@ export function ProductsScreen() {
             </Card>
           </div>
 
-          {/* Product Catalog List (8 Cols) */}
+          {/* Catalogue Table (8 Cols) */}
           <div className="col-span-8">
             <Card>
               <CardHeader>
-                <CardTitle>Master Product Catalog ({products.length})</CardTitle>
-                <CardDescription>Dense, scannable pricing view with auto vs. pinned retail states.</CardDescription>
+                <CardTitle>
+                  McKesson Catalogue ({catalogItems.length.toLocaleString()} items)
+                  {catalogSearch && !catalogLoading && (
+                    <span className="ml-2 text-xs font-normal text-[var(--muted-foreground)]">
+                      (filtered from full catalogue)
+                    </span>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  {catalogSearch.trim().length > 0
+                    ? 'Server-side FTS5 search across all fields. Results update automatically.'
+                    : 'Full catalogue from latest McKesson WEBCAT import. Start typing to search.'}
+                </CardDescription>
               </CardHeader>
-              <div className="max-h-[480px] overflow-y-auto pr-1">
-                {products.length === 0 ? (
-                  <div className="rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-6 text-center text-sm text-[var(--muted-foreground)]">
-                    No products yet. Add the first item to start building the catalog.
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {products.map((p) => (
-                      <div key={p.id} className="grid grid-cols-[1.6fr_0.8fr_0.7fr_0.7fr] items-center gap-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3 text-xs">
-                        <div>
-                          <div className="flex items-center gap-2 font-semibold text-[var(--foreground)]">
-                            <span>{p.name}</span>
-                            {p.isPinned ? (
-                              <span className="rounded-full border border-[var(--warning)]/30 bg-[var(--warning-bg)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--warning)]">
-                                Pinned
-                              </span>
-                            ) : (
-                              <span className="rounded-full border border-[var(--border)] bg-[var(--muted)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
-                                Auto
-                              </span>
-                            )}
-                          </div>
-                          <div className="mt-1 text-[var(--muted-foreground)]">UPC: {p.barcode || 'N/A'} • SKU: {p.sku}</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-[var(--muted-foreground)]">Cost</div>
-                          <div className="font-semibold text-[var(--foreground)]">{formatCurrency(p.costCents)}</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-[var(--muted-foreground)]">Retail</div>
-                          <div className="font-semibold text-[var(--primary)]">{formatCurrency(p.priceCents)}</div>
-                        </div>
-                        <div className="flex justify-end gap-2">
-                          <button onClick={() => handleEditClick(p)} className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-2 py-1 text-[var(--foreground)]">
-                            Edit
-                          </button>
-                          <button onClick={() => handleDeleteProduct(p.id)} className="rounded-[var(--radius)] border border-[var(--error)]/30 bg-[var(--error-bg)] px-2 py-1 text-[var(--error)]">
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  placeholder="Search catalogue by any field: code, description, UPC, vendor, form, strength..."
+                  value={catalogSearch}
+                  onChange={(e) => setCatalogSearch(e.target.value)}
+                  className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:border-[var(--primary)] focus:outline-none"
+                />
+                <div className="max-h-[600px] overflow-y-auto pr-1">
+                  {catalogLoading ? (
+                    <div className="rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-6 text-center text-sm text-[var(--muted-foreground)]">
+                      Searching catalogue...
+                    </div>
+                  ) : displayCatalog.length === 0 ? (
+                    <div className="rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-6 text-center text-sm text-[var(--muted-foreground)]">
+                      {catalogSearch ? 'No catalogue items match your search.' : 'No catalogue items yet. Upload a McKesson WEBCAT file to populate the catalogue.'}
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead className="sticky top-0 bg-[var(--background)]">
+                          <tr className="text-left text-[var(--muted-foreground)]">
+                            <th className="pb-2 pr-2 font-medium">Product Code</th>
+                            <th className="pb-2 pr-2 font-medium">Description</th>
+                            <th className="pb-2 pr-2 font-medium">Effective Date</th>
+                            <th className="pb-2 pr-2 font-medium">Pack Size</th>
+                            <th className="pb-2 pr-2 font-medium">Form / Strength</th>
+                            <th className="pb-2 pr-2 font-medium">Vendor / Brand</th>
+                            <th className="pb-2 pr-2 text-right font-medium">Unit Cost ($)</th>
+                            <th className="pb-2 pr-2 text-right font-medium">Retail Price ($)</th>
+                            <th className="pb-2 text-right font-medium">UPC / Barcode</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {displayCatalog.map((item) => (
+                            <tr key={item.id} className="border-t border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
+                              <td className="py-1.5 pr-2 text-[var(--foreground)] font-mono">{item.itemNumber}</td>
+                              <td className="py-1.5 pr-2 text-[var(--foreground)]">{item.displayName || item.description}</td>
+                              <td className="py-1.5 pr-2 text-[var(--muted-foreground)]">{item.effectiveDate || 'N/A'}</td>
+                              <td className="py-1.5 pr-2 text-[var(--muted-foreground)]">{item.packSize || 'N/A'}</td>
+                              <td className="py-1.5 pr-2 text-[var(--muted-foreground)]">
+                                {[item.dosageForm, item.strength].filter(Boolean).join(' ') || 'N/A'}
+                              </td>
+                              <td className="py-1.5 pr-2 text-[var(--muted-foreground)]">{item.vendorCode || 'N/A'}</td>
+                              <td className="py-1.5 pr-2 text-right text-[var(--foreground)]">{formatCurrency(item.costPriceCents)}</td>
+                              <td className="py-1.5 pr-2 text-right text-[var(--primary)] font-semibold">{formatCurrency(item.listPriceCents)}</td>
+                              <td className="py-1.5 text-right text-[var(--muted-foreground)] font-mono">{item.gtinPrimary || 'N/A'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </div>
             </Card>
           </div>

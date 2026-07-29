@@ -142,21 +142,21 @@ export function McKessonCatalogTab(): React.JSX.Element {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-left text-[var(--muted-foreground)]">
-                      <th className="pb-1 pr-2 font-medium">UPC</th>
-                      <th className="pb-1 pr-2 font-medium">Name</th>
-                      <th className="pb-1 pr-2 font-medium">SKU</th>
-                      <th className="pb-1 pr-2 text-right font-medium">Cost</th>
-                      <th className="pb-1 text-right font-medium">Retail</th>
+                      <th className="pb-1 pr-2 font-medium">Product Code</th>
+                      <th className="pb-1 pr-2 font-medium">Description</th>
+                      <th className="pb-1 pr-2 text-right font-medium">Unit Cost ($)</th>
+                      <th className="pb-1 pr-2 text-right font-medium">Retail Price ($)</th>
+                      <th className="pb-1 text-right font-medium">UPC / Barcode</th>
                     </tr>
                   </thead>
                   <tbody>
                     {result.newItems.map((item) => (
-                      <tr key={item.productId} className="border-t border-[var(--border)]/50">
-                        <td className="py-1 pr-2 text-[var(--muted-foreground)]">{item.barcode || 'N/A'}</td>
+                      <tr key={item.productId} className="border-t border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
+                        <td className="py-1 pr-2 text-[var(--muted-foreground)] font-mono">{item.itemNumber}</td>
                         <td className="py-1 pr-2 font-medium text-[var(--foreground)]">{item.name}</td>
-                        <td className="py-1 pr-2 text-[var(--muted-foreground)]">{item.sku}</td>
                         <td className="py-1 pr-2 text-right text-[var(--foreground)]">{formatCurrency(item.costCents)}</td>
-                        <td className="py-1 text-right text-[var(--foreground)]">{formatCurrency(item.priceCents)}</td>
+                        <td className="py-1 pr-2 text-right text-[var(--primary)] font-semibold">{formatCurrency(item.priceCents)}</td>
+                        <td className="py-1 text-right text-[var(--muted-foreground)] font-mono">{item.barcode || 'N/A'}</td>
                       </tr>
                     ))}
                   </tbody>

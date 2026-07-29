@@ -28,6 +28,7 @@ const CATALOG_SELECT = {
   itemNumber: true,
   description: true,
   displayName: true,
+  effectiveDate: true,
   din: true,
   province: true,
   strength: true,
@@ -196,7 +197,14 @@ export async function searchCatalog(
         { displayName: { contains: raw } },
         { genericName: { contains: raw } },
         { din: { contains: raw } },
-        { itemNumber: { contains: raw } }
+        { itemNumber: { contains: raw } },
+        { effectiveDate: { contains: raw } },
+        { dosageForm: { contains: raw } },
+        { strength: { contains: raw } },
+        { vendorCode: { contains: raw } },
+        { gtinPrimary: { contains: raw } }
+        // Price/cost contains raw string is hard for Prisma `contains` on Int, 
+        // but fallback to LIKE scan is only for when FTS fails.
       ]
     },
     select: CATALOG_SELECT,
