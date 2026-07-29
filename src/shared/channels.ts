@@ -39,7 +39,27 @@ export const IPC = {
   SETTINGS_GET_STORE: 'settings:getStore',
   SETTINGS_SAVE_STORE: 'settings:saveStore',
   SETTINGS_GET_PAYMENT: 'settings:getPayment',
-  SETTINGS_SAVE_PAYMENT: 'settings:savePayment'
+  SETTINGS_SAVE_PAYMENT: 'settings:savePayment',
+
+  // Compliance & ledger channels (Stage 6/8)
+  COMPLIANCE_SEARCH_RX: 'compliance:searchRx',
+  COMPLIANCE_GET_AGING_RX: 'compliance:getAgingRx',
+  COMPLIANCE_LOG_EVENT: 'compliance:logEvent',
+  COMPLIANCE_GET_AUDIT_LOG: 'compliance:getAuditLog',
+  COMPLIANCE_EXPORT_AUDIT_LOG: 'compliance:exportAuditLog',
+  COMPLIANCE_CAPTURE_SIGNATURE: 'compliance:captureSignature',
+  COMPLIANCE_PSE_VALIDATE: 'compliance:pseValidate',
+  COMPLIANCE_DSCSA_SCAN: 'compliance:dscsaScan',
+  COMPLIANCE_FSA_HSA_CHECK: 'compliance:fsaHsaCheck',
+
+  // Customer ledger / reports
+  CUSTOMER_LEDGER_GET: 'customerLedger:get',
+  CUSTOMER_LEDGER_POST: 'customerLedger:post',
+  REPORTS_GET_DASHBOARD: 'reports:getDashboard',
+  REPORTS_EXPORT_CSV: 'reports:exportCsv',
+  REPORTS_EXPORT_XLSX: 'reports:exportXlsx',
+  BACKUP_CREATE: 'backup:create',
+  BACKUP_RESTORE_TEST: 'backup:restoreTest'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

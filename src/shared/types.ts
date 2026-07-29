@@ -78,6 +78,56 @@ export interface PrintReceiptResult {
   pdfPath?: string
 }
 
+export interface PrescriptionRecord {
+  id: string
+  patientName: string
+  rxNumber: string
+  drugName: string
+  pickupStatus: 'READY' | 'PENDING' | 'PICKED_UP'
+  balanceCents: number
+  ageDays: number
+  notes?: string
+  createdAt: string
+}
+
+export interface ComplianceAuditEntry {
+  id: string
+  kind: string
+  summary: string
+  details?: Record<string, unknown>
+  userName?: string
+  station?: string
+  createdAt: string
+}
+
+export interface CustomerLedgerEntry {
+  id: string
+  customerId: number
+  kind: 'SHORT_PAY' | 'FILL_TAB' | 'APPLY_TAB' | 'CHARGE' | 'PAYMENT'
+  amountCents: number
+  balanceCents: number
+  reference: string
+  userName?: string
+  station?: string
+  notes?: string
+  createdAt: string
+}
+
+export interface DashboardSummary {
+  totalSalesCents: number
+  transactionCount: number
+  topProducts: Array<{ name: string; quantity: number }>
+  categorySales: Array<{ category: string; totalCents: number }>
+  cashierSales: Array<{ name: string; totalCents: number }>
+  lowStockCount: number
+}
+
+export interface BackupBundle {
+  path: string
+  createdAt: string
+  sizeBytes: number
+}
+
 // ---------------------------------------------------------------------------
 // Payment (Stage 5) — provider-agnostic types shared across the IPC boundary
 // ---------------------------------------------------------------------------

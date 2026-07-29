@@ -41,7 +41,7 @@ const PROVIDERS: ProviderMeta[] = [
 ]
 
 const inputCls =
-  'w-full bg-[#0f172a] border border-[#334155] rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-[#0d9488]'
+  'w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]'
 
 export function PaymentSettingsCard(): React.JSX.Element {
   const [provider, setProvider] = React.useState<PaymentProviderName>('manual')
@@ -114,32 +114,31 @@ export function PaymentSettingsCard(): React.JSX.Element {
   }
 
   return (
-    <Card>
+    <Card className="border-0 p-0 shadow-none">
       <CardHeader>
-        <CardTitle>Payments</CardTitle>
+        <CardTitle>Payment mode</CardTitle>
         <CardDescription>
-          Choose how card payments are handled. You can switch modes anytime without losing any data —
-          this only changes which adapter runs the payment step; checkout stays the same.
+          Choose how card payments are handled without changing the checkout flow. The UI stays processor-agnostic and presents the terminal as a workflow state.
         </CardDescription>
       </CardHeader>
 
       <div className="mt-2">
         <button
           onClick={() => setWizardOpen((o) => !o)}
-          className="text-xs px-3 py-1.5 rounded border border-[#0d9488]/50 text-[#14b8a6] hover:bg-[#0d9488]/10"
+          className="rounded-[var(--radius)] border border-[var(--primary)]/30 px-3 py-1.5 text-xs text-[var(--primary)] hover:bg-[var(--muted)]"
         >
           {wizardOpen ? 'Hide setup guide' : 'Not sure? Run the setup guide'}
         </button>
       </div>
 
       {wizardOpen && (
-        <div className="mt-3 rounded border border-[#334155] bg-[#0f172a] p-4 space-y-4 text-sm">
+        <div className="mt-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-4 space-y-4 text-sm">
           <div>
-            <p className="text-white font-medium">1. Do you have a payment terminal already?</p>
+            <p className="font-medium text-[var(--foreground)]">1. Do you have a payment terminal already?</p>
             <div className="flex gap-2 mt-2">
               <button
                 onClick={() => setWizardOpen(true)}
-                className="px-3 py-1.5 rounded bg-[#334155] text-white text-xs"
+                className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-xs text-[var(--foreground)]"
                 disabled
               >
                 Answer below ↓
@@ -147,23 +146,23 @@ export function PaymentSettingsCard(): React.JSX.Element {
             </div>
           </div>
           <div>
-            <p className="text-white font-medium">2. Is it connected to your network / does it support card-present API integration?</p>
-            <p className="text-[#94a3b8] text-xs mt-1">
+            <p className="font-medium text-[var(--foreground)]">2. Is it connected to your network / does it support card-present API integration?</p>
+            <p className="mt-1 text-xs text-[var(--muted-foreground)]">
               Not sure? Check the terminal's model number, or ask your card processor whether they offer
               “integrated / semi-integrated POS support.” If it’s a plain countertop terminal that prints
               its own receipt and isn’t plugged into this computer or your network, it is <em>not</em> integrated.
             </p>
           </div>
           <div className="grid gap-2">
-            <p className="text-white font-medium">Recommended for your setup:</p>
+            <p className="font-medium text-[var(--foreground)]">Recommended for your setup:</p>
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => pickFromWizard('manual')} className="px-3 py-1.5 rounded bg-[#0d9488] text-white text-xs">
+              <button onClick={() => pickFromWizard('manual')} className="rounded-[var(--radius)] bg-[var(--primary)] px-3 py-1.5 text-xs text-[var(--primary-foreground)]">
                 No terminal / not integrated → Manual/External
               </button>
-              <button onClick={() => pickFromWizard('stripe')} className="px-3 py-1.5 rounded bg-indigo-600 text-white text-xs">
+              <button onClick={() => pickFromWizard('stripe')} className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-xs text-[var(--foreground)]">
                 Integrated cloud reader → Stripe/Square
               </button>
-              <button onClick={() => pickFromWizard('moneris')} className="px-3 py-1.5 rounded bg-indigo-600 text-white text-xs">
+              <button onClick={() => pickFromWizard('moneris')} className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-xs text-[var(--foreground)]">
                 Integrated PIN pad → Moneris/Global Payments
               </button>
             </div>
@@ -173,7 +172,7 @@ export function PaymentSettingsCard(): React.JSX.Element {
 
       <div className="grid gap-3 mt-4">
         <div>
-          <label className="text-xs text-[#94a3b8] block mb-1">Processor</label>
+          <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Processor</label>
           <select value={provider} onChange={(e) => setProvider(e.target.value as PaymentProviderName)} className={inputCls}>
             {PROVIDERS.map((p) => (
               <option key={p.value} value={p.value}>
@@ -184,7 +183,7 @@ export function PaymentSettingsCard(): React.JSX.Element {
         </div>
 
         {provider === 'manual' && (
-          <p className="text-xs text-[#94a3b8] rounded border border-[#334155] bg-[#0f172a] px-3 py-2">
+          <p className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-xs text-[var(--muted-foreground)]">
             Manual mode is a deliberate, first-class option. At checkout the cashier keys the total into
             your standalone terminal, then taps <strong>Approved</strong> or <strong>Declined</strong> here.
             No API keys needed.
@@ -194,20 +193,20 @@ export function PaymentSettingsCard(): React.JSX.Element {
         {meta.needsKey && (
           <>
             <div>
-              <label className="text-xs text-[#94a3b8] block mb-1">Environment</label>
+              <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Environment</label>
               <select value={environment} onChange={(e) => setEnvironment(e.target.value as PaymentEnvironment)} className={inputCls}>
                 <option value="sandbox">Sandbox / Test</option>
                 <option value="production">Production / Live</option>
               </select>
             </div>
             <div>
-              <label className="text-xs text-[#94a3b8] block mb-1">
+              <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
                 Terminal / Reader id {meta.terminalHint ? `— ${meta.terminalHint}` : ''}
               </label>
               <input type="text" value={terminalId} onChange={(e) => setTerminalId(e.target.value)} className={inputCls} />
             </div>
             <div>
-              <label className="text-xs text-[#94a3b8] block mb-1">
+              <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
                 API credentials {meta.keyHint ? `— ${meta.keyHint}` : ''}
               </label>
               <input
@@ -217,7 +216,7 @@ export function PaymentSettingsCard(): React.JSX.Element {
                 placeholder={hasApiKey ? '•••••••• (stored — leave blank to keep)' : 'Enter to store securely'}
                 className={inputCls}
               />
-              <p className="text-[11px] text-[#64748b] mt-1">
+              <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
                 Stored encrypted via your OS keychain (Electron safeStorage) — never in plaintext.
               </p>
             </div>
@@ -225,23 +224,23 @@ export function PaymentSettingsCard(): React.JSX.Element {
         )}
 
         <div className="flex items-center gap-3 flex-wrap">
-          <button onClick={handleSave} className="px-4 py-2 bg-[#0d9488] hover:bg-[#0f766e] text-white rounded text-sm font-medium">
+          <button onClick={handleSave} className="rounded-[var(--radius)] bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-foreground)]">
             Save Payment Settings
           </button>
           <button
             onClick={handleCheckReader}
             disabled={checking}
-            className="px-4 py-2 bg-[#334155] hover:bg-[#475569] text-white rounded text-sm disabled:opacity-50"
+            className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-4 py-2 text-sm text-[var(--foreground)] disabled:opacity-50"
           >
             {checking ? 'Checking…' : 'Check Reader Status'}
           </button>
-          {saved && <span className="text-xs text-emerald-400">{saved}</span>}
-          {error && <span className="text-xs text-red-400">{error}</span>}
+          {saved && <span className="text-xs text-[var(--success)]">{saved}</span>}
+          {error && <span className="text-xs text-[var(--error)]">{error}</span>}
         </div>
 
         {reader && (
-          <div className={`text-xs rounded px-3 py-2 border ${reader.connected ? 'border-emerald-500/40 text-emerald-300' : 'border-amber-500/40 text-amber-300'}`}>
-            {reader.connected ? '● Connected' : '○ Not connected'} — {reader.label ?? reader.provider}
+          <div className={`rounded-[var(--radius)] border px-3 py-2 text-xs ${reader.connected ? 'border-[var(--success)]/30 bg-[var(--success-bg)] text-[var(--success)]' : 'border-[var(--warning)]/30 bg-[var(--warning-bg)] text-[var(--warning)]'}`}>
+            {reader.connected ? 'Connected' : 'Pending'} — {reader.label ?? reader.provider}
             {reader.message ? ` · ${reader.message}` : ''}
           </div>
         )}

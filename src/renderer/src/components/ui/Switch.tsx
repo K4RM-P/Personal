@@ -16,8 +16,8 @@ export function Switch({ checked, onCheckedChange, className, disabled }: Switch
       disabled={disabled}
       onClick={() => !disabled && onCheckedChange(!checked)}
       className={cn(
-        'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#0d9488] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
-        checked ? 'bg-[#0d9488]' : 'bg-[#334155]',
+        'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+        checked ? 'bg-[var(--primary)]' : 'bg-[var(--secondary)]',
         className
       )}
     >

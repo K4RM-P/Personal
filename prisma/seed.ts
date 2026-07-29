@@ -24,6 +24,30 @@ async function main() {
       label: 'Customer Lookup',
       description: 'Enable searching and linking customer profiles at checkout.',
       enabled: false
+    },
+    {
+      key: 'rewardPoints',
+      label: 'Reward Points',
+      description: 'Enable loyalty points and redemption flows for participating pharmacies.',
+      enabled: false
+    },
+    {
+      key: 'lotteryTickets',
+      label: 'Ontario Lottery Tickets',
+      description: 'Enable lottery ticket sales and win tracking modules.',
+      enabled: false
+    },
+    {
+      key: 'chargeAccounts',
+      label: 'Charge Accounts',
+      description: 'Enable invoicing, statements, and on-account billing.',
+      enabled: false
+    },
+    {
+      key: 'customerTabs',
+      label: 'Customer Tabs / Store Credit',
+      description: 'Enable tab balances, advance fills, and store credit ledger flows.',
+      enabled: false
     }
   ]
 

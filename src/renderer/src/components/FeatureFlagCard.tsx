@@ -21,13 +21,13 @@ export function FeatureFlagCard({ flag, onToggle }: FeatureFlagCardProps) {
   }
 
   return (
-    <Card className="flex items-center justify-between transition-all hover:border-[#0d9488]/50">
+    <Card className="flex items-center justify-between">
       <div className="space-y-1 pr-4">
-        <CardTitle className="text-base font-semibold text-white">{flag.label}</CardTitle>
-        <CardDescription className="text-sm text-[#94a3b8]">
+        <CardTitle className="text-base font-semibold text-[var(--foreground)]">{flag.label}</CardTitle>
+        <CardDescription className="text-sm text-[var(--muted-foreground)]">
           {flag.description || 'No description provided.'}
         </CardDescription>
-        <div className="mt-1 text-xs text-[#64748b] font-mono">key: {flag.key}</div>
+        <div className="mt-1 text-xs font-mono text-[var(--muted-foreground)]">key: {flag.key}</div>
       </div>
       <Switch checked={flag.enabled} onCheckedChange={handleToggle} disabled={loading} />
     </Card>

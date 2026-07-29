@@ -19,25 +19,22 @@ const navItems: { id: NavTab; label: string; icon: React.ElementType }[] = [
 
 export function AppShell({ activeTab, onTabChange, children }: AppShellProps) {
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#0f172a] text-[#f8fafc]">
-      {/* Sidebar */}
-      <aside className="w-64 border-r border-[#334155] bg-[#1e293b] flex flex-col justify-between">
+    <div className="flex h-screen w-screen overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
+      <aside className="flex w-64 flex-col justify-between border-r border-[var(--border)] bg-[#f8fafb]">
         <div>
-          {/* Logo / Header */}
-          <div className="p-6 border-b border-[#334155]">
+          <div className="border-b border-[var(--border)] p-6">
             <div className="flex items-center space-x-3">
-              <div className="h-8 w-8 rounded-lg bg-[#0d9488] flex items-center justify-center font-bold text-white shadow-md">
+              <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius)] bg-[var(--primary)] font-bold text-[var(--primary-foreground)]">
                 Rx
               </div>
               <div>
-                <h1 className="font-bold text-lg leading-tight text-white">PharmaPOS</h1>
-                <p className="text-xs text-[#94a3b8]">Pharmacy Management</p>
+                <h1 className="text-lg font-semibold leading-tight text-[var(--foreground)]">PharmaPOS</h1>
+                <p className="text-xs text-[var(--muted-foreground)]">Pharmacy Management</p>
               </div>
             </div>
           </div>
 
-          {/* Navigation Items */}
-          <nav className="p-4 space-y-1">
+          <nav className="space-y-1 p-4">
             {navItems.map((item) => {
               const Icon = item.icon
               const isActive = activeTab === item.id
@@ -47,10 +44,10 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps) {
                   key={item.id}
                   onClick={() => onTabChange(item.id)}
                   className={cn(
-                    'w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-150',
+                    'flex w-full items-center space-x-3 rounded-[var(--radius)] px-4 py-3 text-sm font-medium',
                     isActive
-                      ? 'bg-[#0d9488] text-white shadow-sm'
-                      : 'text-[#94a3b8] hover:bg-[#334155]/50 hover:text-white'
+                      ? 'bg-[var(--primary)] text-[var(--primary-foreground)]'
+                      : 'text-[var(--secondary-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
                   )}
                 >
                   <Icon className="h-5 w-5 shrink-0" />
@@ -61,18 +58,16 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps) {
           </nav>
         </div>
 
-        {/* Footer / Station Info */}
-        <div className="p-4 border-t border-[#334155] text-xs text-[#94a3b8]">
-          <div className="flex justify-between items-center mb-1">
-            <span className="font-medium text-white">Station 01</span>
-            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500"></span>
+        <div className="border-t border-[var(--border)] p-4 text-xs text-[var(--muted-foreground)]">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="font-medium text-[var(--foreground)]">Station 01</span>
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-[var(--success)]" />
           </div>
-          <div>Stage 0 Skeleton • Offline Ready</div>
+          <div>Offline-ready • Fast checkout</div>
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto p-8 bg-[#0f172a]">{children}</main>
+      <main className="flex-1 overflow-y-auto bg-[var(--background)] p-8">{children}</main>
     </div>
   )
 }

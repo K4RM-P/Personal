@@ -17,7 +17,12 @@ import type {
   VoidResult,
   ReaderStatus,
   PaymentConfigView,
-  SavePaymentConfigInput
+  SavePaymentConfigInput,
+  PrescriptionRecord,
+  ComplianceAuditEntry,
+  CustomerLedgerEntry,
+  DashboardSummary,
+  BackupBundle
 } from '../shared/types'
 
 const api = {
@@ -78,6 +83,37 @@ const api = {
     getPayment: (): Promise<PaymentConfigView> => ipcRenderer.invoke(IPC.SETTINGS_GET_PAYMENT),
     savePayment: (input: SavePaymentConfigInput): Promise<PaymentConfigView> =>
       ipcRenderer.invoke(IPC.SETTINGS_SAVE_PAYMENT, input)
+  },
+  compliance: {
+    searchRx: (query: string): Promise<PrescriptionRecord[]> => ipcRenderer.invoke(IPC.COMPLIANCE_SEARCH_RX, query),
+    getAgingRx: (olderThanDays: number): Promise<PrescriptionRecord[]> =>
+      ipcRenderer.invoke(IPC.COMPLIANCE_GET_AGING_RX, olderThanDays),
+    logEvent: (kind: string, summary: string, details?: Record<string, unknown>): Promise<ComplianceAuditEntry> =>
+      ipcRenderer.invoke(IPC.COMPLIANCE_LOG_EVENT, { kind, summary, details }),
+    getAuditLog: (): Promise<ComplianceAuditEntry[]> => ipcRenderer.invoke(IPC.COMPLIANCE_GET_AUDIT_LOG),
+    exportAuditLog: (): Promise<{ path: string }> => ipcRenderer.invoke(IPC.COMPLIANCE_EXPORT_AUDIT_LOG),
+    captureSignature: (context: string): Promise<{ captured: boolean; dataUrl?: string }> =>
+      ipcRenderer.invoke(IPC.COMPLIANCE_CAPTURE_SIGNATURE, context),
+    pseValidate: (productName: string, quantity: number, days: number): Promise<{ allowed: boolean; reason?: string }> =>
+      ipcRenderer.invoke(IPC.COMPLIANCE_PSE_VALIDATE, { productName, quantity, days }),
+    dscsaScan: (barcode: string): Promise<{ ok: boolean; detail?: string }> =>
+      ipcRenderer.invoke(IPC.COMPLIANCE_DSCSA_SCAN, barcode),
+    fsaHsaCheck: (productName: string): Promise<{ eligible: boolean; reason?: string }> =>
+      ipcRenderer.invoke(IPC.COMPLIANCE_FSA_HSA_CHECK, productName)
+  },
+  customerLedger: {
+    get: (customerId: number): Promise<CustomerLedgerEntry[]> => ipcRenderer.invoke(IPC.CUSTOMER_LEDGER_GET, customerId),
+    post: (customerId: number, kind: CustomerLedgerEntry['kind'], amountCents: number, reference: string, notes?: string): Promise<CustomerLedgerEntry> =>
+      ipcRenderer.invoke(IPC.CUSTOMER_LEDGER_POST, { customerId, kind, amountCents, reference, notes })
+  },
+  reports: {
+    getDashboard: (): Promise<DashboardSummary> => ipcRenderer.invoke(IPC.REPORTS_GET_DASHBOARD),
+    exportCsv: (): Promise<{ path: string }> => ipcRenderer.invoke(IPC.REPORTS_EXPORT_CSV),
+    exportXlsx: (): Promise<{ path: string }> => ipcRenderer.invoke(IPC.REPORTS_EXPORT_XLSX)
+  },
+  backup: {
+    create: (): Promise<BackupBundle> => ipcRenderer.invoke(IPC.BACKUP_CREATE),
+    restoreTest: (): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke(IPC.BACKUP_RESTORE_TEST)
   }
 }
 

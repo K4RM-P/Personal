@@ -118,28 +118,32 @@ export function SettingsScreen() {
   }
 
   const otcFlag = flags.find((f) => f.key === 'otcMode')
+  const rewardFlag = flags.find((f) => f.key === 'rewardPoints')
+  const lotteryFlag = flags.find((f) => f.key === 'lotteryTickets')
+  const chargeFlag = flags.find((f) => f.key === 'chargeAccounts')
+  const tabFlag = flags.find((f) => f.key === 'customerTabs')
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-white">Settings</h1>
-        <p className="text-[#94a3b8]">Configure system preferences, hardware, and feature modules.</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)]">Settings</h1>
+        <p className="text-[var(--muted-foreground)]">Configure system preferences, hardware, and feature modules.</p>
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-500/50 bg-red-950/50 p-4 text-red-200 text-sm flex items-center justify-between">
+        <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--error)]/30 bg-[var(--error-bg)] p-4 text-sm text-[var(--error)]">
           <div>
             <span className="font-semibold">Error: </span>
             {error}
           </div>
-          <button onClick={() => setError(null)} className="text-xs underline hover:text-white">
+          <button onClick={() => setError(null)} className="text-xs underline hover:text-[var(--foreground)]">
             Dismiss
           </button>
         </div>
       )}
 
       {settingsSaved && (
-        <div className="rounded-lg border border-emerald-500/50 bg-emerald-950/40 p-4 text-emerald-200 text-sm">
+        <div className="rounded-[var(--radius)] border border-[var(--success)]/30 bg-[var(--success-bg)] p-4 text-sm text-[var(--success)]">
           {settingsSaved}
         </div>
       )}
@@ -148,34 +152,34 @@ export function SettingsScreen() {
       <Card>
         <CardHeader>
           <CardTitle>Store Information</CardTitle>
-          <CardDescription>Printed on every receipt header.</CardDescription>
+          <CardDescription>Printed on every receipt header and used for the till summary.</CardDescription>
         </CardHeader>
         <div className="grid gap-3 mt-2">
           <div>
-            <label className="text-xs text-[#94a3b8] block mb-1">Store Name</label>
+            <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Store Name</label>
             <input
               type="text"
               value={storeInfo.name}
               onChange={(e) => setStoreInfo((s) => ({ ...s, name: e.target.value }))}
-              className="w-full bg-[#0f172a] border border-[#334155] rounded px-3 py-2 text-white text-sm"
+              className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
             />
           </div>
           <div>
-            <label className="text-xs text-[#94a3b8] block mb-1">Address</label>
+            <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Address</label>
             <input
               type="text"
               value={storeInfo.address}
               onChange={(e) => setStoreInfo((s) => ({ ...s, address: e.target.value }))}
-              className="w-full bg-[#0f172a] border border-[#334155] rounded px-3 py-2 text-white text-sm"
+              className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
             />
           </div>
           <div>
-            <label className="text-xs text-[#94a3b8] block mb-1">Phone</label>
+            <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Phone</label>
             <input
               type="text"
               value={storeInfo.phone}
               onChange={(e) => setStoreInfo((s) => ({ ...s, phone: e.target.value }))}
-              className="w-full bg-[#0f172a] border border-[#334155] rounded px-3 py-2 text-white text-sm"
+              className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
             />
           </div>
         </div>
@@ -191,7 +195,7 @@ export function SettingsScreen() {
         </CardHeader>
         <div className="grid gap-3 mt-2">
           <div>
-            <label className="text-xs text-[#94a3b8] block mb-1">Printer Type</label>
+            <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Printer Type</label>
             <select
               value={printerConfig.type}
               onChange={(e) =>
@@ -200,7 +204,7 @@ export function SettingsScreen() {
                   type: e.target.value as PrinterConfig['type']
                 }))
               }
-              className="w-full bg-[#0f172a] border border-[#334155] rounded px-3 py-2 text-white text-sm"
+              className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
             >
               <option value="NETWORK">Network Thermal (ESC/POS, port 9100)</option>
               <option value="SYSTEM">System / USB Print Queue</option>
@@ -211,7 +215,7 @@ export function SettingsScreen() {
           {printerConfig.type === 'NETWORK' && (
             <>
               <div>
-                <label className="text-xs text-[#94a3b8] block mb-1">Printer IP Address</label>
+                <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Printer IP Address</label>
                 <input
                   type="text"
                   placeholder="192.168.1.100"
@@ -219,30 +223,30 @@ export function SettingsScreen() {
                   onChange={(e) =>
                     setPrinterConfig((c) => ({ ...c, ipAddress: e.target.value }))
                   }
-                  className="w-full bg-[#0f172a] border border-[#334155] rounded px-3 py-2 text-white text-sm"
+                  className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
                 />
               </div>
               <div>
-                <label className="text-xs text-[#94a3b8] block mb-1">Port</label>
+                <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Port</label>
                 <input
                   type="number"
                   value={printerConfig.port ?? 9100}
                   onChange={(e) =>
                     setPrinterConfig((c) => ({ ...c, port: parseInt(e.target.value, 10) || 9100 }))
                   }
-                  className="w-full bg-[#0f172a] border border-[#334155] rounded px-3 py-2 text-white text-sm"
+                  className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
                 />
               </div>
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleTestNetworkPrinter}
                   disabled={testing}
-                  className="px-4 py-2 bg-[#334155] hover:bg-[#475569] text-white rounded text-sm disabled:opacity-50"
+                  className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-4 py-2 text-sm text-[var(--foreground)] disabled:opacity-50"
                 >
                   {testing ? 'Testing…' : 'Test Network Printer'}
                 </button>
                 {testResult && (
-                  <span className={`text-xs ${testResult.ok ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <span className={`text-xs ${testResult.ok ? 'text-[var(--success)]' : 'text-[var(--error)]'}`}>
                     {testResult.message}
                   </span>
                 )}
@@ -253,23 +257,46 @@ export function SettingsScreen() {
 
         <button
           onClick={handleSaveHardwareSettings}
-          className="mt-4 px-4 py-2 bg-[#0d9488] hover:bg-[#0f766e] text-white rounded text-sm font-medium"
+          className="mt-4 rounded-[var(--radius)] bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-foreground)]"
         >
           Save Hardware Settings
         </button>
       </Card>
 
-      {/* Payment provider setup (Stage 5) */}
-      <PaymentSettingsCard />
+      <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4">
+        <div className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Payments</div>
+        <PaymentSettingsCard />
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Compliance & Operations</CardTitle>
+          <CardDescription>Rx lookup, aging reports, signature capture, PSE checks, DSCSA scan, and FSA/HSA eligibility are available from the tills.</CardDescription>
+        </CardHeader>
+        <div className="grid gap-3 mt-2 text-sm text-[#cbd5e1]">
+          <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
+            <p className="font-semibold text-[var(--foreground)]">Rx lookup / pickup status</p>
+            <p className="text-[var(--muted-foreground)]">Search by patient, Rx number, or drug name from the register to confirm pickup state and outstanding balance.</p>
+          </div>
+          <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
+            <p className="font-semibold text-[var(--foreground)]">Compliance export & audit trail</p>
+            <p className="text-[var(--muted-foreground)]">Every override, PSE event, and ledger adjustment is logged with user/station metadata and exportable for review.</p>
+          </div>
+          <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
+            <p className="font-semibold text-[var(--foreground)]">Backup & restore</p>
+            <p className="text-[var(--muted-foreground)]">Create a backup bundle and run a restore test to keep local-first pharmacies operational.</p>
+          </div>
+        </div>
+      </Card>
 
       {/* Force Reject Testing Utility */}
-      <Card className="border border-amber-500/30 bg-amber-950/20">
+      <Card className="border-[var(--warning)]/30 bg-[var(--warning-bg)]">
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-sm text-amber-400 font-medium">
+            <CardTitle className="text-sm font-medium text-[var(--warning)]">
               IPC Error-Bubble Path Test Mode
             </CardTitle>
-            <CardDescription className="text-xs text-amber-200/70">
+            <CardDescription className="text-xs text-[var(--warning)]/80">
               Enable this to force IPC handler to reject with an error when toggling flags.
             </CardDescription>
           </div>
@@ -278,7 +305,10 @@ export function SettingsScreen() {
       </Card>
 
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-white">Feature Flags</h2>
+        <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4">
+          <h2 className="text-lg font-semibold text-[var(--foreground)]">Feature Flags</h2>
+          <p className="mt-1 text-sm text-[var(--muted-foreground)]">Payments, compliance, and optional modules are grouped to keep setup plain-language and predictable.</p>
+        </div>
         <div className="grid gap-4">
           {flags.map((flag) => (
             <FeatureFlagCard key={flag.key} flag={flag} onToggle={handleToggle} />
@@ -287,15 +317,71 @@ export function SettingsScreen() {
       </div>
 
       {otcFlag?.enabled && (
-        <Card className="border-[#0d9488] bg-[#0d9488]/10 text-white transition-all animate-in fade-in">
+        <Card className="border-[var(--primary)]/30 bg-[var(--muted)] text-[var(--foreground)]">
           <CardHeader>
-            <CardTitle className="text-[#14b8a6]">OTC-Only Mode Preview Active</CardTitle>
-            <CardDescription className="text-[#94a3b8]">
+            <CardTitle className="text-[var(--primary)]">OTC-Only Mode Preview Active</CardTitle>
+            <CardDescription className="text-[var(--muted-foreground)]">
               This placeholder card is rendered conditionally because the <strong>OTC-Only Mode</strong> feature flag is enabled.
             </CardDescription>
           </CardHeader>
         </Card>
       )}
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Optional Modules</CardTitle>
+            <CardDescription>Each module defaults to off until a pharmacy opts in.</CardDescription>
+          </CardHeader>
+          <div className="space-y-3 text-sm text-[#cbd5e1]">
+            <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
+              <div>
+                <p className="font-semibold text-[var(--foreground)]">Reward points</p>
+                <p className="text-[var(--muted-foreground)]">Enable dollar- or product-based loyalty.</p>
+              </div>
+              <span className={`text-xs ${rewardFlag?.enabled ? 'text-[var(--success)]' : 'text-[var(--muted-foreground)]'}`}>{rewardFlag?.enabled ? 'On' : 'Off'}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
+              <div>
+                <p className="font-semibold text-[var(--foreground)]">Ontario lottery</p>
+                <p className="text-[var(--muted-foreground)]">Turn on ticket sales and win tracking when installed.</p>
+              </div>
+              <span className={`text-xs ${lotteryFlag?.enabled ? 'text-[var(--success)]' : 'text-[var(--muted-foreground)]'}`}>{lotteryFlag?.enabled ? 'On' : 'Off'}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
+              <div>
+                <p className="font-semibold text-[var(--foreground)]">Charge accounts</p>
+                <p className="text-[var(--muted-foreground)]">Support invoice and statement billing.</p>
+              </div>
+              <span className={`text-xs ${chargeFlag?.enabled ? 'text-[var(--success)]' : 'text-[var(--muted-foreground)]'}`}>{chargeFlag?.enabled ? 'On' : 'Off'}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
+              <div>
+                <p className="font-semibold text-[var(--foreground)]">Customer tab / store credit</p>
+                <p className="text-[var(--muted-foreground)]">Allow short-pay, advance-fill, and credit-ledger flows.</p>
+              </div>
+              <span className={`text-xs ${tabFlag?.enabled ? 'text-[var(--success)]' : 'text-[var(--muted-foreground)]'}`}>{tabFlag?.enabled ? 'On' : 'Off'}</span>
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Reporting Snapshot</CardTitle>
+            <CardDescription>A simple owner dashboard and export-ready analytics are now wired to the shared reporting layer.</CardDescription>
+          </CardHeader>
+          <div className="space-y-3 text-sm text-[#cbd5e1]">
+            <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
+              <p className="font-semibold text-[var(--foreground)]">Daily sales summary</p>
+              <p className="text-[var(--muted-foreground)]">Track transaction counts, revenue, top movers, and low-stock counts from one dashboard.</p>
+            </div>
+            <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
+              <p className="font-semibold text-[var(--foreground)]">CSV/XLSX exports</p>
+              <p className="text-[var(--muted-foreground)]">Export report data for accountants without a proprietary format lock-in.</p>
+            </div>
+          </div>
+        </Card>
+      </div>
     </div>
   )
 }
