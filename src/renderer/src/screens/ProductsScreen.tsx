@@ -344,7 +344,7 @@ export function ProductsScreen() {
                               </span>
                             )}
                           </div>
-                          <div className="mt-1 text-[var(--muted-foreground)]">SKU {p.sku} • {p.barcode || 'No barcode'}</div>
+                          <div className="mt-1 text-[var(--muted-foreground)]">UPC: {p.barcode || 'N/A'} • SKU: {p.sku}</div>
                         </div>
                         <div className="text-right">
                           <div className="text-[var(--muted-foreground)]">Cost</div>

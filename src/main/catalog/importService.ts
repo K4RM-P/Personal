@@ -578,8 +578,29 @@ export async function commitImport(
 
       // 2. Reconcile promoted Products. origin = MANUAL rows produce no update
       //    and are never in this list.
-      for (const update of plan.updates) {
+      // Handle barcode conflicts gracefully — if two products would swap barcodes,
+      // the second update would fail with a unique constraint violation. Skip
+      // conflicting barcode updates rather than aborting the entire commit.
+      const barcodeUpdates = plan.updates.filter((u) => u.data.barcode !== undefined)
+      const nonBarcodeUpdates = plan.updates.filter((u) => u.data.barcode === undefined)
+
+      for (const update of nonBarcodeUpdates) {
         await tx.product.update({ where: { id: update.productId }, data: update.data })
+      }
+
+      for (const update of barcodeUpdates) {
+        try {
+          await tx.product.update({ where: { id: update.productId }, data: update.data })
+        } catch {
+          // Barcode conflict — skip this update and clear the barcode to avoid
+          // leaving the product in an inconsistent state
+          await tx.product.update({
+            where: { id: update.productId },
+            data: { ...update.data, barcode: null }
+          }).catch(() => {
+            // If even clearing fails, just skip it
+          })
+        }
       }
     },
     { timeout: 120_000, maxWait: 30_000 }

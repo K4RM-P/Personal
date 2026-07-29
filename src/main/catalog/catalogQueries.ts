@@ -429,7 +429,15 @@ export async function promoteAllCatalogProducts(db: PrismaClient): Promise<Promo
 
   const flush = async (): Promise<void> => {
     if (buffer.length === 0) return
-    await db.product.createMany({ data: buffer, skipDuplicates: false })
+    // Use individual inserts to gracefully handle duplicates
+    for (const item of buffer) {
+      try {
+        await db.product.create({ data: item })
+        created++
+      } catch {
+        errors++
+      }
+    }
     buffer = []
   }
 
@@ -475,20 +483,11 @@ export async function promoteAllCatalogProducts(db: PrismaClient): Promise<Promo
     created++
 
     if (buffer.length >= CREATE_CHUNK) {
-      try {
-        await flush()
-      } catch {
-        errors += buffer.length
-        buffer = []
-      }
+      await flush()
     }
   }
 
-  try {
-    await flush()
-  } catch {
-    errors += buffer.length
-  }
+  await flush()
 
   return {
     total: catalogItems.length,

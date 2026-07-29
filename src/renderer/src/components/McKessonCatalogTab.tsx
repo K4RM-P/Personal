@@ -75,7 +75,7 @@ export function McKessonCatalogTab(): React.JSX.Element {
           <CardTitle>McKesson Catalogue Upload</CardTitle>
           <CardDescription>
             Upload a WEBCAT file to import the latest McKesson catalogue. All items are
-            automatically added to your sellable inventory. Existing products are updated
+            automatically added to your catalogue. Existing products are updated
             with the latest pricing and availability.
           </CardDescription>
         </CardHeader>
@@ -136,13 +136,13 @@ export function McKessonCatalogTab(): React.JSX.Element {
           {result.newItems.length > 0 && (
             <div>
               <h4 className="mb-2 px-6 text-xs font-semibold text-[var(--foreground)]">
-                New items added to inventory ({result.newItems.length.toLocaleString()})
+                New items added to catalogue ({result.newItems.length.toLocaleString()})
               </h4>
               <div className="max-h-96 space-y-1 overflow-y-auto px-6 pb-6">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-left text-[var(--muted-foreground)]">
-                      <th className="pb-1 pr-2 font-medium">Item #</th>
+                      <th className="pb-1 pr-2 font-medium">UPC</th>
                       <th className="pb-1 pr-2 font-medium">Name</th>
                       <th className="pb-1 pr-2 font-medium">SKU</th>
                       <th className="pb-1 pr-2 text-right font-medium">Cost</th>
@@ -152,7 +152,7 @@ export function McKessonCatalogTab(): React.JSX.Element {
                   <tbody>
                     {result.newItems.map((item) => (
                       <tr key={item.productId} className="border-t border-[var(--border)]/50">
-                        <td className="py-1 pr-2 text-[var(--muted-foreground)]">{item.itemNumber}</td>
+                        <td className="py-1 pr-2 text-[var(--muted-foreground)]">{item.barcode || 'N/A'}</td>
                         <td className="py-1 pr-2 font-medium text-[var(--foreground)]">{item.name}</td>
                         <td className="py-1 pr-2 text-[var(--muted-foreground)]">{item.sku}</td>
                         <td className="py-1 pr-2 text-right text-[var(--foreground)]">{formatCurrency(item.costCents)}</td>
