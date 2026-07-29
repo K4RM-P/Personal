@@ -7,6 +7,8 @@ import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
 type ScanFeedback = { type: 'success' | 'error'; message: string } | null
 
 export function CheckoutScreen(): React.JSX.Element {
+  const [products, setProducts] = React.useState<Product[]>([])
+  const [searchQuery, setSearchQuery] = React.useState('')
   const [cart, setCart] = React.useState<
     { product: Product; quantity: number; unitPriceCents: number }[]
   >([])
@@ -14,11 +16,12 @@ export function CheckoutScreen(): React.JSX.Element {
   const [tenderedDollars, setTenderedDollars] = React.useState('')
   const [cardProcessing, setCardProcessing] = React.useState(false)
   const [attachedCustomer, setAttachedCustomer] = React.useState<
-    (Customer & { ledgerEntries?: { balanceAfterCents: number }[] }) | null
+    (Customer & { ledgerEntries?: { balanceCents: number }[] }) | null
   >(null)
   const [customerSearchQuery, setCustomerSearchQuery] = React.useState('')
   const [customerSearchResults, setCustomerSearchResults] = React.useState<Customer[]>([])
-  const [customerSearching, setCustomerSearching] = React.useState(false)
+  const searchRef = React.useRef<HTMLInputElement>(null)
+  const tenderRef = React.useRef<HTMLInputElement>(null)
 
   const tenderedCents = Math.round(parseFloat(tenderedDollars || '0') * 100)
 
@@ -28,6 +31,20 @@ export function CheckoutScreen(): React.JSX.Element {
   const totalCents = subtotalCents + taxCents
   const changeCents = Math.max(0, tenderedCents - totalCents)
   const shortCents = Math.max(0, totalCents - tenderedCents)
+
+  React.useEffect(() => {
+    const loadProducts = async (): Promise<void> => {
+      try {
+        if (window.api?.product) {
+          const list = await window.api.product.getAll()
+          setProducts(list)
+        }
+      } catch (err) {
+        console.error('Failed to load products:', err)
+      }
+    }
+    void loadProducts()
+  }, [])
 
   const handleBarcode = React.useCallback(
     async (barcode: string): Promise<void> => {
@@ -67,7 +84,7 @@ export function CheckoutScreen(): React.JSX.Element {
     []
   )
 
-  useBarcodeScanner({ onScan: handleBarcode })
+  useBarcodeScanner({ onScan: handleBarcode, pauseRefs: [searchRef, tenderRef] })
 
   const handleQuantityChange = (
     productId: number,
@@ -81,16 +98,6 @@ export function CheckoutScreen(): React.JSX.Element {
             : item
         )
         .filter((item) => item.quantity > 0)
-    )
-  }
-
-  const handlePriceOverride = (productId: number, newPriceCents: number): void => {
-    setCart((prev) =>
-      prev.map((item) =>
-        item.product.id === productId
-          ? { ...item, unitPriceCents: newPriceCents }
-          : item
-      )
     )
   }
 
@@ -136,14 +143,11 @@ export function CheckoutScreen(): React.JSX.Element {
 
   const handleCustomerSearch = async (): Promise<void> => {
     if (!window.api?.customer) return
-    setCustomerSearching(true)
     try {
       const results = await window.api.customer.search(customerSearchQuery)
       setCustomerSearchResults(results)
     } catch {
       setCustomerSearchResults([])
-    } finally {
-      setCustomerSearching(false)
     }
   }
 
@@ -151,19 +155,26 @@ export function CheckoutScreen(): React.JSX.Element {
     if (!window.api?.customer) return
     try {
       const ledger = await window.api.customerLedger.get(customer.id)
-      const balanceAfterCents = ledger.length > 0 ? ledger[ledger.length - 1].balanceAfterCents : 0
-      setAttachedCustomer({ ...customer, ledgerEntries: [{ balanceAfterCents }] })
+      const balanceCents = ledger.length > 0 ? ledger[ledger.length - 1].balanceCents : 0
+      setAttachedCustomer({ ...customer, ledgerEntries: [{ balanceCents }] })
       setCustomerSearchQuery('')
       setCustomerSearchResults([])
     } catch {
-      setAttachedCustomer({ ...customer, ledgerEntries: [{ balanceAfterCents: 0 }] })
+      setAttachedCustomer({ ...customer, ledgerEntries: [{ balanceCents: 0 }] })
     }
   }
 
-  const customerBalance = attachedCustomer?.ledgerEntries?.[0]?.balanceAfterCents ?? 0
+  const customerBalance = attachedCustomer?.ledgerEntries?.[0]?.balanceCents ?? 0
+
+  const filteredProducts = products.filter(
+    (p) =>
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.barcode && p.barcode.includes(searchQuery))
+  )
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-6">
+    <div className="mx-auto max-w-7xl space-y-4 p-4">
       <h1 className="text-2xl font-bold text-[var(--foreground)]">Checkout</h1>
 
       {/* Scan feedback */}
@@ -179,152 +190,169 @@ export function CheckoutScreen(): React.JSX.Element {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Cart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Cart ({cart.length} items)</CardTitle>
-            <CardDescription>Scan barcode or search products to add items.</CardDescription>
-          </CardHeader>
-          <div className="space-y-2 text-xs">
-            {cart.length === 0 && (
-              <div className="rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-4 text-center text-[var(--muted-foreground)]">
-                Cart is empty. Scan a barcode to start.
+      {/* Customer attachment bar */}
+      <Card>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="min-w-[260px] flex-1">
+            <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Customer (optional)</label>
+            {attachedCustomer ? (
+              <div className="flex min-h-11 items-center justify-between rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--muted)] px-3 text-sm">
+                <span className="font-semibold">
+                  {attachedCustomer.firstName} {attachedCustomer.lastName} · {attachedCustomer.phone}
+                </span>
+                <button
+                  onClick={() => { setAttachedCustomer(null); setTenderedDollars('') }}
+                  className="text-[var(--primary)]"
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <input
+                  ref={searchRef}
+                  value={customerSearchQuery}
+                  onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void handleCustomerSearch()
+                  }}
+                  placeholder="Attach customer — search name or phone"
+                  className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm"
+                />
+                {customerSearchResults.length > 0 && (
+                  <div className="absolute z-20 mt-1 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">
+                    {customerSearchResults.map((customer) => (
+                      <button
+                        key={customer.id}
+                        onClick={() => void attachCustomer(customer)}
+                        className="block min-h-11 w-full border-b border-[var(--border)] px-3 text-left text-sm last:border-0"
+                      >
+                        <b>{customer.firstName} {customer.lastName}</b> · {customer.phone}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
-            {cart.map((item) => (
-              <div
-                key={item.product.id}
-                className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3"
-              >
-                <div className="flex-1">
-                  <div className="font-semibold text-[var(--foreground)]">{item.product.name}</div>
-                  <div className="text-[var(--muted-foreground)]">SKU: {item.product.sku}</div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <div className="text-[var(--muted-foreground)]">Price</div>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={(item.unitPriceCents / 100).toFixed(2)}
-                      onChange={(e) =>
-                        handlePriceOverride(
-                          item.product.id,
-                          Math.round(parseFloat(e.target.value || '0') * 100)
-                        )
-                      }
-                      className="w-20 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-right text-[var(--foreground)]"
-                    />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleQuantityChange(item.product.id, -1)}
-                      className="flex h-7 w-7 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]"
-                    >
-                      −
-                    </button>
-                    <span className="w-6 text-center font-semibold text-[var(--foreground)]">
-                      {item.quantity}
-                    </span>
-                    <button
-                      onClick={() => handleQuantityChange(item.product.id, 1)}
-                      className="flex h-7 w-7 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]"
-                    >
-                      +
-                    </button>
-                  </div>
-                  <div className="w-20 text-right font-semibold text-[var(--foreground)]">
-                    {formatCurrency(item.unitPriceCents * item.quantity)}
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
-        </Card>
-
-        {/* Totals & Payment */}
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Totals</CardTitle>
-            </CardHeader>
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-[var(--muted-foreground)]">Subtotal</span>
-                <span className="font-semibold text-[var(--foreground)]">{formatCurrency(subtotalCents)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[var(--muted-foreground)]">Tax ({taxRatePercent}%)</span>
-                <span className="font-semibold text-[var(--foreground)]">{formatCurrency(taxCents)}</span>
-              </div>
-              <div className="flex justify-between border-t border-[var(--border)] pt-2">
-                <span className="font-bold text-[var(--foreground)]">Total</span>
-                <span className="font-bold text-[var(--foreground)]">{formatCurrency(totalCents)}</span>
+          {attachedCustomer && (
+            <div className="rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm">
+              <div className="text-xs text-[var(--muted-foreground)]">Pharmacy Credit balance</div>
+              <div className={`font-semibold ${customerBalance >= 0 ? 'text-[var(--success)]' : 'text-[var(--owed)]'}`}>
+                {customerBalance >= 0 ? 'Credit available' : 'Customer owes'}: {formatCurrency(Math.abs(customerBalance))}
               </div>
             </div>
-          </Card>
+          )}
+        </div>
+      </Card>
 
-          {/* Customer attachment */}
+      <div className="grid grid-cols-12 gap-4">
+        {/* Left: Product search + selectable items */}
+        <div className="col-span-7 space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Customer</CardTitle>
-              <CardDescription>Attach a customer for Pharmacy Credit / loyalty.</CardDescription>
-            </CardHeader>
-            <div className="space-y-2 text-xs">
-              {attachedCustomer ? (
-                <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-2">
-                  <div>
-                    <div className="font-semibold text-[var(--foreground)]">{attachedCustomer.name}</div>
-                    <div className="text-[var(--muted-foreground)]">{attachedCustomer.phone}</div>
-                    <div className={customerBalance >= 0 ? 'text-[var(--success)]' : 'text-[var(--owed)]'}>
-                      {customerBalance >= 0
-                        ? `Credit: ${formatCurrency(customerBalance)}`
-                        : `Owes: ${formatCurrency(Math.abs(customerBalance))}`}
-                    </div>
-                  </div>
+            <div className="mb-3">
+              <input
+                ref={searchRef}
+                type="text"
+                placeholder="Search products by SKU, name, or barcode"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-4 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
+              />
+            </div>
+
+            {filteredProducts.length === 0 ? (
+              <div className="rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-6 text-center text-sm text-[var(--muted-foreground)]">
+                {searchQuery ? `No results for "${searchQuery}". Try checking the spelling or scanning the barcode directly.` : 'Cart is empty. Scan a barcode to start.'}
+              </div>
+            ) : (
+              <div className="grid max-h-[420px] grid-cols-2 gap-2 overflow-y-auto pr-1">
+                {filteredProducts.map((product) => (
                   <button
-                    onClick={() => setAttachedCustomer(null)}
-                    className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-[var(--foreground)]"
+                    key={product.id}
+                    onClick={() => {
+                      setCart((prev) => {
+                        const existing = prev.find((item) => item.product.id === product.id)
+                        if (existing) {
+                          return prev.map((item) =>
+                            item.product.id === product.id
+                              ? { ...item, quantity: item.quantity + 1 }
+                              : item
+                          )
+                        }
+                        return [...prev, { product, quantity: 1, unitPriceCents: product.priceCents }]
+                      })
+                      setScanFeedback({ type: 'success', message: `Added ${product.name}` })
+                    }}
+                    className="flex flex-col justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3 text-left"
                   >
-                    Remove
+                    <div>
+                      <div className="font-semibold text-[var(--foreground)]">{product.name}</div>
+                      <div className="text-xs text-[var(--muted-foreground)]">SKU: {product.sku}</div>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-xs text-[var(--muted-foreground)]">Cost: {formatCurrency(product.costCents)}</span>
+                      <span className="font-semibold text-[var(--primary)]">{formatCurrency(product.priceCents)}</span>
+                    </div>
                   </button>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+
+        {/* Right: Cart + Payment */}
+        <div className="col-span-5 space-y-4">
+          <Card>
+            <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
+              <h3 className="font-semibold text-[var(--foreground)]">Current Cart</h3>
+              <span className="text-xs text-[var(--muted-foreground)]">{cart.length} line items</span>
+            </div>
+
+            <div className="mt-3 max-h-[180px] space-y-2 overflow-y-auto pr-1">
+              {cart.length === 0 ? (
+                <div className="rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-4 text-center text-sm text-[var(--muted-foreground)]">
+                  Cart is empty. Search or scan to add items.
                 </div>
               ) : (
-                <div className="flex gap-2">
-                  <input
-                    value={customerSearchQuery}
-                    onChange={(e) => setCustomerSearchQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') void handleCustomerSearch()
-                    }}
-                    placeholder="Search by name or phone…"
-                    className="flex-1 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-[var(--foreground)]"
-                  />
-                  <button
-                    onClick={handleCustomerSearch}
-                    disabled={customerSearching}
-                    className="rounded-[var(--radius)] bg-[var(--primary)] px-3 py-1 text-xs font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
-                  >
-                    {customerSearching ? '…' : 'Search'}
-                  </button>
-                </div>
+                cart.map((item) => (
+                  <div key={item.product.id} className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-2.5 text-xs">
+                    <div className="flex-1 pr-2">
+                      <div className="font-medium text-[var(--foreground)]">{item.product.name}</div>
+                      <div className="text-[var(--muted-foreground)]">{formatCurrency(item.unitPriceCents)} × {item.quantity}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center rounded-[var(--radius)] border border-[var(--border)]">
+                        <button onClick={() => handleQuantityChange(item.product.id, -1)} className="px-2 py-1 text-[var(--foreground)]">
+                          −
+                        </button>
+                        <span className="px-2 text-[var(--foreground)]">{item.quantity}</span>
+                        <button onClick={() => handleQuantityChange(item.product.id, 1)} className="px-2 py-1 text-[var(--foreground)]">
+                          +
+                        </button>
+                      </div>
+                      <span className="w-14 text-right font-semibold text-[var(--foreground)]">
+                        {formatCurrency(item.unitPriceCents * item.quantity)}
+                      </span>
+                    </div>
+                  </div>
+                ))
               )}
-              {customerSearchResults.length > 0 && (
-                <div className="max-h-32 space-y-1 overflow-y-auto">
-                  {customerSearchResults.map((c) => (
-                    <button
-                      key={c.id}
-                      onClick={() => void attachCustomer(c)}
-                      className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-2 text-left text-[var(--foreground)]"
-                    >
-                      <div className="font-semibold">{c.name}</div>
-                      <div className="text-[var(--muted-foreground)]">{c.phone}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
+            </div>
+
+            <div className="mt-3 space-y-2 border-t border-[var(--border)] pt-3">
+              <div className="flex justify-between text-sm text-[var(--muted-foreground)]">
+                <span>Subtotal</span>
+                <span>{formatCurrency(subtotalCents)}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm text-[var(--muted-foreground)]">
+                <span>Tax ({taxRatePercent}%)</span>
+                <span>{formatCurrency(taxCents)}</span>
+              </div>
+              <div className="flex justify-between border-t border-[var(--border)] pt-2 text-base font-semibold text-[var(--foreground)]">
+                <span>Total due</span>
+                <span className="text-[var(--primary)]">{formatCurrency(totalCents)}</span>
+              </div>
             </div>
           </Card>
 
@@ -335,10 +363,10 @@ export function CheckoutScreen(): React.JSX.Element {
               <CardDescription>Enter cash amount or charge card.</CardDescription>
             </CardHeader>
             <div className="space-y-3 text-xs">
-              {/* Cash amount input */}
               <div>
                 <label className="mb-1 block font-semibold text-[var(--foreground)]">Cash received</label>
                 <input
+                  ref={tenderRef}
                   type="number"
                   step="0.01"
                   min="0"
@@ -391,7 +419,7 @@ export function CheckoutScreen(): React.JSX.Element {
                     onClick={() => void completeSale('CASH', shortCents)}
                     className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-2 text-xs font-semibold text-[var(--primary-foreground)]"
                   >
-                    Put {formatCurrency(shortCents)} on {attachedCustomer.name}'s tab
+                    Put {formatCurrency(shortCents)} on {attachedCustomer.firstName}'s tab
                   </button>
                 </div>
               )}
