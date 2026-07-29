@@ -709,7 +709,7 @@ export async function ensureSearchIndex(db: PrismaClient): Promise<void> {
        din,
        itemNumber,
        tokenize = "unicode61"
-     )`
+    )`
   )
 }
 
@@ -771,13 +771,15 @@ export async function autoImportCatalog(
 
   // 2. Determine which items are new (not in the previous active catalogue)
   const activeBatchId = await getActiveBatchId(db)
-  let previousItemNumbers = new Set<string>()
+  const previousItemNumbers = new Set<string>()
   if (activeBatchId !== null) {
     const previous = await db.catalogProduct.findMany({
       where: { importBatchId: activeBatchId },
       select: { itemNumber: true }
     })
-    previousItemNumbers = new Set(previous.map((r) => r.itemNumber))
+    for (const row of previous) {
+      previousItemNumbers.add(row.itemNumber)
+    }
   }
 
   // 3. Commit the batch (pointer flip + reconcile existing products)
@@ -801,12 +803,12 @@ export async function autoImportCatalog(
     errors = 1
   }
 
-  // 5. Query new items — Products created from items that weren't in the previous catalogue
-  const newProducts = await db.product.findMany({
+  // 5. Query new items — Products created from items that weren't in the previous catalogue.
+  // Use a smaller in-memory filter instead of `notIn` with 65k+ values to avoid SQLite parameter limits.
+  const batchProducts = await db.product.findMany({
     where: {
       origin: 'CATALOG',
-      lastSeenBatchId: batch.id,
-      sourceItemNumber: { notIn: [...previousItemNumbers] }
+      lastSeenBatchId: batch.id
     },
     select: {
       id: true,
@@ -819,6 +821,7 @@ export async function autoImportCatalog(
     },
     orderBy: { name: 'asc' }
   })
+  const newProducts = batchProducts.filter((p) => p.sourceItemNumber != null && !previousItemNumbers.has(p.sourceItemNumber))
 
   onProgress({ batchId: batch.id, phase: 'done', linesRead: acc.totalLines, totalLines: acc.totalLines, percent: 100 })
 
