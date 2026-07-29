@@ -1,6 +1,7 @@
 import { PrismaClient, Product, Transaction } from '@prisma/client'
 import { calculateRetailPriceCents, PricingTier as EnginePricingTier } from '../../../shared/pricingEngine'
 import { CreateTransactionPayload, BulkImportProductInput, TransactionWithItems } from '../../../shared/types'
+import { customerLedgerInternals, getCreditSettings } from './customerQueries'
 
 // Product Queries
 export async function getAllProducts(db: PrismaClient): Promise<Product[]> {
@@ -180,8 +181,22 @@ export async function createTransaction(
   const changeCents = Math.max(0, payload.tenderedCents - totalCents)
   const receiptNumber = `RX-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`
 
-  return db.transaction.create({
-    data: {
+  const tabAmountCents = payload.tabAmountCents ?? 0
+  if (!Number.isInteger(tabAmountCents) || tabAmountCents < 0 || tabAmountCents > totalCents) throw new Error('Invalid Pharmacy Credit amount.')
+  if (tabAmountCents > 0 && !payload.customerId) throw new Error('Attach a customer before using Pharmacy Credit.')
+
+  return db.$transaction(async (tx) => {
+    if (tabAmountCents > 0 && payload.customerId) {
+      const customer = await tx.customer.findUniqueOrThrow({ where: { id: payload.customerId } })
+      const latest = await tx.creditLedgerEntry.findFirst({ where: { customerId: customer.id }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] })
+      const settings = await getCreditSettings(tx)
+      const availableCredit = Math.max(0, latest?.balanceAfterCents ?? 0)
+      if (tabAmountCents > availableCredit && !settings.allowShortPayToTab) throw new Error('Short-pay to Pharmacy Credit is disabled. Use another tender for the remainder.')
+      const limit = customer.creditLimitCents ?? settings.defaultCreditLimitCents
+      if ((latest?.balanceAfterCents ?? 0) - tabAmountCents < -limit) throw new Error(`Pharmacy Credit limit reached. This charge would exceed the ${limit}¢ credit limit.`)
+    }
+    const transaction = await tx.transaction.create({
+      data: {
       receiptNumber,
       status: payload.status || 'COMPLETED',
       subtotalCents,
@@ -191,6 +206,7 @@ export async function createTransaction(
       tenderedCents: payload.tenderedCents,
       changeCents,
       customerId: payload.customerId || null,
+      tabAmountCents,
       items: {
         create: payload.items.map((item) => ({
           productId: item.productId,
@@ -209,6 +225,26 @@ export async function createTransaction(
       },
       customer: true
     }
+    })
+    if (tabAmountCents > 0 && payload.customerId) {
+      await customerLedgerInternals.appendCreditEntry(tx, payload.customerId, 'SALE_CHARGE', -tabAmountCents, { transactionId: transaction.id })
+      const loyaltyFlag = await tx.featureFlag.findUnique({ where: { key: 'rewardPoints' } })
+      const customer = await tx.customer.findUniqueOrThrow({ where: { id: payload.customerId } })
+      if (loyaltyFlag?.enabled && customer.loyaltyEnabled) {
+        const settings = await getCreditSettings(tx)
+        const points = Math.floor((totalCents / 100) * settings.loyaltyPointsPerDollar)
+        if (points > 0) await customerLedgerInternals.appendPointEvent(tx, customer.id, 'EARNED', points, { transactionId: transaction.id })
+      }
+    } else if (payload.customerId) {
+      const loyaltyFlag = await tx.featureFlag.findUnique({ where: { key: 'rewardPoints' } })
+      const customer = await tx.customer.findUniqueOrThrow({ where: { id: payload.customerId } })
+      if (loyaltyFlag?.enabled && customer.loyaltyEnabled) {
+        const settings = await getCreditSettings(tx)
+        const points = Math.floor((totalCents / 100) * settings.loyaltyPointsPerDollar)
+        if (points > 0) await customerLedgerInternals.appendPointEvent(tx, customer.id, 'EARNED', points, { transactionId: transaction.id })
+      }
+    }
+    return transaction
   })
 }
 

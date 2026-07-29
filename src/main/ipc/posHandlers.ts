@@ -13,6 +13,7 @@ import {
   getAllTransactions,
   voidTransaction
 } from '../db/queries/posQueries'
+import { refundTabAmount } from '../db/queries/customerQueries'
 
 export function registerPosHandlers(db: PrismaClient): void {
   // Products
@@ -30,4 +31,5 @@ export function registerPosHandlers(db: PrismaClient): void {
   ipcMain.handle(IPC.TRANSACTION_CREATE, (_e, payload) => createTransaction(db, payload))
   ipcMain.handle(IPC.TRANSACTION_GET_ALL, () => getAllTransactions(db))
   ipcMain.handle(IPC.TRANSACTION_VOID, (_e, { id, reason }) => voidTransaction(db, id, reason))
+  ipcMain.handle(IPC.TRANSACTION_REFUND_TAB, (_e, { id, amountCents }) => refundTabAmount(db, id, amountCents))
 }

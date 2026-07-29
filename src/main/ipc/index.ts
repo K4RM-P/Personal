@@ -6,6 +6,7 @@ import { registerReceiptHandlers } from './receiptHandlers'
 import { registerPaymentHandlers } from './paymentHandlers'
 import { registerComplianceHandlers } from './complianceHandlers'
 import { registerCatalogHandlers } from './catalogHandlers'
+import { registerCustomerHandlers } from './customerHandlers'
 
 export function registerAllHandlers(db: PrismaClient): void {
   registerFeatureFlagHandlers(db)
@@ -15,4 +16,5 @@ export function registerAllHandlers(db: PrismaClient): void {
   registerPaymentHandlers(db)
   registerComplianceHandlers(db)
   registerCatalogHandlers(db)
+  registerCustomerHandlers(db)
 }

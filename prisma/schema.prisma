@@ -152,12 +152,69 @@ model CatalogImportBatch {
 }
 
 model Customer {
-  id           Int           @id @default(autoincrement())
-  name         String
-  phone        String?
-  email        String?
-  createdAt    DateTime      @default(now())
-  transactions Transaction[]
+  id               Int                 @id @default(autoincrement())
+  firstName        String
+  lastName         String
+  phone            String
+  phoneNormalized  String
+  address          String
+  email            String?
+  creditLimitCents Int?
+  loyaltyEnabled   Boolean             @default(true)
+  notes            String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  ledgerEntries    CreditLedgerEntry[]
+  pointEvents      LoyaltyPointEvent[]
+  transactions     Transaction[]
+
+  @@index([phoneNormalized])
+  @@index([lastName, firstName])
+}
+
+model CreditLedgerEntry {
+  id                Int             @id @default(autoincrement())
+  customerId        Int
+  customer          Customer        @relation(fields: [customerId], references: [id])
+  type              CreditEntryType
+  amountCents       Int
+  balanceAfterCents Int
+  transactionId     String?
+  note              String?
+  createdByUserId   Int?
+  createdAt         DateTime        @default(now())
+
+  @@index([customerId, createdAt])
+  @@index([transactionId])
+}
+
+model LoyaltyPointEvent {
+  id         Int              @id @default(autoincrement())
+  customerId Int
+  customer   Customer         @relation(fields: [customerId], references: [id])
+  type       LoyaltyEventType
+  points     Int
+  pointsAfter Int
+  transactionId String?
+  note       String?
+  createdAt  DateTime         @default(now())
+
+  @@index([customerId, createdAt])
+  @@index([transactionId])
+}
+
+enum CreditEntryType {
+  FUNDS_ADDED
+  SALE_CHARGE
+  MANUAL_ADJUSTMENT
+  REFUND_CREDIT
+}
+
+enum LoyaltyEventType {
+  EARNED
+  REDEEMED
+  MANUAL_ADJUSTMENT
+  EXPIRED
 }
 
 model PricingTier {
@@ -181,6 +238,7 @@ model Transaction {
   voidReason     String?
   customerId     Int?
   customer       Customer?         @relation(fields: [customerId], references: [id])
+  tabAmountCents Int?               @default(0)
   userId         Int?
   user           User?             @relation(fields: [userId], references: [id])
   items          TransactionItem[]

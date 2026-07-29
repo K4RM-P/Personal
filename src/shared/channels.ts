@@ -22,6 +22,19 @@ export const IPC = {
   TRANSACTION_GET_ALL: 'transaction:getAll',
   TRANSACTION_PARK: 'transaction:park',
   TRANSACTION_VOID: 'transaction:void',
+  TRANSACTION_REFUND_TAB: 'transaction:refundTab',
+
+  // Customer profiles, credit ledger, and loyalty points
+  CUSTOMER_SEARCH: 'customer:search',
+  CUSTOMER_GET: 'customer:get',
+  CUSTOMER_CREATE: 'customer:create',
+  CUSTOMER_UPDATE: 'customer:update',
+  CUSTOMER_DUPLICATE_PHONE: 'customer:duplicatePhone',
+  CUSTOMER_ADD_FUNDS: 'customer:addFunds',
+  CUSTOMER_ADJUST_CREDIT: 'customer:adjustCredit',
+  CUSTOMER_ADJUST_POINTS: 'customer:adjustPoints',
+  CUSTOMER_GET_CREDIT_SETTINGS: 'customer:getCreditSettings',
+  CUSTOMER_SAVE_CREDIT_SETTINGS: 'customer:saveCreditSettings',
 
   // Receipt Printing Channels (Stage 4)
   RECEIPT_PRINT: 'receipt:print',

@@ -36,6 +36,13 @@ export function CheckoutScreen() {
   const [manualPrompt, setManualPrompt] = React.useState<{ amountCents: number; orderRef: string } | null>(null)
   const [manualRef, setManualRef] = React.useState<string>('')
   const [paymentMessage, setPaymentMessage] = React.useState<string | null>(null)
+  const [customerSearch, setCustomerSearch] = React.useState('')
+  const [customerMatches, setCustomerMatches] = React.useState<any[]>([])
+  const [attachedCustomer, setAttachedCustomer] = React.useState<any>(null)
+  const [tabDollars, setTabDollars] = React.useState('')
+  const [creditSettings, setCreditSettings] = React.useState<{ allowShortPayToTab: boolean }>({ allowShortPayToTab: false })
+  const [quickAdd, setQuickAdd] = React.useState(false)
+  const [quickCustomer, setQuickCustomer] = React.useState({ firstName: '', lastName: '', phone: '', address: '', email: '' })
 
   const searchRef = React.useRef<HTMLInputElement>(null)
   const tenderRef = React.useRef<HTMLInputElement>(null)
@@ -77,7 +84,23 @@ export function CheckoutScreen() {
     loadProducts()
     loadTransactions()
     loadPaymentMode()
+    window.api.customer.getCreditSettings().then(setCreditSettings).catch(console.error)
   }, [])
+
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (customerSearch.trim()) window.api.customer.search(customerSearch).then(setCustomerMatches).catch(console.error)
+      else setCustomerMatches([])
+    }, 200)
+    return () => window.clearTimeout(timer)
+  }, [customerSearch])
+
+  React.useEffect(() => {
+    const currentTotal = cart.reduce((sum, item) => sum + item.product.priceCents * item.quantity, 0) * (1 + taxRatePercent / 100)
+    if (!attachedCustomer || currentTotal <= 0) return
+    const balance = attachedCustomer.ledgerEntries?.[0]?.balanceAfterCents ?? 0
+    setTabDollars((Math.min(Math.max(balance, 0), Math.round(currentTotal)) / 100).toFixed(2))
+  }, [attachedCustomer?.id, cart, taxRatePercent])
 
   const filteredProducts = products.filter(
     (p) =>
@@ -150,11 +173,12 @@ export function CheckoutScreen() {
   const totalCents = subtotalCents + taxCents
 
   const tenderedCents = Math.round((parseFloat(tenderedDollars) || 0) * 100)
+  const tabAmountCents = Math.max(0, Math.round((parseFloat(tabDollars) || 0) * 100))
   const changeCents = Math.max(0, tenderedCents - totalCents)
 
   // Records the finished sale + prints the receipt. Card sales only reach here
   // after the PaymentProvider returned "approved".
-  const completeSale = async (tenderType: 'CASH' | 'CARD'): Promise<void> => {
+  const completeSale = async (tenderType: 'CASH' | 'CARD' | 'SPLIT' | 'TAB', cardAmountCents?: number): Promise<void> => {
     if (dbIssue) {
       setScanFeedback({ type: 'error', message: dbIssue })
       return
@@ -170,7 +194,9 @@ export function CheckoutScreen() {
         })),
         taxRatePercent,
         tenderType,
-        tenderedCents: tenderType === 'CASH' ? tenderedCents : totalCents
+        tenderedCents: tenderType === 'CASH' || tenderType === 'SPLIT' ? tenderedCents : (cardAmountCents ?? totalCents),
+        customerId: attachedCustomer?.id,
+        tabAmountCents
       }
 
       if (window.api && window.api.transaction) {
@@ -178,6 +204,8 @@ export function CheckoutScreen() {
         setActiveReceipt(tx)
         setCart([])
         setTenderedDollars('')
+        setTabDollars('')
+        setAttachedCustomer(null)
         loadTransactions()
 
         if (window.api.receipt) {
@@ -197,11 +225,16 @@ export function CheckoutScreen() {
 
   const handleCashCheckout = () => {
     if (cart.length === 0) return
-    if (tenderedCents < totalCents) {
+    const availableCredit = Math.max(0, attachedCustomer?.ledgerEntries?.[0]?.balanceAfterCents ?? 0)
+    if (tabAmountCents > availableCredit && !creditSettings.allowShortPayToTab) {
+      setScanFeedback({ type: 'error', message: 'Pharmacy Credit only has enough available credit for the displayed balance. Use another tender for the remainder.' })
+      return
+    }
+    if (tenderedCents + tabAmountCents < totalCents) {
       setScanFeedback({ type: 'error', message: 'Tendered amount is less than the total due.' })
       return
     }
-    completeSale('CASH')
+    completeSale(tabAmountCents ? 'SPLIT' : 'CASH')
   }
 
   // Applies a card charge result: approved → record the sale; otherwise abort
@@ -214,7 +247,7 @@ export function CheckoutScreen() {
       setPaymentState('approved')
       setPaymentMessage(`Card approved${detail ? ` (${detail})` : ''}`)
       setCardStatus({ ok: true, message: `Card approved${detail ? ` (${detail})` : ''}` })
-      completeSale('CARD')
+      completeSale(tabAmountCents ? 'SPLIT' : 'CARD', totalCents - tabAmountCents)
     } else if (result.status === 'error') {
       setPaymentState('timeout')
       setPaymentMessage(result.message || 'Payment timed out. Verify the terminal status before retrying.')
@@ -230,10 +263,17 @@ export function CheckoutScreen() {
   // terminals open a confirmation prompt so the cashier can record the outcome.
   const startCardCheckout = async () => {
     if (cart.length === 0 || cardProcessing) return
+    const availableCredit = Math.max(0, attachedCustomer?.ledgerEntries?.[0]?.balanceAfterCents ?? 0)
+    if (tabAmountCents > availableCredit && !creditSettings.allowShortPayToTab) {
+      setScanFeedback({ type: 'error', message: 'Pharmacy Credit only has enough available credit for the displayed balance. Use another tender for the remainder.' })
+      return
+    }
     setCardStatus(null)
     setPaymentState('awaiting')
     setPaymentMessage('Waiting for terminal response…')
     const orderRef = `SALE-${Date.now()}`
+    const cardAmount = totalCents - tabAmountCents
+    if (cardAmount <= 0) { completeSale('TAB'); return }
 
     if (!window.api?.payment) {
       alert('Payment service unavailable')
@@ -242,13 +282,13 @@ export function CheckoutScreen() {
 
     if (paymentMode === 'manual') {
       setManualRef('')
-      setManualPrompt({ amountCents: totalCents, orderRef })
+      setManualPrompt({ amountCents: cardAmount, orderRef })
       return
     }
 
     setCardProcessing(true)
     try {
-      const result = await window.api.payment.charge(totalCents, orderRef)
+      const result = await window.api.payment.charge(cardAmount, orderRef)
       applyChargeResult(result)
     } catch (err: any) {
       setPaymentState('timeout')
@@ -367,6 +407,15 @@ export function CheckoutScreen() {
           </button>
         </div>
       </div>
+
+      <Card className="border-[var(--border)]">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="min-w-[260px] flex-1">
+            <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Customer (optional)</label>
+            {attachedCustomer ? <div className="flex min-h-11 items-center justify-between rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--muted)] px-3 text-sm"><span className="font-semibold">{attachedCustomer.firstName} {attachedCustomer.lastName} · {attachedCustomer.phone}</span><button onClick={() => { setAttachedCustomer(null); setTabDollars('') }} className="text-[var(--primary)]">Remove</button></div> : <div className="relative"><input value={customerSearch} onChange={e => setCustomerSearch(e.target.value)} placeholder="Attach customer — search name or phone" className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm"/>{customerMatches.length > 0 && <div className="absolute z-20 mt-1 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">{customerMatches.map(customer => <button key={customer.id} onClick={() => { setAttachedCustomer(customer); setCustomerSearch(''); setCustomerMatches([]) }} className="block min-h-11 w-full border-b border-[var(--border)] px-3 text-left text-sm last:border-0"><b>{customer.firstName} {customer.lastName}</b> · {customer.phone}</button>)}</div>}<button onClick={() => setQuickAdd(!quickAdd)} className="mt-2 text-xs font-semibold text-[var(--primary)]">Customer not found? Quick add</button>{quickAdd && <div className="mt-2 grid grid-cols-2 gap-2 rounded-[var(--radius)] border border-[var(--border)] bg-white p-2"><input value={quickCustomer.firstName} onChange={e => setQuickCustomer(s => ({ ...s, firstName: e.target.value }))} placeholder="First name" className="input"/><input value={quickCustomer.lastName} onChange={e => setQuickCustomer(s => ({ ...s, lastName: e.target.value }))} placeholder="Last name" className="input"/><input value={quickCustomer.phone} onChange={e => setQuickCustomer(s => ({ ...s, phone: e.target.value }))} placeholder="Phone" className="input"/><input value={quickCustomer.address} onChange={e => setQuickCustomer(s => ({ ...s, address: e.target.value }))} placeholder="Address" className="input"/><button onClick={() => void window.api.customer.create(quickCustomer).then(created => { setAttachedCustomer(created); setQuickAdd(false); setQuickCustomer({ firstName: '', lastName: '', phone: '', address: '', email: '' }) }).catch(error => setScanFeedback({ type: 'error', message: error.message }))} className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-xs font-semibold text-[var(--primary-foreground)]">Add & attach</button></div>}</div>}</div>
+          {attachedCustomer && <div className="rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm"><div className="text-xs text-[var(--muted-foreground)]">Pharmacy Credit balance</div><div className="font-semibold">{(attachedCustomer.ledgerEntries?.[0]?.balanceAfterCents ?? 0) >= 0 ? 'Credit available' : 'Customer owes'}: {formatCurrency(Math.abs(attachedCustomer.ledgerEntries?.[0]?.balanceAfterCents ?? 0))}</div></div>}
+        </div>
+      </Card>
 
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-7 space-y-4">
@@ -521,6 +570,15 @@ export function CheckoutScreen() {
                   </div>
                 )}
               </div>
+
+              {attachedCustomer && (
+                <div className="rounded-[var(--radius)] border border-[var(--primary)]/30 bg-[var(--muted)] p-3">
+                  <label className="mb-1 block text-xs font-semibold text-[var(--foreground)]">Pharmacy Credit tender</label>
+                  <div className="text-xs text-[var(--muted-foreground)]">Current balance: {(attachedCustomer.ledgerEntries?.[0]?.balanceAfterCents ?? 0) >= 0 ? 'Credit available' : 'Customer owes'} {formatCurrency(Math.abs(attachedCustomer.ledgerEntries?.[0]?.balanceAfterCents ?? 0))}</div>
+                  <input value={tabDollars} onChange={e => setTabDollars(e.target.value)} type="number" step="0.01" min="0" className="mt-2 min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white px-3 text-sm" placeholder="Amount to charge to tab"/>
+                  {tabAmountCents > 0 && <div className="mt-1 text-xs text-[var(--muted-foreground)]">Remaining after tab: {formatCurrency(Math.max(0, totalCents - tabAmountCents))}{creditSettings.allowShortPayToTab ? ' · Short-pay to tab is enabled' : ''}</div>}
+                </div>
+              )}
 
               {paymentMessage && (
                 <div className={`rounded-[var(--radius)] border px-3 py-2 text-xs ${

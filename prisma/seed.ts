@@ -99,8 +99,8 @@ async function main() {
 
   // Seed Customers
   const customers = [
-    { id: 1, name: 'Jane Doe', phone: '555-0100', email: 'jane@example.com' },
-    { id: 2, name: 'John Smith', phone: '555-0101', email: 'john@example.com' }
+    { id: 1, firstName: 'Jane', lastName: 'Doe', phone: '555-0100', phoneNormalized: '5550100', address: '123 Health Ave', email: 'jane@example.com' },
+    { id: 2, firstName: 'John', lastName: 'Smith', phone: '555-0101', phoneNormalized: '5550101', address: '456 Wellness Rd', email: 'john@example.com' }
   ]
 
   for (const c of customers) {

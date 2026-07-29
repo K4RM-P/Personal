@@ -24,10 +24,12 @@ export interface CreateTransactionPayload {
     unitPriceCents: number
   }[]
   taxRatePercent: number
-  tenderType: 'CASH' | 'CARD' | 'SPLIT'
+  tenderType: 'CASH' | 'CARD' | 'SPLIT' | 'TAB'
   tenderedCents: number
   status?: 'COMPLETED' | 'PARKED'
   customerId?: number
+  /** Total amount applied from the customer's Pharmacy Credit ledger. */
+  tabAmountCents?: number
 }
 
 export interface BulkImportProductInput {
