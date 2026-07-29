@@ -12,7 +12,8 @@ import type {
   CatalogDealRow,
   CatalogScanResult,
   CatalogSearchRow,
-  CatalogStatus
+  CatalogStatus,
+  PromoteAllResult
 } from '../../shared/catalogTypes'
 import { gtinNorm } from './webcatParser'
 import { calculateRetailPriceCents } from '../../shared/pricingEngine'
@@ -378,15 +379,6 @@ export async function countDiscontinuedProducts(db: PrismaClient): Promise<numbe
   return db.product.count({ where: { origin: 'CATALOG', discontinued: true } })
 }
 
-
-export interface PromoteAllResult {
-  total: number
-  created: number
-  skipped: number
-  errors: number
-  barcodeSkipped: number
-  zeroCostPinned: number
-}
 
 /**
  * Promote EVERY unstocked catalogue item from the active batch into sellable

@@ -12,6 +12,7 @@ import {
 import {
   getCatalogDeals,
   getCatalogStatus,
+  promoteAllCatalogProducts,
   promoteCatalogProduct,
   scanLookup,
   searchCatalog
@@ -122,6 +123,11 @@ export function registerCatalogHandlers(db: PrismaClient): void {
     guard('Promote catalogue item', async (_e: Electron.IpcMainInvokeEvent, catalogProductId: number) =>
       promoteCatalogProduct(db, catalogProductId)
     )
+  )
+
+  ipcMain.handle(
+    IPC.CATALOG_PROMOTE_ALL,
+    guard('Promote all catalogue items', async () => promoteAllCatalogProducts(db))
   )
 
   ipcMain.handle(

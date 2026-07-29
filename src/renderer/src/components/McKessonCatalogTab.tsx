@@ -6,7 +6,8 @@ import type {
   CatalogCommitResult,
   CatalogImportProgress,
   CatalogSearchRow,
-  CatalogStatus
+  CatalogStatus,
+  PromoteAllResult
 } from '@shared/catalogTypes'
 
 type Phase = 'idle' | 'picking' | 'importing' | 'previewing' | 'committing' | 'done' | 'failed'
@@ -30,6 +31,8 @@ export function McKessonCatalogTab(): React.JSX.Element {
   const [searching, setSearching] = React.useState(false)
   const [promotingId, setPromotingId] = React.useState<number | null>(null)
   const [promoteMessage, setPromoteMessage] = React.useState<string | null>(null)
+  const [promotingAll, setPromotingAll] = React.useState(false)
+  const [promoteAllResult, setPromoteAllResult] = React.useState<PromoteAllResult | null>(null)
 
   // Province
   const [province, setProvince] = React.useState('')
@@ -198,6 +201,30 @@ export function McKessonCatalogTab(): React.JSX.Element {
       setPromoteMessage(`Failed: ${errorMessage(err, 'error')}`)
     } finally {
       setPromotingId(null)
+    }
+  }
+
+  const handlePromoteAll = async (): Promise<void> => {
+    if (!window.api?.catalog) return
+    if (!status?.activeBatchId) return
+    if (
+      !confirm(
+        `Promote ALL ${status.productCount.toLocaleString()} catalogue items into sellable inventory?\n\nItems already stocked will be skipped. Zero-cost items will be pinned so you can set a real price.`
+      )
+    )
+      return
+    setPromotingAll(true)
+    setPromoteAllResult(null)
+    setPromoteMessage(null)
+    try {
+      const result = await window.api.catalog.promoteAll()
+      setPromoteAllResult(result)
+      // Refresh search to update stockedProductId badges
+      void handleSearch()
+    } catch (err) {
+      setPromoteMessage(`Promote ALL failed: ${errorMessage(err, 'error')}`)
+    } finally {
+      setPromotingAll(false)
     }
   }
 
@@ -516,6 +543,38 @@ export function McKessonCatalogTab(): React.JSX.Element {
           {promoteMessage && (
             <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-2 text-[var(--foreground)]">
               {promoteMessage}
+            </div>
+          )}
+
+          {/* Promote ALL */}
+          <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
+            <div className="flex-1">
+              <div className="font-semibold text-[var(--foreground)]">Promote the entire catalogue</div>
+              <div className="text-[var(--muted-foreground)]">
+                Add every unstocked item from the active McKesson catalogue into sellable inventory in one pass.
+                Already-stocked items are skipped; zero-cost items are pinned so you can set a real price.
+              </div>
+            </div>
+            <button
+              onClick={handlePromoteAll}
+              disabled={!status?.activeBatchId || promotingAll || isBusy}
+              className="rounded-[var(--radius)] bg-[var(--primary)] px-4 py-2 text-xs font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+            >
+              {promotingAll ? 'Promoting ALL…' : 'Promote ALL'}
+            </button>
+          </div>
+
+          {promoteAllResult && (
+            <div className="rounded-[var(--radius)] border border-[var(--success)]/30 bg-[var(--success-bg)] p-3 text-[var(--foreground)]">
+              <div className="font-semibold text-[var(--success)]">Promote ALL complete</div>
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <StatCell label="Total in catalogue" value={promoteAllResult.total} />
+                <StatCell label="Created" value={promoteAllResult.created} />
+                <StatCell label="Already stocked" value={promoteAllResult.skipped} />
+                <StatCell label="Barcode skipped" value={promoteAllResult.barcodeSkipped} />
+                <StatCell label="Zero-cost pinned" value={promoteAllResult.zeroCostPinned} />
+                <StatCell label="Errors" value={promoteAllResult.errors} />
+              </div>
             </div>
           )}
 

@@ -168,3 +168,13 @@ export interface CatalogStatus {
   staleThresholdDays: number
   isStale: boolean
 }
+
+/** Result of promoting every unstocked catalogue item into sellable inventory. */
+export interface PromoteAllResult {
+  total: number
+  created: number
+  skipped: number
+  errors: number
+  barcodeSkipped: number
+  zeroCostPinned: number
+}

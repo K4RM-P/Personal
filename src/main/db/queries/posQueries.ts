@@ -197,34 +197,34 @@ export async function createTransaction(
     }
     const transaction = await tx.transaction.create({
       data: {
-      receiptNumber,
-      status: payload.status || 'COMPLETED',
-      subtotalCents,
-      taxCents,
-      totalCents,
-      tenderType: payload.tenderType,
-      tenderedCents: payload.tenderedCents,
-      changeCents,
-      customerId: payload.customerId || null,
-      tabAmountCents,
-      items: {
-        create: payload.items.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          costCents: item.costCents,
-          unitPriceCents: item.unitPriceCents,
-          totalCents: item.unitPriceCents * item.quantity
-        }))
-      }
-    },
-    include: {
-      items: {
-        include: {
-          product: true
+        receiptNumber,
+        status: payload.status || 'COMPLETED',
+        subtotalCents,
+        taxCents,
+        totalCents,
+        tenderType: payload.tenderType,
+        tenderedCents: payload.tenderedCents,
+        changeCents,
+        customerId: payload.customerId || null,
+        tabAmountCents,
+        items: {
+          create: payload.items.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            costCents: item.costCents,
+            unitPriceCents: item.unitPriceCents,
+            totalCents: item.unitPriceCents * item.quantity
+          }))
         }
       },
-      customer: true
-    }
+      include: {
+        items: {
+          include: {
+            product: true
+          }
+        },
+        customer: true
+      }
     })
     if (tabAmountCents > 0 && payload.customerId) {
       await customerLedgerInternals.appendCreditEntry(tx, payload.customerId, 'SALE_CHARGE', -tabAmountCents, { transactionId: transaction.id })
