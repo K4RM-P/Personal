@@ -24,6 +24,15 @@ import type {
   DashboardSummary,
   BackupBundle
 } from '../shared/types'
+import type {
+  CatalogCommitResult,
+  CatalogDealRow,
+  CatalogImportProgress,
+  CatalogPreview,
+  CatalogScanResult,
+  CatalogSearchRow,
+  CatalogStatus
+} from '../shared/catalogTypes'
 
 const api = {
   featureFlag: {
@@ -73,6 +82,43 @@ const api = {
     void: (transactionId: string): Promise<VoidResult> =>
       ipcRenderer.invoke(IPC.PAYMENT_VOID, { transactionId }),
     getReaderStatus: (): Promise<ReaderStatus> => ipcRenderer.invoke(IPC.PAYMENT_GET_READER_STATUS)
+  },
+  catalog: {
+    pickFile: (): Promise<string | null> => ipcRenderer.invoke(IPC.CATALOG_PICK_FILE),
+    startImport: (filePath: string): Promise<CatalogPreview> =>
+      ipcRenderer.invoke(IPC.CATALOG_START_IMPORT, filePath),
+    commitImport: (batchId: number, confirmations?: string[]): Promise<CatalogCommitResult> =>
+      ipcRenderer.invoke(IPC.CATALOG_COMMIT_IMPORT, { batchId, confirmations }),
+    discardImport: (batchId: number): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IPC.CATALOG_DISCARD_IMPORT, batchId),
+    rollback: (): Promise<CatalogCommitResult> => ipcRenderer.invoke(IPC.CATALOG_ROLLBACK),
+    getStatus: (): Promise<CatalogStatus> => ipcRenderer.invoke(IPC.CATALOG_GET_STATUS),
+    search: (query: string, province?: string | null, limit?: number): Promise<CatalogSearchRow[]> =>
+      ipcRenderer.invoke(IPC.CATALOG_SEARCH, { query, province, limit }),
+    scanLookup: (barcode: string): Promise<CatalogScanResult> =>
+      ipcRenderer.invoke(IPC.CATALOG_SCAN_LOOKUP, barcode),
+    getDeals: (catalogProductId: number): Promise<CatalogDealRow[]> =>
+      ipcRenderer.invoke(IPC.CATALOG_GET_DEALS, catalogProductId),
+    promote: (
+      catalogProductId: number
+    ): Promise<{
+      productId: number
+      created: boolean
+      priceCents: number
+      costCents: number
+      listPriceCents: number
+      barcodeSkipped: boolean
+      pricePinnedForZeroCost: boolean
+    }> => ipcRenderer.invoke(IPC.CATALOG_PROMOTE, catalogProductId),
+    getProvince: (): Promise<string> => ipcRenderer.invoke(IPC.CATALOG_GET_PROVINCE),
+    setProvince: (province: string): Promise<string> =>
+      ipcRenderer.invoke(IPC.CATALOG_SET_PROVINCE, province),
+    /** Subscribe to streaming import progress. Returns an unsubscribe function. */
+    onImportProgress: (callback: (progress: CatalogImportProgress) => void): (() => void) => {
+      const listener = (_e: unknown, progress: CatalogImportProgress): void => callback(progress)
+      ipcRenderer.on(IPC.CATALOG_IMPORT_PROGRESS, listener)
+      return () => ipcRenderer.removeListener(IPC.CATALOG_IMPORT_PROGRESS, listener)
+    }
   },
   settings: {
     getPrinter: (): Promise<PrinterConfig> => ipcRenderer.invoke(IPC.SETTINGS_GET_PRINTER),

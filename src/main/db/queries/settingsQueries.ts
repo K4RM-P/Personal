@@ -12,7 +12,10 @@ const DEFAULTS = {
   'payment.provider': 'manual',
   'payment.environment': 'sandbox',
   'payment.terminalId': '',
-  'payment.apiKeyEnc': ''
+  'payment.apiKeyEnc': '',
+  // Catalogue (McKesson WEBCAT import)
+  'catalog.province': 'ONT',
+  'catalog.staleThresholdDays': '90'
 } as const
 
 async function getSetting(db: PrismaClient, key: string): Promise<string> {
@@ -61,6 +64,21 @@ export async function savePrinterConfig(db: PrismaClient, config: PrinterConfig)
   await setSetting(db, 'printer.networkIp', config.ipAddress ?? '')
   await setSetting(db, 'printer.networkPort', String(config.port ?? 9100))
   return getPrinterConfig(db)
+}
+
+/** Province the catalogue browser filters to by default. */
+export async function getCatalogProvince(db: PrismaClient): Promise<string> {
+  return (await getSetting(db, 'catalog.province')) || 'ONT'
+}
+
+export async function getCatalogStaleThresholdDays(db: PrismaClient): Promise<number> {
+  const raw = await getSetting(db, 'catalog.staleThresholdDays')
+  return parseInt(raw, 10) || 90
+}
+
+export async function setCatalogProvince(db: PrismaClient, province: string): Promise<string> {
+  await setSetting(db, 'catalog.province', province)
+  return getCatalogProvince(db)
 }
 
 export async function seedDefaultSettings(db: PrismaClient): Promise<void> {

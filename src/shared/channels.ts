@@ -33,6 +33,22 @@ export const IPC = {
   PAYMENT_VOID: 'payment:void',
   PAYMENT_GET_READER_STATUS: 'payment:getReaderStatus',
 
+  // McKesson Catalogue Channels
+  CATALOG_PICK_FILE: 'catalog:pickFile',
+  CATALOG_START_IMPORT: 'catalog:startImport',
+  CATALOG_COMMIT_IMPORT: 'catalog:commitImport',
+  CATALOG_DISCARD_IMPORT: 'catalog:discardImport',
+  CATALOG_ROLLBACK: 'catalog:rollback',
+  CATALOG_GET_STATUS: 'catalog:getStatus',
+  CATALOG_SEARCH: 'catalog:search',
+  CATALOG_SCAN_LOOKUP: 'catalog:scanLookup',
+  CATALOG_GET_DEALS: 'catalog:getDeals',
+  CATALOG_PROMOTE: 'catalog:promote',
+  CATALOG_GET_PROVINCE: 'catalog:getProvince',
+  CATALOG_SET_PROVINCE: 'catalog:setProvince',
+  /** main -> renderer stream */
+  CATALOG_IMPORT_PROGRESS: 'catalog:importProgress',
+
   // Settings Channels
   SETTINGS_GET_PRINTER: 'settings:getPrinter',
   SETTINGS_SAVE_PRINTER: 'settings:savePrinter',

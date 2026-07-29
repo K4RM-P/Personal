@@ -47,6 +47,108 @@ model Product {
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
   orderItems TransactionItem[]
+
+  // --- Catalogue provenance (McKesson import) ---
+  // origin: MANUAL | CATALOG. MANUAL rows are never read or written by a catalogue import.
+  origin            String    @default("MANUAL")
+  sourceItemNumber  String? // McKesson 6-digit item number — the stable link key
+  lastCatalogSyncAt DateTime?
+  lastSeenBatchId   Int?
+
+  // Lifecycle — an item dropped from the catalogue is flagged, never deleted
+  discontinued   Boolean   @default(false)
+  discontinuedAt DateTime?
+
+  // Field-level ownership: true means the pharmacist edited it by hand,
+  // so a catalogue refresh must NOT overwrite it.
+  nameOverridden    Boolean @default(false)
+  costOverridden    Boolean @default(false)
+  barcodeOverridden Boolean @default(false)
+
+  @@index([origin])
+  @@index([sourceItemNumber])
+  @@index([discontinued])
+}
+
+model CatalogProduct {
+  id              Int                @id @default(autoincrement())
+  itemNumber      String // pos 2-7, unique within a batch
+  description     String // pos 8-57, raw ALL-CAPS — never overwritten
+  displayName     String // polished — see spec §4
+  effectiveDate   String? // pos 58-65, YYYYMMDD
+  categoryCode    String? // pos 90-94
+  din             String? // pos 127-134, null when all-zero
+  packSize        Int? // pos 144-149
+  province        String // pos 150-152: ONT | QUE
+  strength        String? // pos 153-162
+  dosageForm      String? // pos 163-177
+  genericCode     String? // pos 178-183
+  genericName     String? // pos 184-213
+  mfrPartNumber   String? // pos 214-228
+  deptCode        String? // pos 232-234
+  vendorCode      String? // pos 235-237
+  listPriceCents  Int                @default(0) // pos 332-338
+  costPriceCents  Int                @default(0) // pos 339-345
+  uomGroup        String? // pos 352
+  uomType         String? // pos 353
+  gtinPrimary     String? // pos 355-368, check-digit validated
+  gtinPrimaryNorm String? // leading zeros stripped — the scan-match key
+  gtinCase        String? // pos 383-396
+  gtinCaseNorm    String?
+  importBatchId   Int
+  importBatch     CatalogImportBatch @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
+  deals           CatalogDeal[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@unique([importBatchId, itemNumber])
+  @@index([itemNumber])
+  @@index([gtinPrimaryNorm])
+  @@index([gtinCaseNorm])
+  @@index([din])
+  @@index([province])
+  @@index([vendorCode])
+}
+
+model CatalogDeal {
+  id               Int            @id @default(autoincrement())
+  catalogProductId Int
+  catalogProduct   CatalogProduct @relation(fields: [catalogProductId], references: [id], onDelete: Cascade)
+  dealType         String // pos 8-10
+  dealNumber       String // pos 11-15
+  date1            String? // pos 16-23
+  date2            String? // pos 24-31
+  date3            String? // pos 32-39
+  date4            String? // pos 40-47
+  allowanceCents   Int            @default(0) // pos 69-75
+  dealPriceCents   Int            @default(0) // pos 76-82
+  tierFlag         String? // pos 95
+
+  @@index([catalogProductId])
+}
+
+model CatalogImportBatch {
+  id                Int              @id @default(autoincrement())
+  filename          String
+  fileSizeBytes     Int
+  startedAt         DateTime         @default(now())
+  completedAt       DateTime?
+  status            String // pending | previewing | committed | failed | rolledBack
+  totalLines        Int              @default(0)
+  productsNew       Int              @default(0)
+  productsUpdated   Int              @default(0)
+  productsUnchanged Int              @default(0)
+  dealsImported     Int              @default(0)
+  linesRejected     Int              @default(0)
+  errorReport       String? // JSON: line numbers + reasons
+  reconcileReport   String? // JSON: the committed reconciliation plan summary
+  repricedCount     Int              @default(0)
+  discontinuedCount Int              @default(0)
+  isActive          Boolean          @default(false)
+  supersededAt      DateTime?
+  products          CatalogProduct[]
+
+  @@index([isActive])
 }
 
 model Customer {
