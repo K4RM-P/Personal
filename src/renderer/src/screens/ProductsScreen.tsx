@@ -8,11 +8,12 @@ import {
   TierChangePreviewItem
 } from '@shared/pricingEngine'
 import { parseImportPreviewCsv } from '../lib/checkoutUi'
+import { McKessonCatalogTab } from '../components/McKessonCatalogTab'
 
 export function ProductsScreen() {
   const [products, setProducts] = React.useState<Product[]>([])
   const [tiers, setTiers] = React.useState<PricingTier[]>([])
-  const [activeTab, setActiveTab] = React.useState<'catalog' | 'tiers' | 'import'>('catalog')
+  const [activeTab, setActiveTab] = React.useState<'catalog' | 'tiers' | 'import' | 'mckesson'>('catalog')
 
   // New/Edit Product Form State
   const [sku, setSku] = React.useState('')
@@ -195,6 +196,14 @@ export function ProductsScreen() {
             }`}
           >
             Bulk Spreadsheet Import
+          </button>
+          <button
+            onClick={() => setActiveTab('mckesson')}
+            className={`px-4 py-1.5 text-xs font-semibold rounded ${
+              activeTab === 'mckesson' ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+            }`}
+          >
+            McKesson Catalogue
           </button>
         </div>
       </div>
@@ -491,6 +500,8 @@ export function ProductsScreen() {
           </div>
         </Card>
       )}
+      {/* Tab 4: McKesson Catalogue Import */}
+      {activeTab === 'mckesson' && <McKessonCatalogTab />}
     </div>
   )
 }
