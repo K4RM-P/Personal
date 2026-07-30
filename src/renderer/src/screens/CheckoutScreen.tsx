@@ -36,6 +36,7 @@ export function CheckoutScreen(): React.JSX.Element {
 
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod>(null)
   const [cardType, setCardType] = React.useState<CardType>(null)
+  const [applySurcharge, setApplySurcharge] = React.useState(false)
   const [eTransferEmail, setETransferEmail] = React.useState('')
   const [eTransferConfirmed, setETransferConfirmed] = React.useState(false)
   const [checkoutSettings, setCheckoutSettings] = React.useState({
@@ -57,7 +58,7 @@ export function CheckoutScreen(): React.JSX.Element {
   const subtotalCents = cart.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0)
   const taxRatePercent = 13
   const taxCents = Math.round((subtotalCents * taxRatePercent) / 100)
-  const surchargeCents = cardType === 'CREDIT' && checkoutSettings.allowCreditCardSurcharge
+  const surchargeCents = cardType === 'CREDIT' && checkoutSettings.allowCreditCardSurcharge && applySurcharge
     ? Math.floor(subtotalCents * checkoutSettings.cardSurchargePercent / 100)
     : 0
   const totalWithSurchargeCents = subtotalCents + taxCents + surchargeCents
@@ -111,6 +112,23 @@ export function CheckoutScreen(): React.JSX.Element {
     }, 150)
     return () => clearTimeout(timer)
   }, [searchQuery])
+
+  // Live, debounced customer search — fires as the cashier types (no Enter required)
+  React.useEffect(() => {
+    if (!window.api?.customer || attachedCustomer) return
+    const q = customerSearchQuery.trim()
+    if (!q) {
+      setCustomerSearchResults([])
+      return
+    }
+    const timer = setTimeout(() => {
+      window.api.customer
+        .search(q)
+        .then(setCustomerSearchResults)
+        .catch(() => setCustomerSearchResults([]))
+    }, 200)
+    return () => clearTimeout(timer)
+  }, [customerSearchQuery, attachedCustomer])
 
   const handleBarcode = React.useCallback(
     async (barcode: string): Promise<void> => {
@@ -197,6 +215,7 @@ export function CheckoutScreen(): React.JSX.Element {
       setAttachedCustomer(null)
       setPaymentMethod(null)
       setCardType(null)
+      setApplySurcharge(false)
       setETransferEmail('')
       setETransferConfirmed(false)
       setScanFeedback({ type: 'success', message: `Sale complete — ${transaction.receiptNumber}` })
@@ -381,8 +400,10 @@ export function CheckoutScreen(): React.JSX.Element {
     try {
       const result = await window.api.receipt.print(activeReceipt)
       if (result.success) {
-        setPrintStatus('Receipt printed ✓')
+        setPrintStatus('Receipt printed successfully ✓ — closing…')
         setReceiptPdfUrl(result.pdfDataUrl ?? null)
+        // Give the cashier ~2s to see the confirmation, then close and reset checkout.
+        setTimeout(() => dismissReceipt(), 2000)
       } else {
         setPrintStatus(result.message || 'Printer unavailable')
         setReceiptPdfUrl(result.pdfDataUrl ?? null)
@@ -413,6 +434,7 @@ export function CheckoutScreen(): React.JSX.Element {
   const resetPaymentMethod = (): void => {
     setPaymentMethod(null)
     setCardType(null)
+    setApplySurcharge(false)
     setETransferEmail('')
     setETransferConfirmed(false)
     setPaymentMessage(null)
@@ -809,7 +831,19 @@ export function CheckoutScreen(): React.JSX.Element {
 
                     {cardType === 'CREDIT' && checkoutSettings.allowCreditCardSurcharge && (
                       <div className="rounded-[var(--radius)] border border-[var(--warning)]/30 bg-[var(--warning-bg)] p-3 text-xs text-[var(--foreground)]">
-                        Original: {formatCurrency(subtotalCents + taxCents)} + {checkoutSettings.cardSurchargePercent}% credit fee: {formatCurrency(surchargeCents)} = Total: {formatCurrency(effectiveTotal)}
+                        <label className="flex items-center gap-2 font-semibold">
+                          <input
+                            type="checkbox"
+                            checked={applySurcharge}
+                            onChange={() => setApplySurcharge((v) => !v)}
+                          />
+                          Apply {checkoutSettings.cardSurchargePercent}% credit card surcharge
+                        </label>
+                        {applySurcharge && (
+                          <div className="mt-2">
+                            Original: {formatCurrency(subtotalCents + taxCents)} + {checkoutSettings.cardSurchargePercent}% credit fee: {formatCurrency(surchargeCents)} = Total: {formatCurrency(effectiveTotal)}
+                          </div>
+                        )}
                       </div>
                     )}
 
