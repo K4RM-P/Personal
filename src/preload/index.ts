@@ -32,7 +32,8 @@ import type {
   InventoryValuation,
   CreditHealthSummary,
   AlertsSummary,
-  DashboardData
+  DashboardData,
+  CheckoutSettings
 } from '../shared/types'
 import type {
   AutoImportResult,
@@ -162,7 +163,10 @@ const api = {
     saveStore: (info: StoreInfo): Promise<StoreInfo> => ipcRenderer.invoke(IPC.SETTINGS_SAVE_STORE, info),
     getPayment: (): Promise<PaymentConfigView> => ipcRenderer.invoke(IPC.SETTINGS_GET_PAYMENT),
     savePayment: (input: SavePaymentConfigInput): Promise<PaymentConfigView> =>
-      ipcRenderer.invoke(IPC.SETTINGS_SAVE_PAYMENT, input)
+      ipcRenderer.invoke(IPC.SETTINGS_SAVE_PAYMENT, input),
+    getCheckout: (): Promise<CheckoutSettings> => ipcRenderer.invoke(IPC.SETTINGS_GET_CHECKOUT),
+    saveCheckout: (input: CheckoutSettings): Promise<CheckoutSettings> =>
+      ipcRenderer.invoke(IPC.SETTINGS_SAVE_CHECKOUT, input)
   },
   compliance: {
     searchRx: (query: string): Promise<PrescriptionRecord[]> => ipcRenderer.invoke(IPC.COMPLIANCE_SEARCH_RX, query),

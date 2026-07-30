@@ -1,0 +1,2 @@
+ALTER TABLE "Transaction" ADD COLUMN "surchargeCents" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "Transaction" ADD COLUMN "email" TEXT;

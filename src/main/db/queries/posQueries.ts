@@ -235,21 +235,38 @@ export async function createTransaction(
     0
   )
   const taxCents = Math.round((subtotalCents * payload.taxRatePercent) / 100)
-  const totalCents = subtotalCents + taxCents
+  const surchargeCents = payload.surchargeCents ?? 0
+  const totalCents = subtotalCents + taxCents + surchargeCents
   const cashOverageToCreditCents = payload.cashOverageToCreditCents ?? 0
   const changeCents = cashOverageToCreditCents > 0 ? 0 : Math.max(0, payload.tenderedCents - totalCents)
   const receiptNumber = `RX-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`
 
   const tabAmountCents = payload.tabAmountCents ?? 0
+  if (!Number.isInteger(surchargeCents) || surchargeCents < 0) throw new Error('Invalid surcharge amount.')
   if (!Number.isInteger(tabAmountCents) || tabAmountCents < 0 || tabAmountCents > totalCents) throw new Error('Invalid Pharmacy Credit amount.')
   if (!Number.isInteger(cashOverageToCreditCents) || cashOverageToCreditCents < 0 || cashOverageToCreditCents > Math.max(0, payload.tenderedCents - totalCents)) throw new Error('Invalid cash deposit amount.')
   if (tabAmountCents > 0 && !payload.customerId) throw new Error('Attach a customer before using Pharmacy Credit.')
   if (cashOverageToCreditCents > 0 && !payload.customerId) throw new Error('Attach a customer before depositing cash to Pharmacy Credit.')
 
+  if (payload.tenderType === 'PHARMACY_CREDIT' && tabAmountCents !== totalCents) {
+    throw new Error('Pharmacy Credit standalone must charge the full sale total to the tab.')
+  }
+
   return db.$transaction(async (tx) => {
     if (tabAmountCents > 0 && payload.customerId) {
       await tx.customer.findUniqueOrThrow({ where: { id: payload.customerId } })
     }
+
+    if (payload.tenderType === 'PHARMACY_CREDIT' && payload.customerId) {
+      const settings = await db.setting.findUnique({ where: { key: 'customer.allowShortPayToTab' } })
+      const allowShortPay = settings?.value === 'true'
+      const detail = await tx.customer.findUniqueOrThrow({ where: { id: payload.customerId }, select: { id: true, ledgerEntries: { orderBy: { createdAt: 'desc' }, take: 1 } } })
+      const currentBalance = detail.ledgerEntries[0]?.balanceAfterCents ?? 0
+      if (currentBalance < totalCents && !allowShortPay) {
+        throw new Error('Balance insufficient for full Pharmacy Credit payment. Add another tender or enable short-pay to tab in settings.')
+      }
+    }
+
     const transaction = await tx.transaction.create({
       data: {
         receiptNumber,
@@ -262,6 +279,8 @@ export async function createTransaction(
         changeCents,
         customerId: payload.customerId || null,
         tabAmountCents,
+        surchargeCents,
+        email: payload.email || null,
         items: {
           create: payload.items.map((item) => ({
             productId: item.productId,
@@ -281,27 +300,30 @@ export async function createTransaction(
         customer: true
       }
     })
+
     if (tabAmountCents > 0 && payload.customerId) {
       await customerLedgerInternals.appendCreditEntry(tx, payload.customerId, 'SALE_CHARGE', -tabAmountCents, { transactionId: transaction.id })
       const loyaltyFlag = await tx.featureFlag.findUnique({ where: { key: 'rewardPoints' } })
       const customer = await tx.customer.findUniqueOrThrow({ where: { id: payload.customerId } })
       if (loyaltyFlag?.enabled && customer.loyaltyEnabled) {
-        const settings = await getCreditSettings(tx)
-        const points = Math.floor((totalCents / 100) * settings.loyaltyPointsPerDollar)
+        const creditSettings = await getCreditSettings(tx)
+        const points = Math.floor((totalCents / 100) * creditSettings.loyaltyPointsPerDollar)
         if (points > 0) await customerLedgerInternals.appendPointEvent(tx, customer.id, 'EARNED', points, { transactionId: transaction.id })
       }
     } else if (payload.customerId) {
       const loyaltyFlag = await tx.featureFlag.findUnique({ where: { key: 'rewardPoints' } })
       const customer = await tx.customer.findUniqueOrThrow({ where: { id: payload.customerId } })
       if (loyaltyFlag?.enabled && customer.loyaltyEnabled) {
-        const settings = await getCreditSettings(tx)
-        const points = Math.floor((totalCents / 100) * settings.loyaltyPointsPerDollar)
+        const creditSettings = await getCreditSettings(tx)
+        const points = Math.floor((totalCents / 100) * creditSettings.loyaltyPointsPerDollar)
         if (points > 0) await customerLedgerInternals.appendPointEvent(tx, customer.id, 'EARNED', points, { transactionId: transaction.id })
       }
     }
+
     if (cashOverageToCreditCents > 0 && payload.customerId) {
       await customerLedgerInternals.appendCreditEntry(tx, payload.customerId, 'FUNDS_ADDED', cashOverageToCreditCents, { transactionId: transaction.id, note: `Cash overpayment deposited from ${transaction.receiptNumber}` })
     }
+
     return transaction
   })
 }

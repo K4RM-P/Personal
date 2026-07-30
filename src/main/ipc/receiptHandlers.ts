@@ -2,8 +2,8 @@ import { ipcMain } from 'electron'
 import { PrismaClient } from '@prisma/client'
 import { IPC } from '../../shared/channels'
 import { printReceipt, testNetworkPrinter } from '../receipt/receiptPrinter'
-import { getPrinterConfig, getStoreInfo, savePrinterConfig, saveStoreInfo } from '../db/queries/settingsQueries'
-import type { PrinterConfig, StoreInfo, TransactionWithItems } from '../../shared/types'
+import { getPrinterConfig, getStoreInfo, savePrinterConfig, saveStoreInfo, getAllowCreditCardSurcharge, getCardSurchargePercent, getAllowShortPayToTab, saveAllowCreditCardSurcharge, saveCardSurchargePercent, saveAllowShortPayToTab } from '../db/queries/settingsQueries'
+import type { PrinterConfig, StoreInfo, TransactionWithItems, CheckoutSettings } from '../../shared/types'
 
 export function registerReceiptHandlers(db: PrismaClient): void {
   ipcMain.handle(IPC.RECEIPT_PRINT, async (_e, transaction: TransactionWithItems) => {
@@ -20,4 +20,22 @@ export function registerReceiptHandlers(db: PrismaClient): void {
 
   ipcMain.handle(IPC.SETTINGS_GET_STORE, () => getStoreInfo(db))
   ipcMain.handle(IPC.SETTINGS_SAVE_STORE, (_e, info: StoreInfo) => saveStoreInfo(db, info))
+
+  ipcMain.handle(IPC.SETTINGS_GET_CHECKOUT, async (): Promise<CheckoutSettings> => {
+    const [allowSurcharge, surchargePercent, allowShortPay] = await Promise.all([
+      getAllowCreditCardSurcharge(db),
+      getCardSurchargePercent(db),
+      getAllowShortPayToTab(db)
+    ])
+    return { allowCreditCardSurcharge: allowSurcharge, cardSurchargePercent: surchargePercent, allowShortPayToTab: allowShortPay }
+  })
+
+  ipcMain.handle(IPC.SETTINGS_SAVE_CHECKOUT, async (_e, input: CheckoutSettings) => {
+    await Promise.all([
+      saveAllowCreditCardSurcharge(db, input.allowCreditCardSurcharge),
+      saveCardSurchargePercent(db, input.cardSurchargePercent),
+      saveAllowShortPayToTab(db, input.allowShortPayToTab)
+    ])
+    return input
+  })
 }

@@ -16,7 +16,11 @@ const DEFAULTS = {
   // Catalogue (McKesson WEBCAT import)
   'catalog.province': 'ONT',
   'catalog.staleThresholdDays': '90',
-  'customer.loyaltyPointsPerDollar': '1'
+  'customer.loyaltyPointsPerDollar': '1',
+  // Payment configuration
+  'payment.allowCreditCardSurcharge': 'false',
+  'payment.cardSurchargePercent': '2',
+  'customer.allowShortPayToTab': 'false'
 } as const
 
 async function getSetting(db: PrismaClient, key: string): Promise<string> {
@@ -90,4 +94,29 @@ export async function seedDefaultSettings(db: PrismaClient): Promise<void> {
       create: { key, value }
     })
   }
+}
+
+export async function getAllowCreditCardSurcharge(db: PrismaClient): Promise<boolean> {
+  return (await getSetting(db, 'payment.allowCreditCardSurcharge')) === 'true'
+}
+
+export async function getCardSurchargePercent(db: PrismaClient): Promise<number> {
+  const raw = await getSetting(db, 'payment.cardSurchargePercent')
+  return parseInt(raw, 10) || 2
+}
+
+export async function getAllowShortPayToTab(db: PrismaClient): Promise<boolean> {
+  return (await getSetting(db, 'customer.allowShortPayToTab')) === 'true'
+}
+
+export async function saveAllowCreditCardSurcharge(db: PrismaClient, enabled: boolean): Promise<void> {
+  await setSetting(db, 'payment.allowCreditCardSurcharge', String(enabled))
+}
+
+export async function saveCardSurchargePercent(db: PrismaClient, percent: number): Promise<void> {
+  await setSetting(db, 'payment.cardSurchargePercent', String(percent))
+}
+
+export async function saveAllowShortPayToTab(db: PrismaClient, enabled: boolean): Promise<void> {
+  await setSetting(db, 'customer.allowShortPayToTab', String(enabled))
 }

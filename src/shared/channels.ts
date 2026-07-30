@@ -74,6 +74,8 @@ export const IPC = {
   SETTINGS_SAVE_STORE: 'settings:saveStore',
   SETTINGS_GET_PAYMENT: 'settings:getPayment',
   SETTINGS_SAVE_PAYMENT: 'settings:savePayment',
+  SETTINGS_GET_CHECKOUT: 'settings:getCheckout',
+  SETTINGS_SAVE_CHECKOUT: 'settings:saveCheckout',
 
   // Compliance & ledger channels (Stage 6/8)
   COMPLIANCE_SEARCH_RX: 'compliance:searchRx',

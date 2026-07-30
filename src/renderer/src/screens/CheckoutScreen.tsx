@@ -6,6 +6,8 @@ import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
 import { Lock } from 'lucide-react'
 
 type ScanFeedback = { type: 'success' | 'error'; message: string } | null
+type PaymentMethod = 'CASH' | 'E_TRANSFER' | 'CARD' | 'PHARMACY_CREDIT' | null
+type CardType = 'DEBIT' | 'CREDIT' | null
 
 export function CheckoutScreen(): React.JSX.Element {
   const [products, setProducts] = React.useState<Product[]>([])
@@ -24,12 +26,28 @@ export function CheckoutScreen(): React.JSX.Element {
   const [activeReceipt, setActiveReceipt] = React.useState<TransactionWithItems | null>(null)
   const [printStatus, setPrintStatus] = React.useState<string | null>(null)
   const [receiptPdfUrl, setReceiptPdfUrl] = React.useState<string | null>(null)
+  const [receiptError, setReceiptError] = React.useState(false)
   const [parkedCarts, setParkedCarts] = React.useState<{ id: string; name: string; items: { product: Product; quantity: number; unitPriceCents: number }[] }[]>([])
   const [recentTransactions, setRecentTransactions] = React.useState<TransactionWithItems[]>([])
   const [paymentState, setPaymentState] = React.useState<'idle' | 'awaiting' | 'processing' | 'approved' | 'declined' | 'timeout'>('idle')
   const [paymentMessage, setPaymentMessage] = React.useState<string | null>(null)
   const [manualPrompt, setManualPrompt] = React.useState<{ amountCents: number; orderRef: string } | null>(null)
   const [manualRef, setManualRef] = React.useState('')
+
+  const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod>(null)
+  const [cardType, setCardType] = React.useState<CardType>(null)
+  const [eTransferEmail, setETransferEmail] = React.useState('')
+  const [eTransferConfirmed, setETransferConfirmed] = React.useState(false)
+  const [checkoutSettings, setCheckoutSettings] = React.useState({
+    allowCreditCardSurcharge: false,
+    cardSurchargePercent: 2,
+    allowShortPayToTab: false
+  })
+
+  const [showAddCustomer, setShowAddCustomer] = React.useState(false)
+  const [newCustomer, setNewCustomer] = React.useState({ firstName: '', lastName: '', phone: '', address: '', email: '' })
+  const [customerCreationError, setCustomerCreationError] = React.useState<string | null>(null)
+  const [creatingCustomer, setCreatingCustomer] = React.useState(false)
 
   const searchRef = React.useRef<HTMLInputElement>(null)
   const tenderRef = React.useRef<HTMLInputElement>(null)
@@ -39,9 +57,16 @@ export function CheckoutScreen(): React.JSX.Element {
   const subtotalCents = cart.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0)
   const taxRatePercent = 13
   const taxCents = Math.round((subtotalCents * taxRatePercent) / 100)
-  const totalCents = subtotalCents + taxCents
-  const changeCents = Math.max(0, tenderedCents - totalCents)
-  const shortCents = Math.max(0, totalCents - tenderedCents)
+  const surchargeCents = cardType === 'CREDIT' && checkoutSettings.allowCreditCardSurcharge
+    ? Math.floor(subtotalCents * checkoutSettings.cardSurchargePercent / 100)
+    : 0
+  const totalWithSurchargeCents = subtotalCents + taxCents + surchargeCents
+  const effectiveTotal = paymentMethod === 'CARD' && cardType === 'CREDIT' && checkoutSettings.allowCreditCardSurcharge
+    ? totalWithSurchargeCents
+    : subtotalCents + taxCents
+  const changeCents = Math.max(0, tenderedCents - effectiveTotal)
+  const shortCents = Math.max(0, effectiveTotal - tenderedCents)
+  const customerBalance = attachedCustomer?.ledgerEntries?.[0]?.balanceCents ?? 0
 
   React.useEffect(() => {
     const loadTransactions = async (): Promise<void> => {
@@ -57,9 +82,20 @@ export function CheckoutScreen(): React.JSX.Element {
     void loadTransactions()
   }, [])
 
-  // Product results come from the server, capped, and debounced. Nothing loads
-  // until the cashier types: an empty box shows a prompt, not 50k rows. This is
-  // what keeps the register instant regardless of catalogue size.
+  React.useEffect(() => {
+    const loadSettings = async (): Promise<void> => {
+      try {
+        if (window.api?.settings?.getCheckout) {
+          const settings = await window.api.settings.getCheckout()
+          setCheckoutSettings(settings)
+        }
+      } catch (err) {
+        console.error('Failed to load checkout settings:', err)
+      }
+    }
+    void loadSettings()
+  }, [])
+
   React.useEffect(() => {
     if (!window.api?.product) return
     const q = searchQuery.trim()
@@ -125,9 +161,11 @@ export function CheckoutScreen(): React.JSX.Element {
   }
 
   const completeSale = async (
-    tenderType: 'CASH' | 'CARD' | 'SPLIT',
+    tenderType: 'CASH' | 'CARD' | 'E_TRANSFER' | 'PHARMACY_CREDIT' | 'SPLIT',
     tabAmountCents?: number,
-    cashOverageToCreditCents?: number
+    cashOverageToCreditCents?: number,
+    surchargeCentsArg?: number,
+    email?: string
   ): Promise<void> => {
     if (cart.length === 0) return
     setCardProcessing(true)
@@ -136,6 +174,7 @@ export function CheckoutScreen(): React.JSX.Element {
         setScanFeedback({ type: 'error', message: 'API not available' })
         return
       }
+      const finalTendered = tenderType === 'E_TRANSFER' ? effectiveTotal : tenderedCents
       const transaction = await window.api.transaction.create({
         items: cart.map((item) => ({
           productId: item.product.id,
@@ -144,23 +183,23 @@ export function CheckoutScreen(): React.JSX.Element {
           unitPriceCents: item.unitPriceCents
         })),
         taxRatePercent,
-        tenderedCents,
+        tenderedCents: finalTendered,
         tenderType,
         customerId: attachedCustomer?.id,
         tabAmountCents: tabAmountCents ?? 0,
-        cashOverageToCreditCents: cashOverageToCreditCents ?? 0
+        cashOverageToCreditCents: cashOverageToCreditCents ?? 0,
+        surchargeCents: surchargeCentsArg ?? 0,
+        email: email || undefined
       })
       setActiveReceipt(transaction)
       setCart([])
       setTenderedDollars('')
       setAttachedCustomer(null)
+      setPaymentMethod(null)
+      setCardType(null)
+      setETransferEmail('')
+      setETransferConfirmed(false)
       setScanFeedback({ type: 'success', message: `Sale complete — ${transaction.receiptNumber}` })
-
-      if (window.api?.receipt) {
-        const printResult = await window.api.receipt.print(transaction)
-        setPrintStatus(printResult.message)
-        setReceiptPdfUrl(printResult.pdfDataUrl ?? null)
-      }
     } catch (err) {
       setScanFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Transaction failed' })
     } finally {
@@ -170,15 +209,15 @@ export function CheckoutScreen(): React.JSX.Element {
 
   const handleCashCheckout = (): void => {
     if (cart.length === 0) return
-    if (tenderedCents < totalCents && !attachedCustomer) {
+    if (tenderedCents < effectiveTotal && !attachedCustomer) {
       setScanFeedback({ type: 'error', message: 'Not enough cash. Attach a customer to put the shortfall on their tab.' })
       return
     }
-    if (tenderedCents + (attachedCustomer ? Math.max(0, attachedCustomer.ledgerEntries?.[0]?.balanceCents ?? 0) : 0) < totalCents) {
+    if (tenderedCents + (attachedCustomer ? Math.max(0, attachedCustomer.ledgerEntries?.[0]?.balanceCents ?? 0) : 0) < effectiveTotal) {
       setScanFeedback({ type: 'error', message: 'Tendered amount is less than the total due.' })
       return
     }
-    if (tenderedCents >= totalCents) {
+    if (tenderedCents >= effectiveTotal) {
       void completeSale('CASH')
     } else if (attachedCustomer) {
       void completeSale('CASH', shortCents)
@@ -189,7 +228,7 @@ export function CheckoutScreen(): React.JSX.Element {
     if (result.status === 'approved') {
       setPaymentState('approved')
       setPaymentMessage(`Card approved${result.cardLast4 ? ` (card •••• ${result.cardLast4})` : ''}`)
-      void completeSale('CARD')
+      void completeSale('CARD', undefined, undefined, surchargeCents)
     } else if (result.status === 'error') {
       setPaymentState('timeout')
       setPaymentMessage(result.message || 'Payment timed out.')
@@ -204,7 +243,7 @@ export function CheckoutScreen(): React.JSX.Element {
     setPaymentState('awaiting')
     setPaymentMessage('Waiting for terminal response…')
     const orderRef = `SALE-${Date.now()}`
-    const cardAmount = totalCents
+    const cardAmount = effectiveTotal
 
     if (!window.api?.payment) {
       alert('Payment service unavailable')
@@ -243,6 +282,24 @@ export function CheckoutScreen(): React.JSX.Element {
     }
   }
 
+  const handleETransferComplete = (): void => {
+    if (cart.length === 0 || !eTransferConfirmed) return
+    void completeSale('E_TRANSFER', undefined, undefined, 0, eTransferEmail || undefined)
+  }
+
+  const handlePharmacyCreditCheckout = (): void => {
+    if (cart.length === 0) return
+    if (!attachedCustomer) {
+      setScanFeedback({ type: 'error', message: 'Attach a customer before using Pharmacy Credit.' })
+      return
+    }
+    if (customerBalance < effectiveTotal && !checkoutSettings.allowShortPayToTab) {
+      setScanFeedback({ type: 'error', message: 'Balance insufficient for full Pharmacy Credit payment. Add another tender.' })
+      return
+    }
+    void completeSale('PHARMACY_CREDIT', effectiveTotal)
+  }
+
   const handleParkSale = (): void => {
     if (cart.length === 0) return
     const parkId = `PARK-${Date.now()}`
@@ -272,8 +329,11 @@ export function CheckoutScreen(): React.JSX.Element {
   const attachCustomer = async (customer: Customer): Promise<void> => {
     if (!window.api?.customer) return
     try {
-      const ledger = await window.api.customerLedger.get(customer.id)
-      const balanceCents = ledger.length > 0 ? ledger[ledger.length - 1].balanceCents : 0
+      // Read the authoritative balance from the Prisma credit ledger (same store
+      // that sales charge and the backend Pharmacy Credit guard read), not the
+      // Setting-table ledger — those two stores can diverge.
+      const detail = (await window.api.customer.get(customer.id)) as Customer & { currentBalanceCents?: number }
+      const balanceCents = detail.currentBalanceCents ?? 0
       setAttachedCustomer({ ...customer, ledgerEntries: [{ balanceCents }] })
       setCustomerSearchQuery('')
       setCustomerSearchResults([])
@@ -282,9 +342,83 @@ export function CheckoutScreen(): React.JSX.Element {
     }
   }
 
-  const customerBalance = attachedCustomer?.ledgerEntries?.[0]?.balanceCents ?? 0
+  const handleCreateCustomer = async (): Promise<void> => {
+    if (!newCustomer.firstName.trim() || !newCustomer.lastName.trim() || !newCustomer.phone.trim() || !newCustomer.address.trim()) {
+      setCustomerCreationError('First name, last name, phone, and address are required.')
+      return
+    }
+    if (window.api?.customer?.findDuplicatePhone) {
+      const dup = await window.api.customer.findDuplicatePhone(newCustomer.phone)
+      if (dup) {
+        setCustomerCreationError(`A customer with phone ${newCustomer.phone} already exists.`)
+        return
+      }
+    }
+    try {
+      setCreatingCustomer(true)
+      const created = await window.api.customer.create({
+        firstName: newCustomer.firstName.trim(),
+        lastName: newCustomer.lastName.trim(),
+        phone: newCustomer.phone.trim(),
+        address: newCustomer.address.trim(),
+        email: newCustomer.email.trim() || undefined
+      })
+      await attachCustomer(created)
+      setShowAddCustomer(false)
+      setNewCustomer({ firstName: '', lastName: '', phone: '', address: '', email: '' })
+      setCustomerCreationError(null)
+    } catch (err) {
+      setCustomerCreationError(err instanceof Error ? err.message : 'Failed to create customer')
+    } finally {
+      setCreatingCustomer(false)
+    }
+  }
 
-  // Results are already searched + capped server-side; render them as-is.
+  const handlePrintReceipt = async (): Promise<void> => {
+    if (!activeReceipt || !window.api?.receipt) return
+    setPrintStatus('Printing…')
+    setReceiptError(false)
+    try {
+      const result = await window.api.receipt.print(activeReceipt)
+      if (result.success) {
+        setPrintStatus('Receipt printed ✓')
+        setReceiptPdfUrl(result.pdfDataUrl ?? null)
+      } else {
+        setPrintStatus(result.message || 'Printer unavailable')
+        setReceiptPdfUrl(result.pdfDataUrl ?? null)
+        setReceiptError(true)
+      }
+    } catch (err) {
+      setPrintStatus(err instanceof Error ? err.message : 'Printer unavailable')
+      setReceiptError(true)
+    }
+  }
+
+  const dismissReceipt = (): void => {
+    setActiveReceipt(null)
+    setPrintStatus(null)
+    setReceiptPdfUrl(null)
+    setReceiptError(false)
+    void (async () => {
+      if (window.api?.transaction) {
+        try {
+          setRecentTransactions(await window.api.transaction.getAll())
+        } catch {
+          /* non-fatal */
+        }
+      }
+    })()
+  }
+
+  const resetPaymentMethod = (): void => {
+    setPaymentMethod(null)
+    setCardType(null)
+    setETransferEmail('')
+    setETransferConfirmed(false)
+    setPaymentMessage(null)
+    setPaymentState('idle')
+  }
+
   const filteredProducts = products
 
   return (
@@ -325,7 +459,7 @@ export function CheckoutScreen(): React.JSX.Element {
                   value={customerSearchQuery}
                   onChange={(e) => setCustomerSearchQuery(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') void handleCustomerSearch() }}
-                  placeholder="Attach customer — search name or phone"
+                  placeholder="Attach customer — search name or phone, then Enter"
                   className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm"
                 />
                 {customerSearchResults.length > 0 && (
@@ -339,6 +473,21 @@ export function CheckoutScreen(): React.JSX.Element {
                         <b>{customer.firstName} {customer.lastName}</b> · {customer.phone}
                       </button>
                     ))}
+                  </div>
+                )}
+                {/* No results → offer to add a new customer */}
+                {customerSearchQuery.trim() !== '' && customerSearchResults.length === 0 && (
+                  <div className="absolute z-20 mt-1 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white p-3 text-center text-sm shadow-sm">
+                    <div className="mb-2 text-[var(--muted-foreground)]">Customer not found</div>
+                    <button
+                      onClick={() => {
+                        setNewCustomer((prev) => ({ ...prev, lastName: customerSearchQuery.trim() }))
+                        setShowAddCustomer(true)
+                      }}
+                      className="min-h-11 w-full rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
+                    >
+                      + Add new customer
+                    </button>
                   </div>
                 )}
               </div>
@@ -361,7 +510,6 @@ export function CheckoutScreen(): React.JSX.Element {
           <Card>
             <div className="mb-3">
               <input
-                ref={searchRef}
                 type="text"
                 placeholder="Search products by SKU, name, or barcode"
                 value={searchQuery}
@@ -444,15 +592,10 @@ export function CheckoutScreen(): React.JSX.Element {
                   <div>
                     <div className="font-bold text-[var(--foreground)]">{tx.receiptNumber}</div>
                     <div className="text-[var(--muted-foreground)]">
-                      {new Date(tx.createdAt).toLocaleTimeString()} • {tx.items.length} items • Status:{' '}
-                      <span className={tx.status === 'VOIDED' ? 'font-bold text-[var(--error)]' : 'text-[var(--success)]'}>
-                        {tx.status}
-                      </span>
+                      {new Date(tx.createdAt).toLocaleTimeString()} • {tx.items.length} items • {tx.tenderType}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-bold text-[var(--primary)]">{formatCurrency(tx.totalCents)}</span>
-                  </div>
+                  <span className="text-sm font-bold text-[var(--primary)]">{formatCurrency(tx.totalCents)}</span>
                 </div>
               ))}
             </div>
@@ -503,133 +646,272 @@ export function CheckoutScreen(): React.JSX.Element {
                 <span>Tax ({taxRatePercent}%)</span>
                 <span>{formatCurrency(taxCents)}</span>
               </div>
+              {surchargeCents > 0 && (
+                <div className="flex items-center justify-between text-sm text-[var(--warning)]">
+                  <span>Credit card fee ({checkoutSettings.cardSurchargePercent}%)</span>
+                  <span>{formatCurrency(surchargeCents)}</span>
+                </div>
+              )}
               <div className="flex justify-between border-t border-[var(--border)] pt-2 text-base font-semibold text-[var(--foreground)]">
                 <span>Total due</span>
-                <span className="text-[var(--primary)]">{formatCurrency(totalCents)}</span>
+                <span className="text-[var(--primary)]">{formatCurrency(effectiveTotal)}</span>
               </div>
             </div>
           </Card>
 
-          {/* Payment */}
+          {/* Payment method selection */}
           <Card>
             <CardHeader>
-              <CardTitle>Payment</CardTitle>
-              <CardDescription>Enter cash amount or charge card.</CardDescription>
+              <CardTitle>How will they pay?</CardTitle>
+              <CardDescription>Choose a payment method to continue.</CardDescription>
             </CardHeader>
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="mb-1 block font-semibold text-[var(--foreground)]">Cash received</label>
-                <input
-                  ref={tenderRef}
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={tenderedDollars}
-                  onChange={(e) => setTenderedDollars(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
-                />
-              </div>
 
-              {/* Overpaid — give change or deposit to credit */}
-              {tenderedCents > totalCents && (
-                <div className="rounded-[var(--radius)] border border-[var(--success)]/30 bg-[var(--muted)] p-3">
-                  <div className="mb-2 text-xs font-semibold text-[var(--foreground)]">
-                    Overpaid by {formatCurrency(tenderedCents - totalCents)}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={handleCashCheckout}
-                      className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-white px-2 text-xs font-semibold text-[var(--foreground)]"
-                    >
-                      Give change ({formatCurrency(changeCents)})
-                    </button>
-                    {attachedCustomer ? (
-                      <button
-                        onClick={() => void completeSale('CASH', 0, tenderedCents - totalCents)}
-                        className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-2 text-xs font-semibold text-[var(--primary-foreground)]"
-                      >
-                        Deposit {formatCurrency(tenderedCents - totalCents)} to credit
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => setScanFeedback({ type: 'error', message: 'Attach a customer to deposit overpayment to their credit.' })}
-                        className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-white px-2 text-xs font-semibold text-[var(--muted-foreground)]"
-                      >
-                        Deposit to credit
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Underpaid — put the rest on customer's tab */}
-              {tenderedCents > 0 && tenderedCents < totalCents && attachedCustomer && (
-                <div className="rounded-[var(--radius)] border border-[var(--primary)]/30 bg-[var(--muted)] p-3">
-                  <div className="mb-2 text-xs font-semibold text-[var(--foreground)]">
-                    Short by {formatCurrency(shortCents)}
-                  </div>
-                  <button
-                    onClick={() => void completeSale('CASH', shortCents)}
-                    className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-2 text-xs font-semibold text-[var(--primary-foreground)]"
-                  >
-                    Put {formatCurrency(shortCents)} on {attachedCustomer.firstName}'s tab
-                  </button>
-                </div>
-              )}
-
-              {/* Underpaid but no customer attached */}
-              {tenderedCents > 0 && tenderedCents < totalCents && !attachedCustomer && (
-                <div className="rounded-[var(--radius)] border border-[var(--warning)]/30 bg-[var(--warning-bg)] p-3 text-xs text-[var(--foreground)]">
-                  Not enough cash. Attach a customer to put the remaining {formatCurrency(shortCents)} on their tab.
-                </div>
-              )}
-
-              {/* Payment status message */}
-              {paymentMessage && (
-                <div
-                  className={`rounded-[var(--radius)] border px-3 py-2 text-xs ${
-                    paymentState === 'approved'
-                      ? 'border-[var(--success)]/30 bg-[var(--success-bg)] text-[var(--success)]'
-                      : paymentState === 'declined'
-                        ? 'border-[var(--error)]/30 bg-[var(--error-bg)] text-[var(--error)]'
-                      : paymentState === 'timeout'
-                        ? 'border-[var(--warning)]/30 bg-[var(--warning-bg)] text-[var(--warning)]'
-                      : 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]'
-                  }`}
+            {paymentMethod === null ? (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setPaymentMethod('CASH')}
+                  disabled={cart.length === 0}
+                  className="min-h-14 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] disabled:opacity-50"
                 >
-                  {paymentMessage}
-                </div>
-              )}
-
-              {/* Action buttons */}
-              <div className="grid grid-cols-3 gap-2">
+                  CASH
+                </button>
+                <button
+                  onClick={() => setPaymentMethod('E_TRANSFER')}
+                  disabled={cart.length === 0}
+                  className="min-h-14 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] disabled:opacity-50"
+                >
+                  E-TRANSFER
+                </button>
+                <button
+                  onClick={() => setPaymentMethod('CARD')}
+                  disabled={cart.length === 0}
+                  className="min-h-14 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] disabled:opacity-50"
+                >
+                  CARD (Debit/Credit)
+                </button>
+                <button
+                  onClick={() => setPaymentMethod('PHARMACY_CREDIT')}
+                  disabled={cart.length === 0 || !attachedCustomer}
+                  title={!attachedCustomer ? 'Attach a customer to use Pharmacy Credit' : undefined}
+                  className="min-h-14 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+                >
+                  PHARMACY CREDIT
+                </button>
                 <button
                   onClick={handleParkSale}
-                  disabled={cart.length === 0 || cardProcessing}
-                  className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 py-3 text-xs font-medium text-[var(--foreground)] disabled:opacity-50"
+                  disabled={cart.length === 0}
+                  className="col-span-2 min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-xs font-medium text-[var(--foreground)] disabled:opacity-50"
                 >
-                  <span className="flex items-center justify-center gap-1"><Lock className="h-3.5 w-3.5" />Hold / Park</span>
-                </button>
-                <button
-                  onClick={startCardCheckout}
-                  disabled={cart.length === 0 || cardProcessing}
-                  className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 py-3 text-xs font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
-                >
-                  {cardProcessing ? 'Processing…' : 'Pay Card'}
-                </button>
-                <button
-                  onClick={handleCashCheckout}
-                  disabled={cart.length === 0 || cardProcessing || (tenderedCents < totalCents && !attachedCustomer)}
-                  className="min-h-11 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 py-3 text-xs font-semibold text-[var(--primary)] disabled:opacity-50"
-                >
-                  Pay Cash
+                  <span className="flex items-center justify-center gap-1"><Lock className="h-3.5 w-3.5" />Hold / Park sale</span>
                 </button>
               </div>
-            </div>
+            ) : (
+              <div className="mt-3 space-y-3 text-xs">
+                <button onClick={resetPaymentMethod} className="text-[var(--primary)]">← Back to payment methods</button>
+
+                {/* CASH */}
+                {paymentMethod === 'CASH' && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="mb-1 block font-semibold text-[var(--foreground)]">Cash received</label>
+                      <input
+                        ref={tenderRef}
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={tenderedDollars}
+                        onChange={(e) => setTenderedDollars(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
+                      />
+                    </div>
+                    <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3 text-sm">
+                      Paid: {formatCurrency(tenderedCents)} | Change: {formatCurrency(changeCents)}
+                    </div>
+
+                    {tenderedCents > effectiveTotal && attachedCustomer && (
+                      <button
+                        onClick={() => void completeSale('CASH', 0, tenderedCents - effectiveTotal)}
+                        className="w-full min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-white px-2 text-xs font-semibold text-[var(--foreground)]"
+                      >
+                        Deposit {formatCurrency(tenderedCents - effectiveTotal)} overpayment to credit
+                      </button>
+                    )}
+
+                    {tenderedCents > 0 && tenderedCents < effectiveTotal && attachedCustomer && (
+                      <button
+                        onClick={() => void completeSale('CASH', shortCents)}
+                        disabled={customerBalance < shortCents && !checkoutSettings.allowShortPayToTab}
+                        className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-2 text-xs font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+                      >
+                        Put {formatCurrency(shortCents)} on {attachedCustomer.firstName}&apos;s tab
+                      </button>
+                    )}
+
+                    <button
+                      onClick={handleCashCheckout}
+                      disabled={cardProcessing || tenderedCents < effectiveTotal}
+                      className="w-full min-h-11 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] disabled:opacity-50"
+                    >
+                      Complete Cash Sale
+                    </button>
+                  </div>
+                )}
+
+                {/* E-TRANSFER */}
+                {paymentMethod === 'E_TRANSFER' && (
+                  <div className="space-y-3">
+                    <div className="text-center">
+                      <div className="text-xs text-[var(--muted-foreground)]">Amount due via E-Transfer</div>
+                      <div className="text-3xl font-bold text-[var(--primary)]">{formatCurrency(effectiveTotal)}</div>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[var(--muted-foreground)]">Customer email for E-Transfer (optional)</label>
+                      <input
+                        type="email"
+                        value={eTransferEmail}
+                        onChange={(e) => setETransferEmail(e.target.value)}
+                        placeholder={attachedCustomer?.email || 'name@example.com'}
+                        className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
+                      />
+                    </div>
+                    <label className="flex items-center gap-2 text-sm text-[var(--foreground)]">
+                      <input type="checkbox" checked={eTransferConfirmed} onChange={(e) => setETransferConfirmed(e.target.checked)} />
+                      I have received the E-Transfer confirmation
+                    </label>
+                    <button
+                      onClick={handleETransferComplete}
+                      disabled={!eTransferConfirmed || cardProcessing}
+                      className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+                    >
+                      Complete Sale
+                    </button>
+                  </div>
+                )}
+
+                {/* CARD */}
+                {paymentMethod === 'CARD' && (
+                  <div className="space-y-3">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setCardType('DEBIT')}
+                        className={`flex-1 min-h-11 rounded-[var(--radius)] border px-3 text-sm font-semibold ${cardType === 'DEBIT' ? 'border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)]' : 'border-[var(--border)] text-[var(--foreground)]'}`}
+                      >
+                        Debit
+                      </button>
+                      <button
+                        onClick={() => setCardType('CREDIT')}
+                        className={`flex-1 min-h-11 rounded-[var(--radius)] border px-3 text-sm font-semibold ${cardType === 'CREDIT' ? 'border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)]' : 'border-[var(--border)] text-[var(--foreground)]'}`}
+                      >
+                        Credit
+                      </button>
+                    </div>
+
+                    {cardType === 'CREDIT' && checkoutSettings.allowCreditCardSurcharge && (
+                      <div className="rounded-[var(--radius)] border border-[var(--warning)]/30 bg-[var(--warning-bg)] p-3 text-xs text-[var(--foreground)]">
+                        Original: {formatCurrency(subtotalCents + taxCents)} + {checkoutSettings.cardSurchargePercent}% credit fee: {formatCurrency(surchargeCents)} = Total: {formatCurrency(effectiveTotal)}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={startCardCheckout}
+                      disabled={!cardType || cardProcessing}
+                      className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+                    >
+                      {cardProcessing ? 'Processing…' : `Charge ${formatCurrency(effectiveTotal)}`}
+                    </button>
+                  </div>
+                )}
+
+                {/* PHARMACY CREDIT */}
+                {paymentMethod === 'PHARMACY_CREDIT' && (
+                  <div className="space-y-3">
+                    {!attachedCustomer ? (
+                      <div className="rounded-[var(--radius)] border border-[var(--warning)]/30 bg-[var(--warning-bg)] p-3 text-xs text-[var(--foreground)]">
+                        Attach a customer to pay with Pharmacy Credit.
+                      </div>
+                    ) : (
+                      <>
+                        <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3 text-sm">
+                          Available: {formatCurrency(customerBalance)} | Applying: {formatCurrency(effectiveTotal)}
+                        </div>
+                        {customerBalance < effectiveTotal && (
+                          <div className={`rounded-[var(--radius)] border p-3 text-xs ${checkoutSettings.allowShortPayToTab ? 'border-[var(--warning)]/30 bg-[var(--warning-bg)] text-[var(--foreground)]' : 'border-[var(--error)]/30 bg-[var(--error-bg)] text-[var(--error)]'}`}>
+                            {checkoutSettings.allowShortPayToTab
+                              ? `Balance is short by ${formatCurrency(effectiveTotal - customerBalance)}; this will push the tab negative.`
+                              : 'Balance insufficient; short-pay to tab is disabled. Add another tender.'}
+                          </div>
+                        )}
+                        <button
+                          onClick={handlePharmacyCreditCheckout}
+                          disabled={cardProcessing || (customerBalance < effectiveTotal && !checkoutSettings.allowShortPayToTab)}
+                          className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+                        >
+                          Pay with Pharmacy Credit
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Payment status message */}
+                {paymentMessage && (
+                  <div
+                    className={`rounded-[var(--radius)] border px-3 py-2 text-xs ${
+                      paymentState === 'approved'
+                        ? 'border-[var(--success)]/30 bg-[var(--success-bg)] text-[var(--success)]'
+                        : paymentState === 'declined'
+                          ? 'border-[var(--error)]/30 bg-[var(--error-bg)] text-[var(--error)]'
+                        : paymentState === 'timeout'
+                          ? 'border-[var(--warning)]/30 bg-[var(--warning-bg)] text-[var(--warning)]'
+                        : 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]'
+                    }`}
+                  >
+                    {paymentMessage}
+                  </div>
+                )}
+              </div>
+            )}
           </Card>
         </div>
       </div>
+
+      {/* Add-customer modal */}
+      {showAddCustomer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <Card className="w-[440px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-3">
+            <CardTitle className="text-[var(--foreground)]">Add new customer</CardTitle>
+            {customerCreationError && (
+              <div className="rounded-[var(--radius)] border border-[var(--error)]/30 bg-[var(--error-bg)] px-3 py-2 text-xs text-[var(--error)]">
+                {customerCreationError}
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              <input placeholder="First name" value={newCustomer.firstName} onChange={(e) => setNewCustomer((p) => ({ ...p, firstName: e.target.value }))} className="rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm" />
+              <input placeholder="Last name" value={newCustomer.lastName} onChange={(e) => setNewCustomer((p) => ({ ...p, lastName: e.target.value }))} className="rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm" />
+            </div>
+            <input placeholder="Phone (required)" value={newCustomer.phone} onChange={(e) => setNewCustomer((p) => ({ ...p, phone: e.target.value }))} className="w-full rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm" />
+            <input placeholder="Address" value={newCustomer.address} onChange={(e) => setNewCustomer((p) => ({ ...p, address: e.target.value }))} className="w-full rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm" />
+            <input placeholder="Email (optional)" value={newCustomer.email} onChange={(e) => setNewCustomer((p) => ({ ...p, email: e.target.value }))} className="w-full rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm" />
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                onClick={() => { setShowAddCustomer(false); setCustomerCreationError(null) }}
+                disabled={creatingCustomer}
+                className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)] disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void handleCreateCustomer()}
+                disabled={creatingCustomer}
+                className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+              >
+                {creatingCustomer ? 'Saving…' : 'Create & attach'}
+              </button>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Manual / External Terminal confirmation */}
       {manualPrompt && (
@@ -656,92 +938,59 @@ export function CheckoutScreen(): React.JSX.Element {
               />
             </div>
             <div className="grid grid-cols-2 gap-2 pt-1">
-              <button
-                onClick={() => confirmManualPayment('declined')}
-                disabled={cardProcessing}
-                className="rounded-[var(--radius)] bg-[var(--error-bg)] px-3 py-2 text-sm font-medium text-[var(--error)] disabled:opacity-50"
-              >
-                Declined
-              </button>
-              <button
-                onClick={() => confirmManualPayment('approved')}
-                disabled={cardProcessing}
-                className="rounded-[var(--radius)] bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
-              >
-                Approved
-              </button>
+              <button onClick={() => confirmManualPayment('declined')} disabled={cardProcessing} className="rounded-[var(--radius)] bg-[var(--error-bg)] px-3 py-2 text-sm font-medium text-[var(--error)] disabled:opacity-50">Declined</button>
+              <button onClick={() => confirmManualPayment('approved')} disabled={cardProcessing} className="rounded-[var(--radius)] bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50">Approved</button>
             </div>
-            <button
-              onClick={() => setManualPrompt(null)}
-              disabled={cardProcessing}
-              className="w-full text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)] disabled:opacity-50"
-            >
-              Cancel
-            </button>
+            <button onClick={() => setManualPrompt(null)} disabled={cardProcessing} className="w-full text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)] disabled:opacity-50">Cancel</button>
           </Card>
         </div>
       )}
 
-      {/* On-Screen Receipt Modal */}
+      {/* Receipt printing popup — not dismissable by outside click, forces an explicit choice */}
       {activeReceipt && (
-        <Card className="border-[var(--primary)] bg-[var(--card)] p-6 space-y-4">
-          <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <Card className="w-[440px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-4">
             <div>
-              <h2 className="text-lg font-bold text-[var(--foreground)]">Receipt Summary</h2>
-              <p className="text-xs text-[var(--muted-foreground)]">Transaction #{activeReceipt.receiptNumber}</p>
-              {printStatus && <p className="mt-1 text-xs text-[var(--success)]">{printStatus}</p>}
+              <CardTitle className="text-[var(--foreground)]">Sale complete — {activeReceipt.receiptNumber}</CardTitle>
+              <CardDescription className="text-[var(--muted-foreground)]">
+                Total {formatCurrency(activeReceipt.totalCents)} · Paid via {activeReceipt.tenderType.replace('_', '-')}
+              </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
-              {receiptPdfUrl && (
-                <a
-                  href={receiptPdfUrl}
-                  download={`receipt-${activeReceipt.receiptNumber}.pdf`}
-                  className="rounded-[var(--radius)] bg-[var(--primary)] px-3 py-1 text-xs text-[var(--primary-foreground)]"
-                >
-                  Download PDF
-                </a>
-              )}
-              <button
-                onClick={() => { setActiveReceipt(null); setPrintStatus(null); setReceiptPdfUrl(null) }}
-                className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 py-1 text-xs text-[var(--foreground)]"
-              >
-                Close Receipt
-              </button>
-            </div>
-          </div>
 
-          <div className="space-y-2 text-xs">
-            {activeReceipt.items.map((item) => (
-              <div key={item.id} className="flex justify-between text-[var(--foreground)]">
-                <span>{item.product.name} (x{item.quantity})</span>
-                <span>{formatCurrency(item.totalCents)}</span>
+            {printStatus && (
+              <div className={`rounded-[var(--radius)] border px-3 py-2 text-xs ${receiptError ? 'border-[var(--error)]/30 bg-[var(--error-bg)] text-[var(--error)]' : 'border-[var(--success)]/30 bg-[var(--success-bg)] text-[var(--success)]'}`}>
+                {printStatus}
               </div>
-            ))}
-          </div>
+            )}
 
-          <div className="space-y-1 border-t border-[var(--border)] pt-3 text-xs">
-            <div className="flex justify-between text-[var(--muted-foreground)]">
-              <span>Subtotal:</span>
-              <span>{formatCurrency(activeReceipt.subtotalCents)}</span>
-            </div>
-            <div className="flex justify-between text-[var(--muted-foreground)]">
-              <span>Tax:</span>
-              <span>{formatCurrency(activeReceipt.taxCents)}</span>
-            </div>
-            <div className="flex justify-between text-sm font-bold text-[var(--foreground)]">
-              <span>Total:</span>
-              <span className="text-[var(--primary)]">{formatCurrency(activeReceipt.totalCents)}</span>
-            </div>
-            <div className="flex justify-between text-[var(--success)]">
-              <span>Tendered ({activeReceipt.tenderType}):</span>
-              <span>{formatCurrency(activeReceipt.tenderedCents)}</span>
-            </div>
-            <div className="flex justify-between text-[var(--success)]">
-              <span>Change Due:</span>
-              <span>{formatCurrency(activeReceipt.changeCents)}</span>
-            </div>
-          </div>
-        </Card>
+            {!receiptError ? (
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => void handlePrintReceipt()} className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]">
+                  Print Receipt
+                </button>
+                <button onClick={dismissReceipt} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)]">
+                  Skip
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                <button onClick={() => void handlePrintReceipt()} className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]">
+                  Retry
+                </button>
+                {receiptPdfUrl ? (
+                  <a href={receiptPdfUrl} download={`receipt-${activeReceipt.receiptNumber}.pdf`} className="min-h-11 flex items-center justify-center rounded-[var(--radius)] border border-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary)]">
+                    PDF
+                  </a>
+                ) : (
+                  <button disabled className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--muted-foreground)] opacity-50">PDF</button>
+                )}
+                <button onClick={dismissReceipt} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)]">
+                  Skip
+                </button>
+              </div>
+            )}
+          </Card>
+        </div>
       )}
     </div>
   )

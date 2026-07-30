@@ -60,4 +60,52 @@ describe('customer credit ledger', () => {
     await expect(adjustCredit(db, c.id, 100, '  ', true)).rejects.toThrow('note is required')
     expect((await getCustomerDetail(db, c.id)).ledgerEntries).toHaveLength(0)
   })
+
+  it('adds a credit-card surcharge into the transaction total (rounded down)', async () => {
+    // subtotal 1000, tax 0, 2% surcharge = 20 cents
+    const sale = await createTransaction(db, { items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }], taxRatePercent: 0, tenderType: 'CARD', tenderedCents: 1020, surchargeCents: 20 })
+    expect(sale.surchargeCents).toBe(20)
+    expect(sale.totalCents).toBe(1020)
+    expect(sale.changeCents).toBe(0)
+  })
+
+  it('records an E-Transfer tender with email and no ledger entry', async () => {
+    const sale = await createTransaction(db, { items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }], taxRatePercent: 0, tenderType: 'E_TRANSFER', tenderedCents: 1000, email: 'buyer@example.com' })
+    expect(sale.tenderType).toBe('E_TRANSFER')
+    expect(sale.email).toBe('buyer@example.com')
+    expect(sale.tabAmountCents).toBe(0)
+  })
+
+  it('charges a standalone Pharmacy Credit sale fully to the tab (one SALE_CHARGE)', async () => {
+    const c = await customer()
+    await addFunds(db, c.id, 5000)
+    const sale = await createTransaction(db, { items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }], taxRatePercent: 0, tenderType: 'PHARMACY_CREDIT', tenderedCents: 0, customerId: c.id, tabAmountCents: 1000 })
+    const entries = await db.creditLedgerEntry.findMany({ where: { transactionId: sale.id } })
+    expect(entries).toHaveLength(1)
+    expect(entries[0]).toMatchObject({ type: 'SALE_CHARGE', amountCents: -1000 })
+    expect((await getCustomerDetail(db, c.id)).currentBalanceCents).toBe(4000)
+  })
+
+  it('rejects a Pharmacy Credit standalone tender whose amount is not the full total', async () => {
+    const c = await customer()
+    await addFunds(db, c.id, 5000)
+    await expect(createTransaction(db, { items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }], taxRatePercent: 0, tenderType: 'PHARMACY_CREDIT', tenderedCents: 0, customerId: c.id, tabAmountCents: 400 })).rejects.toThrow('full sale total')
+  })
+
+  it('blocks an insufficient-balance Pharmacy Credit sale when short-pay to tab is off', async () => {
+    await db.setting.upsert({ where: { key: 'customer.allowShortPayToTab' }, update: { value: 'false' }, create: { key: 'customer.allowShortPayToTab', value: 'false' } })
+    const c = await customer()
+    await addFunds(db, c.id, 200)
+    await expect(createTransaction(db, { items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }], taxRatePercent: 0, tenderType: 'PHARMACY_CREDIT', tenderedCents: 0, customerId: c.id, tabAmountCents: 1000 })).rejects.toThrow('Balance insufficient')
+    await db.setting.upsert({ where: { key: 'customer.allowShortPayToTab' }, update: { value: 'true' }, create: { key: 'customer.allowShortPayToTab', value: 'true' } })
+  })
+
+  it('allows an insufficient-balance Pharmacy Credit sale (negative tab) when short-pay is on', async () => {
+    await db.setting.upsert({ where: { key: 'customer.allowShortPayToTab' }, update: { value: 'true' }, create: { key: 'customer.allowShortPayToTab', value: 'true' } })
+    const c = await customer()
+    await addFunds(db, c.id, 200)
+    const sale = await createTransaction(db, { items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }], taxRatePercent: 0, tenderType: 'PHARMACY_CREDIT', tenderedCents: 0, customerId: c.id, tabAmountCents: 1000 })
+    expect(sale.tenderType).toBe('PHARMACY_CREDIT')
+    expect((await getCustomerDetail(db, c.id)).currentBalanceCents).toBe(-800)
+  })
 })

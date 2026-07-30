@@ -24,7 +24,7 @@ export interface CreateTransactionPayload {
     unitPriceCents: number
   }[]
   taxRatePercent: number
-  tenderType: 'CASH' | 'CARD' | 'SPLIT'
+  tenderType: 'CASH' | 'CARD' | 'E_TRANSFER' | 'PHARMACY_CREDIT' | 'SPLIT'
   tenderedCents: number
   status?: 'COMPLETED' | 'PARKED'
   customerId?: number
@@ -32,6 +32,10 @@ export interface CreateTransactionPayload {
   tabAmountCents?: number
   /** Cash overpayment deposited to the attached customer's credit instead of returned as change. */
   cashOverageToCreditCents?: number
+  /** Additional surcharge cents for credit card transactions. */
+  surchargeCents?: number
+  /** Customer email for E-Transfer (optional, shown on receipt). */
+  email?: string
 }
 
 export interface BulkImportProductInput {
@@ -220,6 +224,12 @@ export interface InventoryValuation {
   totalCostValueCents: number
   totalRetailValueCents: number
   totalVariancePercent: number
+}
+
+export interface CheckoutSettings {
+  allowCreditCardSurcharge: boolean
+  cardSurchargePercent: number
+  allowShortPayToTab: boolean
 }
 
 export interface CreditHealthSummary {

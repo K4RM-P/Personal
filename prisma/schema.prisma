@@ -243,13 +243,17 @@ model Transaction {
   subtotalCents Int
   taxCents       Int
   totalCents     Int
-  tenderType     String            @default("CASH") // CASH, CARD, SPLIT
+  tenderType     String            @default("CASH") // CASH, CARD, E_TRANSFER, PHARMACY_CREDIT, SPLIT
   tenderedCents  Int
   changeCents    Int
   voidReason     String?
   customerId     Int?
   customer       Customer?         @relation(fields: [customerId], references: [id])
   tabAmountCents Int?               @default(0)
+  /** Additional surcharge cents for credit card transactions (e.g. 2% fee). */
+  surchargeCents Int?               @default(0)
+  /** Customer email for E-Transfer (optional, shown on receipt). */
+  email          String?
   userId         Int?
   user           User?             @relation(fields: [userId], references: [id])
   items          TransactionItem[]
