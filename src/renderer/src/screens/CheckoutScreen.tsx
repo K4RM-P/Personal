@@ -58,13 +58,10 @@ export function CheckoutScreen(): React.JSX.Element {
   const subtotalCents = cart.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0)
   const taxRatePercent = 13
   const taxCents = Math.round((subtotalCents * taxRatePercent) / 100)
-  const surchargeCents = cardType === 'CREDIT' && checkoutSettings.allowCreditCardSurcharge && applySurcharge
+  const surchargeCents = cardType === 'CREDIT' && applySurcharge
     ? Math.floor(subtotalCents * checkoutSettings.cardSurchargePercent / 100)
     : 0
-  const totalWithSurchargeCents = subtotalCents + taxCents + surchargeCents
-  const effectiveTotal = paymentMethod === 'CARD' && cardType === 'CREDIT' && checkoutSettings.allowCreditCardSurcharge
-    ? totalWithSurchargeCents
-    : subtotalCents + taxCents
+  const effectiveTotal = subtotalCents + taxCents + surchargeCents
   const changeCents = Math.max(0, tenderedCents - effectiveTotal)
   const shortCents = Math.max(0, effectiveTotal - tenderedCents)
   const customerBalance = attachedCustomer?.ledgerEntries?.[0]?.balanceCents ?? 0
@@ -829,7 +826,7 @@ export function CheckoutScreen(): React.JSX.Element {
                       </button>
                     </div>
 
-                    {cardType === 'CREDIT' && checkoutSettings.allowCreditCardSurcharge && (
+                    {cardType === 'CREDIT' && (
                       <div className="rounded-[var(--radius)] border border-[var(--warning)]/30 bg-[var(--warning-bg)] p-3 text-xs text-[var(--foreground)]">
                         <label className="flex items-center gap-2 font-semibold">
                           <input
