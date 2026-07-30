@@ -297,9 +297,13 @@ export async function createTransaction(
   })
 }
 
-export async function getAllTransactions(db: PrismaClient): Promise<TransactionWithItems[]> {
+export async function getAllTransactions(
+  db: PrismaClient,
+  limit = 25
+): Promise<TransactionWithItems[]> {
   return db.transaction.findMany({
     orderBy: { createdAt: 'desc' },
+    take: limit,
     include: {
       items: {
         include: {

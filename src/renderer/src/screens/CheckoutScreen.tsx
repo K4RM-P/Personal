@@ -57,14 +57,19 @@ export function CheckoutScreen(): React.JSX.Element {
     void loadTransactions()
   }, [])
 
-  // Product results come from the server, capped, and debounced. The register
-  // must never pull the whole catalogue into memory (50k+ rows) just to filter
-  // it in the browser — that was the source of the multi-second freeze.
+  // Product results come from the server, capped, and debounced. Nothing loads
+  // until the cashier types: an empty box shows a prompt, not 50k rows. This is
+  // what keeps the register instant regardless of catalogue size.
   React.useEffect(() => {
     if (!window.api?.product) return
+    const q = searchQuery.trim()
+    if (!q) {
+      setProducts([])
+      return
+    }
     const timer = setTimeout(() => {
       window.api.product
-        .search(searchQuery, 50)
+        .search(q, 50)
         .then(setProducts)
         .catch((err) => console.error('Product search failed:', err))
     }, 150)
@@ -367,7 +372,7 @@ export function CheckoutScreen(): React.JSX.Element {
 
             {filteredProducts.length === 0 ? (
               <div className="rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-6 text-center text-sm text-[var(--muted-foreground)]">
-                {searchQuery ? `No results for "${searchQuery}". Try checking the spelling or scanning the barcode directly.` : 'Cart is empty. Search or scan to add items.'}
+                {searchQuery.trim() ? `No results for "${searchQuery}". Try checking the spelling or scanning the barcode directly.` : 'Search to load items — type a name, SKU, or barcode, or scan an item.'}
               </div>
             ) : (
               <div className="grid max-h-[420px] grid-cols-2 gap-2 overflow-y-auto pr-1">
