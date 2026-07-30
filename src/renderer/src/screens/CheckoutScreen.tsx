@@ -276,12 +276,21 @@ export function CheckoutScreen(): React.JSX.Element {
 
   const customerBalance = attachedCustomer?.ledgerEntries?.[0]?.balanceCents ?? 0
 
-  const filteredProducts = products.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.barcode && p.barcode.includes(searchQuery))
-  )
+  // Stored barcodes are GTINs with leading zeros stripped (see gtinNorm).
+  // Normalize the typed query the same way so a printed 12/13-digit UPC
+  // (e.g. "012345678905") matches the stored value ("12345678905").
+  const query = searchQuery.trim().toLowerCase()
+  const queryDigits = searchQuery.replace(/\D/g, '').replace(/^0+/, '')
+  const filteredProducts = products.filter((p) => {
+    if (!query) return true
+    if (p.name.toLowerCase().includes(query)) return true
+    if (p.sku.toLowerCase().includes(query)) return true
+    if (p.barcode) {
+      if (p.barcode.includes(searchQuery)) return true
+      if (queryDigits && p.barcode.replace(/^0+/, '').includes(queryDigits)) return true
+    }
+    return false
+  })
 
   return (
     <div className="mx-auto max-w-7xl space-y-4 p-4">
