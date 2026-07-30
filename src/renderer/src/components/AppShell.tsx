@@ -1,8 +1,9 @@
 import * as React from 'react'
-import { ShoppingCart, Package, Users, Settings, BarChart3 } from 'lucide-react'
+import { ShoppingCart, Package, Users, Settings, BarChart3, Receipt, UserCog, LogOut } from 'lucide-react'
 import { cn } from '../lib/utils'
+import { useCurrentUser } from '../context/CurrentUserContext'
 
-export type NavTab = 'checkout' | 'products' | 'customers' | 'settings' | 'reports'
+export type NavTab = 'checkout' | 'products' | 'customers' | 'settings' | 'reports' | 'users' | 'sales'
 
 interface AppShellProps {
   activeTab: NavTab
@@ -10,15 +11,23 @@ interface AppShellProps {
   children: React.ReactNode
 }
 
-const navItems: { id: NavTab; label: string; icon: React.ElementType }[] = [
-  { id: 'checkout', label: 'Checkout', icon: ShoppingCart },
-  { id: 'products', label: 'Products', icon: Package },
-  { id: 'customers', label: 'Customers', icon: Users },
-  { id: 'reports', label: 'Reports', icon: BarChart3 },
-  { id: 'settings', label: 'Settings', icon: Settings }
+const allNavItems: { id: NavTab; label: string; icon: React.ElementType; managerOnly: boolean }[] = [
+  { id: 'checkout', label: 'Checkout', icon: ShoppingCart, managerOnly: false },
+  { id: 'sales', label: "Today's Sales", icon: Receipt, managerOnly: false },
+  { id: 'customers', label: 'Customers', icon: Users, managerOnly: true },
+  { id: 'products', label: 'Products', icon: Package, managerOnly: true },
+  { id: 'reports', label: 'Reports', icon: BarChart3, managerOnly: true },
+  { id: 'settings', label: 'Settings', icon: Settings, managerOnly: true },
+  { id: 'users', label: 'Users', icon: UserCog, managerOnly: true }
 ]
 
 export function AppShell({ activeTab, onTabChange, children }: AppShellProps) {
+  const { user, logout } = useCurrentUser()
+  const isManager = user?.role === 'MANAGER'
+  // Managers have the full Reports screen (with date ranges), so the cashier-only
+  // "Today's Sales" tab is omitted for them.
+  const navItems = allNavItems.filter((item) => (item.managerOnly ? isManager : item.id !== 'sales' || !isManager))
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
       <aside className="flex w-64 flex-col justify-between border-r border-[var(--border)] bg-[#f8fafb]">
@@ -60,11 +69,18 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps) {
         </div>
 
         <div className="border-t border-[var(--border)] p-4 text-xs text-[var(--muted-foreground)]">
-          <div className="mb-1 flex items-center justify-between">
-            <span className="font-medium text-[var(--foreground)]">Station 01</span>
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-[var(--success)]" />
-          </div>
-          <div>Offline-ready • Fast checkout</div>
+          {user && (
+            <div className="mb-3">
+              <div className="font-medium text-[var(--foreground)]">{user.fullName}</div>
+              <div className="text-[var(--muted-foreground)]">{user.role === 'MANAGER' ? 'Manager' : 'Cashier'} • Station 01</div>
+            </div>
+          )}
+          <button
+            onClick={() => void logout()}
+            className="flex w-full items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted)]"
+          >
+            <LogOut className="h-4 w-4" /> Log out
+          </button>
         </div>
       </aside>
 

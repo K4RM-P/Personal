@@ -1,4 +1,5 @@
 import type { CreditEntryType, LoyaltyEventType, Prisma, PrismaClient } from '@prisma/client'
+import { getSession } from '../../auth/session'
 
 export const normalizePhone = (phone: string): string => phone.replace(/\D/g, '')
 
@@ -46,7 +47,8 @@ function validateCustomer(input: CustomerInput): void {
 
 export async function createCustomer(db: PrismaClient, input: CustomerInput) {
   validateCustomer(input)
-  return db.customer.create({ data: { ...input, firstName: input.firstName.trim(), lastName: input.lastName.trim(), phone: input.phone.trim(), phoneNormalized: normalizePhone(input.phone), address: input.address.trim(), email: input.email?.trim() || null } })
+  const createdByUserId = getSession()?.userId ?? null
+  return db.customer.create({ data: { ...input, firstName: input.firstName.trim(), lastName: input.lastName.trim(), phone: input.phone.trim(), phoneNormalized: normalizePhone(input.phone), address: input.address.trim(), email: input.email?.trim() || null, createdByUserId } })
 }
 
 export async function updateCustomer(db: PrismaClient, id: number, input: CustomerInput) {
@@ -69,7 +71,8 @@ async function appendCreditEntry(tx: Prisma.TransactionClient, customerId: numbe
   if (!Number.isInteger(amountCents) || amountCents === 0) throw new Error('Ledger amounts must be a non-zero integer number of cents.')
   if (type === 'MANUAL_ADJUSTMENT' && !options.note?.trim()) throw new Error('A note is required for a manual balance adjustment.')
   const previous = await tx.creditLedgerEntry.findFirst({ where: { customerId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] })
-  return tx.creditLedgerEntry.create({ data: { customerId, type, amountCents, balanceAfterCents: (previous?.balanceAfterCents ?? 0) + amountCents, transactionId: options.transactionId, note: options.note?.trim() || null, createdByUserId: options.createdByUserId } })
+  const createdByUserId = options.createdByUserId ?? getSession()?.userId ?? null
+  return tx.creditLedgerEntry.create({ data: { customerId, type, amountCents, balanceAfterCents: (previous?.balanceAfterCents ?? 0) + amountCents, transactionId: options.transactionId, note: options.note?.trim() || null, createdByUserId } })
 }
 
 async function appendPointEvent(tx: Prisma.TransactionClient, customerId: number, type: LoyaltyEventType, points: number, options: { transactionId?: string; note?: string } = {}) {

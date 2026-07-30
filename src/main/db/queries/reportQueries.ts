@@ -526,7 +526,9 @@ export async function getCashierTotals(
   >()
 
   for (const tx of transactions) {
-    const key = tx.userId ?? 0
+    // Prefer cashierId: it has no FK cascade, so it survives user deletion and
+    // keeps historical sales attributed to the original cashier's id.
+    const key = tx.cashierId ?? tx.userId ?? 0
     const entry = byUser.get(key) ?? {
       transactionCount: 0,
       totalSalesCents: 0,
@@ -551,7 +553,7 @@ export async function getCashierTotals(
 
   const userIds = Array.from(byUser.keys()).filter((id) => id !== 0)
   const users = userIds.length > 0 ? await db.user.findMany({ where: { id: { in: userIds } } }) : []
-  const userMap = new Map(users.map((u) => [u.id, u.name]))
+  const userMap = new Map(users.map((u) => [u.id, u.fullName]))
 
   const result: CashierTotalRow[] = Array.from(byUser.entries())
     .map(([userId, data]) => ({

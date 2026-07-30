@@ -77,6 +77,17 @@ export const IPC = {
   SETTINGS_GET_CHECKOUT: 'settings:getCheckout',
   SETTINGS_SAVE_CHECKOUT: 'settings:saveCheckout',
 
+  // Auth & user management channels
+  AUTH_LOGIN: 'auth:login',
+  AUTH_LOGOUT: 'auth:logout',
+  AUTH_GET_CURRENT_USER: 'auth:getCurrentUser',
+  AUTH_CHECK_FIRST_BOOT: 'auth:checkFirstBoot',
+  AUTH_SETUP_FIRST_MANAGER: 'auth:setupFirstManager',
+  USER_LIST: 'user:list',
+  USER_CREATE: 'user:create',
+  USER_UPDATE: 'user:update',
+  USER_DELETE: 'user:delete',
+
   // Compliance & ledger channels (Stage 6/8)
   COMPLIANCE_SEARCH_RX: 'compliance:searchRx',
   COMPLIANCE_GET_AGING_RX: 'compliance:getAgingRx',

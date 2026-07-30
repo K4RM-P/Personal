@@ -33,7 +33,10 @@ import type {
   CreditHealthSummary,
   AlertsSummary,
   DashboardData,
-  CheckoutSettings
+  CheckoutSettings,
+  AuthUser,
+  LoginResult,
+  UserRole
 } from '../shared/types'
 import type {
   AutoImportResult,
@@ -215,6 +218,24 @@ const api = {
   backup: {
     create: (): Promise<BackupBundle> => ipcRenderer.invoke(IPC.BACKUP_CREATE),
     restoreTest: (): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke(IPC.BACKUP_RESTORE_TEST)
+  },
+  auth: {
+    checkFirstBoot: (): Promise<boolean> => ipcRenderer.invoke(IPC.AUTH_CHECK_FIRST_BOOT),
+    getCurrentUser: (): Promise<AuthUser | null> => ipcRenderer.invoke(IPC.AUTH_GET_CURRENT_USER),
+    login: (fullName: string, password: string): Promise<LoginResult> =>
+      ipcRenderer.invoke(IPC.AUTH_LOGIN, { fullName, password }),
+    logout: (): Promise<void> => ipcRenderer.invoke(IPC.AUTH_LOGOUT),
+    setupFirstManager: (fullName: string, password: string): Promise<LoginResult> =>
+      ipcRenderer.invoke(IPC.AUTH_SETUP_FIRST_MANAGER, { fullName, password })
+  },
+  user: {
+    list: (): Promise<AuthUser[] | { error: string }> => ipcRenderer.invoke(IPC.USER_LIST),
+    create: (input: { fullName: string; password: string; role: UserRole }): Promise<AuthUser | { error: string }> =>
+      ipcRenderer.invoke(IPC.USER_CREATE, input),
+    update: (userId: number, role?: UserRole, password?: string): Promise<AuthUser | { error: string }> =>
+      ipcRenderer.invoke(IPC.USER_UPDATE, { userId, role, password }),
+    delete: (userId: number): Promise<{ ok: true } | { error: string }> =>
+      ipcRenderer.invoke(IPC.USER_DELETE, userId)
   }
 }
 

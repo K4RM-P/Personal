@@ -54,8 +54,7 @@ describe('Reports System — MVP Phase 1 Queries', () => {
     productId3 = p3.id
 
     // Seed a user
-    const role = await prisma.role.create({ data: { name: 'Cashier' } })
-    const user = await prisma.user.create({ data: { name: 'Test Cashier', pin: '0000', roleId: role.id } })
+    const user = await prisma.user.create({ data: { fullName: `Test Cashier ${Date.now()}`, passwordHash: 'x', role: 'CASHIER' } })
     userId = user.id
 
     // Seed a customer

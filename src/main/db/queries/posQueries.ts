@@ -7,6 +7,7 @@ import {
 } from '../../../shared/pricingEngine'
 import { CreateTransactionPayload, BulkImportProductInput, TransactionWithItems } from '../../../shared/types'
 import { customerLedgerInternals, getCreditSettings } from './customerQueries'
+import { getSession } from '../../auth/session'
 
 // Product Queries
 export async function getAllProducts(db: PrismaClient): Promise<Product[]> {
@@ -235,6 +236,7 @@ export async function createTransaction(
     0
   )
   const taxCents = Math.round((subtotalCents * payload.taxRatePercent) / 100)
+  const sessionUserId = getSession()?.userId ?? null
   const surchargeCents = payload.surchargeCents ?? 0
   const totalCents = subtotalCents + taxCents + surchargeCents
   const cashOverageToCreditCents = payload.cashOverageToCreditCents ?? 0
@@ -281,6 +283,10 @@ export async function createTransaction(
         tabAmountCents,
         surchargeCents,
         email: payload.email || null,
+        // Audit: attribute the sale to the signed-in cashier (server session,
+        // not renderer-supplied). Null in tests / when no session is active.
+        userId: sessionUserId,
+        cashierId: sessionUserId,
         items: {
           create: payload.items.map((item) => ({
             productId: item.productId,
@@ -341,7 +347,8 @@ export async function getAllTransactions(
           product: true
         }
       },
-      customer: true
+      customer: true,
+      user: { select: { id: true, fullName: true, role: true } }
     }
   })
 }
@@ -355,7 +362,8 @@ export async function voidTransaction(
     where: { id },
     data: {
       status: 'VOIDED',
-      voidReason: reason
+      voidReason: reason,
+      voidedByUserId: getSession()?.userId ?? null
     }
   })
 }

@@ -20,18 +20,12 @@ model FeatureFlag {
   description String?
 }
 
-model Role {
-  id    Int    @id @default(autoincrement())
-  name  String @unique
-  users User[]
-}
-
 model User {
   id           Int           @id @default(autoincrement())
-  name         String
-  pin          String
-  roleId       Int
-  role         Role          @relation(fields: [roleId], references: [id])
+  fullName     String        @unique
+  passwordHash String
+  role         String        // MANAGER | CASHIER
+  lastLogin    DateTime?
   createdAt    DateTime      @default(now())
   transactions Transaction[]
 }
@@ -175,6 +169,8 @@ model Customer {
   notes            String?
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
+  /** Audit: user who created this customer record (User.id). Soft linkage only. */
+  createdByUserId  Int?
   ledgerEntries    CreditLedgerEntry[]
   pointEvents      LoyaltyPointEvent[]
   transactions     Transaction[]
@@ -256,6 +252,12 @@ model Transaction {
   email          String?
   userId         Int?
   user           User?             @relation(fields: [userId], references: [id])
+  /** Audit: the cashier who rang up the sale (User.id). */
+  cashierId              Int?
+  /** Audit: manager who authorized a void (User.id). */
+  voidedByUserId         Int?
+  /** Audit: manager who issued a discount (User.id). */
+  discountIssuedByUserId Int?
   items          TransactionItem[]
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt

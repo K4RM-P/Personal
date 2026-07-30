@@ -8,8 +8,10 @@ import { registerComplianceHandlers } from './complianceHandlers'
 import { registerCatalogHandlers } from './catalogHandlers'
 import { registerCustomerHandlers } from './customerHandlers'
 import { registerReportHandlers } from './reportHandlers'
+import { registerUserHandlers } from './userHandlers'
 
 export function registerAllHandlers(db: PrismaClient): void {
+  registerUserHandlers(db)
   registerFeatureFlagHandlers(db)
   registerPosHandlers(db)
   registerBarcodeHandlers(db)

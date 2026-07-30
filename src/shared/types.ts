@@ -16,6 +16,20 @@ export interface CartItem {
   quantity: number
 }
 
+// ---------------------------------------------------------------- Auth / users
+export type UserRole = 'MANAGER' | 'CASHIER'
+
+/** Safe user shape exposed to the renderer — never includes the password hash. */
+export interface AuthUser {
+  id: number
+  fullName: string
+  role: UserRole
+  lastLogin: string | null
+  createdAt: string
+}
+
+export type LoginResult = { user: AuthUser } | { error: string }
+
 export interface CreateTransactionPayload {
   items: {
     productId: number
@@ -50,6 +64,7 @@ export interface BulkImportProductInput {
 export type TransactionWithItems = DBTransaction & {
   items: (DBTransactionItem & { product: Product })[]
   customer?: Customer | null
+  user?: { id: number; fullName: string; role: string } | null
 }
 
 export interface StoreInfo {
