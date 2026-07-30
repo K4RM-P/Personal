@@ -22,7 +22,6 @@ import type {
   PrescriptionRecord,
   ComplianceAuditEntry,
   CustomerLedgerEntry,
-  DashboardSummary,
   BackupBundle,
   SalesSummary,
   TopItemRow,

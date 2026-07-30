@@ -456,7 +456,7 @@ export async function getSalesByTender(
   let cashCents = 0
   let cardCents = 0
   let creditCents = 0
-  let pointsCents = 0
+  const pointsCents = 0
 
   for (const tx of transactions) {
     const isReturn = tx.status === 'REFUNDED' || tx.saleType === 'RETURN'
@@ -720,14 +720,7 @@ export async function getAlerts(db: PrismaClient): Promise<AlertsSummary> {
   const cached = getCached<AlertsSummary>(cacheKey)
   if (cached) return cached
 
-  const [lowStockCount, outOfStockCount, creditHealth] = await Promise.all([
-    db.product.count({
-      where: {
-        discontinued: false,
-        currentOnHand: { gt: 0 },
-        reorderPoint: { gt: 0 }
-      }
-    }),
+  const [outOfStockCount, creditHealth] = await Promise.all([
     db.product.count({
       where: {
         discontinued: false,
@@ -738,7 +731,7 @@ export async function getAlerts(db: PrismaClient): Promise<AlertsSummary> {
   ])
 
   // Low stock: currentOnHand <= reorderPoint but > 0
-  const actualLowStock = await db.product.count({
+  const lowStockCount = await db.product.count({
     where: {
       discontinued: false,
       currentOnHand: { lte: 0 }
@@ -746,7 +739,7 @@ export async function getAlerts(db: PrismaClient): Promise<AlertsSummary> {
   })
 
   const result: AlertsSummary = {
-    lowStockCount: actualLowStock,
+    lowStockCount,
     outOfStockCount,
     overdueTabCount: creditHealth.overdueAccounts
   }
@@ -765,10 +758,7 @@ export async function getDashboardData(db: PrismaClient): Promise<DashboardData>
   if (cached) return cached
 
   const now = new Date()
-  const todayStart = startOfDay(now)
-  const todayEnd = endOfDay(now)
   const monthStart = startOfMonth(now)
-  const monthEnd = todayEnd
 
   const todayStr = localDateString(now)
   const monthStartStr = localDateString(monthStart)
