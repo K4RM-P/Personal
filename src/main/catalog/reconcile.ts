@@ -353,12 +353,15 @@ export function computeGuards(input: GuardInput): ImportGuard[] {
   }
   const medianSwing = median(swings)
   if (swings.length > 0 && medianSwing > COST_SWING_THRESHOLD) {
+    // Spec §10: a large median cost swing is a *warning*, not a commit gate.
+    // It surfaces the risk to the owner but must not block the refresh, since
+    // wholesale prices legitimately move and a blocked commit is worse than an
+    // informed one.
     guards.push({
       code: 'costSwing',
-      severity: 'confirm',
+      severity: 'warn',
       title: `Median cost moved ${Math.round(medianSwing * 100)}%`,
-      detail: `Across ${swings.length.toLocaleString()} items present in both catalogues, the median wholesale cost change is ${Math.round(medianSwing * 100)}%. This can be real, but it will propagate to shelf prices.`,
-      confirmPhrase: 'PRICES ARE CORRECT'
+      detail: `Across ${swings.length.toLocaleString()} items present in both catalogues, the median wholesale cost change is ${Math.round(medianSwing * 100)}%. This can be real, but it will propagate to shelf prices.`
     })
   }
 

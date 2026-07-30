@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
-import { execSync } from 'child_process'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   searchRxRecords,
   getAgingRxRecords,
@@ -16,14 +19,27 @@ import {
 
 describe('compliance and ledger workflows', () => {
   let prisma: PrismaClient
+  let workDir: string
 
+  // Isolated, seeded temp SQLite DB — see featureFlagQueries.test.ts for why we
+  // avoid `prisma migrate dev` here. The seed provides customer #1, which the
+  // ledger-entry test posts against (FK requirement).
   beforeAll(async () => {
-    execSync('npx prisma migrate dev --name init', { stdio: 'ignore' })
-    prisma = new PrismaClient()
-  })
+    workDir = mkdtempSync(join(tmpdir(), 'compliance-it-'))
+    const url = `file:${join(workDir, 'test.db')}`
+    const env = { ...process.env, DATABASE_URL: url }
+    execFileSync('npx', ['prisma', 'db', 'push', '--skip-generate', '--accept-data-loss'], {
+      cwd: process.cwd(),
+      env,
+      stdio: 'pipe'
+    })
+    execFileSync('npx', ['tsx', 'prisma/seed.ts'], { cwd: process.cwd(), env, stdio: 'pipe' })
+    prisma = new PrismaClient({ datasources: { db: { url } } })
+  }, 120_000)
 
   afterAll(async () => {
-    await prisma.$disconnect()
+    await prisma?.$disconnect()
+    rmSync(workDir, { recursive: true, force: true })
   })
 
   it('searches RX records and flags aged ones', async () => {

@@ -322,7 +322,7 @@ describe('6. bad-file guards', () => {
       pharmacyProvince: 'ONT',
       validRecordCount: 1000
     })
-    expect(guards.find((g) => g.code === 'costSwing')?.severity).toBe('confirm')
+    expect(guards.find((g) => g.code === 'costSwing')?.severity).toBe('warn')
   })
 
   it('stays silent on a normal, healthy refresh', () => {

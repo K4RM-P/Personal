@@ -72,7 +72,10 @@ export interface InventoryImpact {
   zeroCostSkipped: SimpleProductRef[]
 }
 
-export type GuardSeverity = 'block' | 'confirm'
+// 'block' refuses the commit outright; 'confirm' requires a typed phrase;
+// 'warn' is informational only and never blocks the commit (per import spec §10:
+// province mismatch and median cost swing are warnings, not gates).
+export type GuardSeverity = 'block' | 'confirm' | 'warn'
 
 export interface ImportGuard {
   code: 'zeroRecords' | 'largeShrink' | 'provinceMismatch' | 'costSwing'
