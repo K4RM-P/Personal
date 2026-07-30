@@ -243,6 +243,10 @@ model Transaction {
   items          TransactionItem[]
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
+
+  @@index([createdAt])
+  @@index([status])
+  @@index([customerId])
 }
 
 model TransactionItem {
@@ -256,4 +260,7 @@ model TransactionItem {
   unitPriceCents Int
   totalCents    Int
   isVoided      Boolean     @default(false)
+
+  @@index([transactionId])
+  @@index([productId])
 }

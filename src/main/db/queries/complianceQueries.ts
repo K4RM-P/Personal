@@ -163,22 +163,31 @@ export async function postCustomerLedgerEntry(
 }
 
 export async function buildDashboardSummary(db: PrismaClient): Promise<any> {
-  const transactions = await db.transaction.findMany({ orderBy: { createdAt: 'desc' }, include: { items: true } })
-  const lowStockCount = await db.product.count({ where: { costCents: { lte: 0 } } })
-  const salesByProduct = transactions.flatMap((tx) => tx.items).reduce<Record<string, number>>((acc, item) => {
-    acc[item.productId] = (acc[item.productId] ?? 0) + item.quantity
-    return acc
-  }, {})
-  const productNames = await db.product.findMany({ where: { id: { in: Object.keys(salesByProduct).map((id) => Number(id)) } } })
+  // Aggregate in SQL rather than loading every transaction + line item into
+  // memory (which grew unbounded with sales history). The database does the
+  // sums and the top-N ranking; we only fetch names for the 5 winners.
+  const [totals, topItems, lowStockCount] = await Promise.all([
+    db.transaction.aggregate({ _sum: { totalCents: true }, _count: { _all: true } }),
+    db.transactionItem.groupBy({
+      by: ['productId'],
+      _sum: { quantity: true },
+      orderBy: { _sum: { quantity: 'desc' } },
+      take: 5
+    }),
+    db.product.count({ where: { costCents: { lte: 0 } } })
+  ])
+
+  const topProductIds = topItems.map((row) => row.productId)
+  const productNames = await db.product.findMany({ where: { id: { in: topProductIds } } })
   const productLookup = Object.fromEntries(productNames.map((product) => [product.id, product.name]))
 
   return {
-    totalSalesCents: transactions.reduce((sum, tx) => sum + tx.totalCents, 0),
-    transactionCount: transactions.length,
-    topProducts: Object.entries(salesByProduct)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([id, quantity]) => ({ name: productLookup[Number(id)] ?? 'Unknown', quantity })),
+    totalSalesCents: totals._sum.totalCents ?? 0,
+    transactionCount: totals._count._all,
+    topProducts: topItems.map((row) => ({
+      name: productLookup[row.productId] ?? 'Unknown',
+      quantity: row._sum.quantity ?? 0
+    })),
     categorySales: [],
     cashierSales: [],
     lowStockCount
