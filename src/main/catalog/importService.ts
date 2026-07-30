@@ -720,7 +720,42 @@ export async function rollbackImport(db: PrismaClient): Promise<CatalogCommitRes
  * pointer flip. A LIKE '%term%' scan over 52,741 rows feels sluggish and gets
  * worse with each import.
  */
+// Column list (in order) the FTS index is expected to expose. Kept as a single
+// source of truth so the schema-drift check below stays in sync with CREATE.
+const FTS_COLUMNS = [
+  'catalogProductId',
+  'description',
+  'displayName',
+  'genericName',
+  'din',
+  'itemNumber',
+  'effectiveDate',
+  'packSize',
+  'dosageForm',
+  'strength',
+  'vendorCode',
+  'gtinPrimary',
+  'costPrice',
+  'listPrice',
+] as const
+
 export async function ensureSearchIndex(db: PrismaClient): Promise<void> {
+  // An older build created catalog_fts without some of the columns above (e.g.
+  // effectiveDate). `CREATE ... IF NOT EXISTS` never migrates that stale table,
+  // so any INSERT referencing a missing column fails. Detect the drift and drop
+  // the table so it gets recreated with the current schema. The FTS index is
+  // derived data (rebuilt from CatalogProduct), so dropping it is safe.
+  const existing = await db.$queryRawUnsafe<Array<{ name: string }>>(
+    `PRAGMA table_info(catalog_fts)`
+  )
+  if (existing.length > 0) {
+    const cols = new Set(existing.map((r) => r.name))
+    const drifted = FTS_COLUMNS.some((c) => !cols.has(c))
+    if (drifted) {
+      await db.$executeRawUnsafe('DROP TABLE IF EXISTS catalog_fts')
+    }
+  }
+
   await db.$executeRawUnsafe(
     `CREATE VIRTUAL TABLE IF NOT EXISTS catalog_fts USING fts5(
        catalogProductId UNINDEXED,
