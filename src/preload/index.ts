@@ -23,7 +23,17 @@ import type {
   ComplianceAuditEntry,
   CustomerLedgerEntry,
   DashboardSummary,
-  BackupBundle
+  BackupBundle,
+  SalesSummary,
+  TopItemRow,
+  SlowItemRow,
+  DailySalesRow,
+  TenderBreakdownRow,
+  CashierTotalRow,
+  InventoryValuation,
+  CreditHealthSummary,
+  AlertsSummary,
+  DashboardData
 } from '../shared/types'
 import type {
   AutoImportResult,
@@ -178,7 +188,24 @@ const api = {
       ipcRenderer.invoke(IPC.CUSTOMER_LEDGER_POST, { customerId, kind, amountCents, reference, notes })
   },
   reports: {
-    getDashboard: (): Promise<DashboardSummary> => ipcRenderer.invoke(IPC.REPORTS_GET_DASHBOARD),
+    getDashboard: (): Promise<DashboardData> => ipcRenderer.invoke(IPC.REPORTS_GET_DASHBOARD),
+    getSalesSummary: (fromDate: string, toDate: string): Promise<SalesSummary> =>
+      ipcRenderer.invoke(IPC.REPORTS_GET_SALES_SUMMARY, { fromDate, toDate }),
+    getTopItems: (fromDate: string, toDate: string, limit?: number): Promise<TopItemRow[]> =>
+      ipcRenderer.invoke(IPC.REPORTS_GET_TOP_ITEMS, { fromDate, toDate, limit }),
+    getSlowItems: (fromDate: string, toDate: string, threshold?: number): Promise<SlowItemRow[]> =>
+      ipcRenderer.invoke(IPC.REPORTS_GET_SLOW_ITEMS, { fromDate, toDate, threshold }),
+    getDailySales: (fromDate: string, toDate: string): Promise<DailySalesRow[]> =>
+      ipcRenderer.invoke(IPC.REPORTS_GET_DAILY_SALES, { fromDate, toDate }),
+    getSalesByTender: (fromDate: string, toDate: string): Promise<TenderBreakdownRow[]> =>
+      ipcRenderer.invoke(IPC.REPORTS_GET_SALES_BY_TENDER, { fromDate, toDate }),
+    getCashierTotals: (fromDate: string, toDate: string): Promise<CashierTotalRow[]> =>
+      ipcRenderer.invoke(IPC.REPORTS_GET_CASHIER_TOTALS, { fromDate, toDate }),
+    getInventoryValuation: (): Promise<InventoryValuation> =>
+      ipcRenderer.invoke(IPC.REPORTS_GET_INVENTORY_VALUATION),
+    getCreditHealth: (): Promise<CreditHealthSummary> =>
+      ipcRenderer.invoke(IPC.REPORTS_GET_CREDIT_HEALTH),
+    getAlerts: (): Promise<AlertsSummary> => ipcRenderer.invoke(IPC.REPORTS_GET_ALERTS),
     exportCsv: (): Promise<{ path: string }> => ipcRenderer.invoke(IPC.REPORTS_EXPORT_CSV),
     exportXlsx: (): Promise<{ path: string }> => ipcRenderer.invoke(IPC.REPORTS_EXPORT_XLSX)
   },

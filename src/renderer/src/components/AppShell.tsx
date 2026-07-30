@@ -1,8 +1,8 @@
 import * as React from 'react'
-import { ShoppingCart, Package, Users, Settings } from 'lucide-react'
+import { ShoppingCart, Package, Users, Settings, BarChart3 } from 'lucide-react'
 import { cn } from '../lib/utils'
 
-export type NavTab = 'checkout' | 'products' | 'customers' | 'settings'
+export type NavTab = 'checkout' | 'products' | 'customers' | 'settings' | 'reports'
 
 interface AppShellProps {
   activeTab: NavTab
@@ -14,6 +14,7 @@ const navItems: { id: NavTab; label: string; icon: React.ElementType }[] = [
   { id: 'checkout', label: 'Checkout', icon: ShoppingCart },
   { id: 'products', label: 'Products', icon: Package },
   { id: 'customers', label: 'Customers', icon: Users },
+  { id: 'reports', label: 'Reports', icon: BarChart3 },
   { id: 'settings', label: 'Settings', icon: Settings }
 ]
 

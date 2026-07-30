@@ -133,6 +133,129 @@ export interface BackupBundle {
 }
 
 // ---------------------------------------------------------------------------
+// Reports System — shared types across the IPC boundary
+// ---------------------------------------------------------------------------
+
+export interface DateRange {
+  fromDate: string // ISO date string (inclusive)
+  toDate: string // ISO date string (inclusive)
+}
+
+export interface SalesSummary {
+  grossCents: number
+  returnsCents: number
+  netCents: number
+  cogsCents: number
+  marginCents: number
+  marginPercent: number
+  transactionCount: number
+  avgTransactionCents: number
+  newCustomers: number
+  repeatCustomers: number
+}
+
+export interface TopItemRow {
+  productId: number
+  name: string
+  sku: string
+  category: string | null
+  costCents: number
+  retailCents: number
+  quantity: number
+  revenueCents: number
+  cogsCents: number
+  marginCents: number
+  marginPercent: number
+}
+
+export interface SlowItemRow {
+  productId: number
+  name: string
+  sku: string
+  category: string | null
+  currentOnHand: number
+  quantitySold: number
+  lastSoldAt: string | null
+}
+
+export interface DailySalesRow {
+  date: string // YYYY-MM-DD in local timezone
+  transactionCount: number
+  grossCents: number
+  returnsCents: number
+  netCents: number
+  cogsCents: number
+  marginCents: number
+  marginPercent: number
+}
+
+export interface TenderBreakdownRow {
+  tender: string // CASH | CARD | PHARMACY_CREDIT | POINTS
+  amountCents: number
+  percent: number
+}
+
+export interface CashierTotalRow {
+  userId: number | null
+  cashierName: string
+  transactionCount: number
+  totalSalesCents: number
+  avgTransactionCents: number
+  discountsCents: number
+  voidsCount: number
+  voidsCents: number
+}
+
+export interface InventoryValuationRow {
+  category: string
+  itemCount: number
+  costValueCents: number
+  retailValueCents: number
+  variancePercent: number
+}
+
+export interface InventoryValuation {
+  rows: InventoryValuationRow[]
+  totalItemCount: number
+  totalCostValueCents: number
+  totalRetailValueCents: number
+  totalVariancePercent: number
+}
+
+export interface CreditHealthSummary {
+  enabled: boolean
+  activeAccounts: number
+  totalCustomers: number
+  adoptionPercent: number
+  totalOutstandingCents: number
+  overdueAccounts: number
+  overdueCents: number
+}
+
+export interface AlertsSummary {
+  lowStockCount: number
+  outOfStockCount: number
+  overdueTabCount: number
+}
+
+export interface DashboardData {
+  today: {
+    sales: SalesSummary
+    topItems: TopItemRow[]
+    alerts: AlertsSummary
+  }
+  thisMonth: {
+    sales: SalesSummary
+    topItems: TopItemRow[]
+    alerts: AlertsSummary
+  }
+  creditHealth: CreditHealthSummary | null
+  alerts: AlertsSummary
+}
+
+export type ReportExportFormat = 'csv'
+
+// ---------------------------------------------------------------------------
 // Payment (Stage 5) — provider-agnostic types shared across the IPC boundary
 // ---------------------------------------------------------------------------
 

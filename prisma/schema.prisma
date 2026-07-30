@@ -48,6 +48,15 @@ model Product {
   updatedAt  DateTime          @updatedAt
   orderItems TransactionItem[]
 
+  // --- Inventory (reporting) ---
+  // On-hand quantity and reorder point for inventory valuation & low-stock alerts.
+  // Defaults to 0; updated by sales (decrement) and InventoryAdjustment entries.
+  currentOnHand  Int @default(0)
+  reorderPoint   Int @default(0)
+  // Category code for grouping in reports (OTC | RX | SPECIALTY | ...).
+  // Mirrors the McKesson categoryCode when promoted from the catalogue.
+  categoryCode   String?
+
   // --- Catalogue provenance (McKesson import) ---
   // origin: MANUAL | CATALOG. MANUAL rows are never read or written by a catalogue import.
   origin            String    @default("MANUAL")
@@ -59,15 +68,18 @@ model Product {
   discontinued   Boolean   @default(false)
   discontinuedAt DateTime?
 
-  // Field-level ownership: true means the pharmacist edited it by hand,
+  // Field-level ownership: true means the pharmacist edits it by hand,
   // so a catalogue refresh must NOT overwrite it.
   nameOverridden    Boolean @default(false)
   costOverridden    Boolean @default(false)
   barcodeOverridden Boolean @default(false)
 
+  inventoryAdjustments InventoryAdjustment[]
+
   @@index([origin])
   @@index([sourceItemNumber])
   @@index([discontinued])
+  @@index([categoryCode])
 }
 
 model CatalogProduct {
@@ -244,9 +256,18 @@ model Transaction {
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
+  // --- Reporting-focused helper columns (spec §4) ---
+  // category mirrors the dominant product category for easy grouping;
+  // saleType distinguishes normal sales from returns/adjustments;
+  // discountApplied captures the total discount cents applied to this sale.
+  category        String?
+  saleType        SaleType        @default(NORMAL)
+  discountApplied Int?
+
   @@index([createdAt])
   @@index([status])
   @@index([customerId])
+  @@index([category])
 }
 
 model TransactionItem {
@@ -263,4 +284,27 @@ model TransactionItem {
 
   @@index([transactionId])
   @@index([productId])
+}
+
+// --- Reporting enums & models (spec §4) ---
+
+enum SaleType {
+  NORMAL
+  RETURN
+  ADJUSTMENT
+}
+
+/// Manual inventory corrections (physical count, damage, expiry, stocking).
+/// Sales decrement `Product.currentOnHand` directly; this model records the
+/// out-of-band adjustments that don't flow through a sale.
+model InventoryAdjustment {
+  id               Int      @id @default(autoincrement())
+  productId        Int
+  product          Product  @relation(fields: [productId], references: [id])
+  quantityDelta    Int // positive = stock in, negative = stock out
+  reason           String // "physical count correction", "damaged", "expired", "stocking", etc.
+  adjustedByUserId Int?
+  createdAt        DateTime @default(now())
+
+  @@index([productId, createdAt])
 }

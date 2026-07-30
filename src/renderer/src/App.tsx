@@ -16,6 +16,9 @@ const CustomersScreen = React.lazy(() =>
 const SettingsScreen = React.lazy(() =>
   import('./screens/SettingsScreen').then((m) => ({ default: m.SettingsScreen }))
 )
+const ReportsScreen = React.lazy(() =>
+  import('./screens/ReportsScreen').then((m) => ({ default: m.ReportsScreen }))
+)
 
 export function App(): React.JSX.Element {
   // A POS opens to the register, not to settings.
@@ -28,6 +31,7 @@ export function App(): React.JSX.Element {
         {activeTab === 'products' && <ProductsScreen />}
         {activeTab === 'customers' && <CustomersScreen />}
         {activeTab === 'settings' && <SettingsScreen />}
+        {activeTab === 'reports' && <ReportsScreen />}
       </React.Suspense>
     </AppShell>
   )
