@@ -44,16 +44,6 @@ export function CheckoutScreen(): React.JSX.Element {
   const shortCents = Math.max(0, totalCents - tenderedCents)
 
   React.useEffect(() => {
-    const loadProducts = async (): Promise<void> => {
-      try {
-        if (window.api?.product) {
-          const list = await window.api.product.getAll()
-          setProducts(list)
-        }
-      } catch (err) {
-        console.error('Failed to load products:', err)
-      }
-    }
     const loadTransactions = async (): Promise<void> => {
       try {
         if (window.api?.transaction) {
@@ -64,9 +54,27 @@ export function CheckoutScreen(): React.JSX.Element {
         console.error('Failed to load transactions:', err)
       }
     }
-    void loadProducts()
     void loadTransactions()
   }, [])
+
+  // Product results come from the server, capped, and debounced. Nothing loads
+  // until the cashier types: an empty box shows a prompt, not 50k rows. This is
+  // what keeps the register instant regardless of catalogue size.
+  React.useEffect(() => {
+    if (!window.api?.product) return
+    const q = searchQuery.trim()
+    if (!q) {
+      setProducts([])
+      return
+    }
+    const timer = setTimeout(() => {
+      window.api.product
+        .search(q, 50)
+        .then(setProducts)
+        .catch((err) => console.error('Product search failed:', err))
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   const handleBarcode = React.useCallback(
     async (barcode: string): Promise<void> => {
@@ -276,21 +284,8 @@ export function CheckoutScreen(): React.JSX.Element {
 
   const customerBalance = attachedCustomer?.ledgerEntries?.[0]?.balanceCents ?? 0
 
-  // Stored barcodes are GTINs with leading zeros stripped (see gtinNorm).
-  // Normalize the typed query the same way so a printed 12/13-digit UPC
-  // (e.g. "012345678905") matches the stored value ("12345678905").
-  const query = searchQuery.trim().toLowerCase()
-  const queryDigits = searchQuery.replace(/\D/g, '').replace(/^0+/, '')
-  const filteredProducts = products.filter((p) => {
-    if (!query) return true
-    if (p.name.toLowerCase().includes(query)) return true
-    if (p.sku.toLowerCase().includes(query)) return true
-    if (p.barcode) {
-      if (p.barcode.includes(searchQuery)) return true
-      if (queryDigits && p.barcode.replace(/^0+/, '').includes(queryDigits)) return true
-    }
-    return false
-  })
+  // Results are already searched + capped server-side; render them as-is.
+  const filteredProducts = products
 
   return (
     <div className="mx-auto max-w-7xl space-y-4 p-4">
@@ -377,7 +372,7 @@ export function CheckoutScreen(): React.JSX.Element {
 
             {filteredProducts.length === 0 ? (
               <div className="rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-6 text-center text-sm text-[var(--muted-foreground)]">
-                {searchQuery ? `No results for "${searchQuery}". Try checking the spelling or scanning the barcode directly.` : 'Cart is empty. Search or scan to add items.'}
+                {searchQuery.trim() ? `No results for "${searchQuery}". Try checking the spelling or scanning the barcode directly.` : 'Search to load items — type a name, SKU, or barcode, or scan an item.'}
               </div>
             ) : (
               <div className="grid max-h-[420px] grid-cols-2 gap-2 overflow-y-auto pr-1">

@@ -4,6 +4,7 @@ export const IPC = {
 
   // Product & Inventory Channels (Stage 2)
   PRODUCT_GET_ALL: 'product:getAll',
+  PRODUCT_SEARCH: 'product:search',
   PRODUCT_CREATE: 'product:create',
   PRODUCT_UPDATE: 'product:update',
   PRODUCT_DELETE: 'product:delete',
@@ -16,6 +17,7 @@ export const IPC = {
   // Pricing Tiers Channels (Stage 2)
   PRICING_TIER_GET_ALL: 'pricingTier:getAll',
   PRICING_TIER_SAVE_ALL: 'pricingTier:saveAll',
+  PRICING_TIER_PREVIEW_IMPACT: 'pricingTier:previewImpact',
 
   // Transaction & Checkout Channels (Stage 1)
   TRANSACTION_CREATE: 'transaction:create',

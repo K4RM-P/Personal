@@ -36,6 +36,7 @@ import type {
   CatalogStatus,
   PromoteAllResult
 } from '../shared/catalogTypes'
+import type { TierChangePreviewItem } from '../shared/pricingEngine'
 
 const api = {
   featureFlag: {
@@ -45,6 +46,8 @@ const api = {
   },
   product: {
     getAll: (): Promise<Product[]> => ipcRenderer.invoke(IPC.PRODUCT_GET_ALL),
+    search: (query: string, limit = 50): Promise<Product[]> =>
+      ipcRenderer.invoke(IPC.PRODUCT_SEARCH, { query, limit }),
     getByBarcode: (barcode: string): Promise<Product | null> =>
       ipcRenderer.invoke(IPC.PRODUCT_GET_BY_BARCODE, barcode),
     create: (data: { sku: string; name: string; costCents: number; priceCents?: number; barcode?: string; isPinned?: boolean }): Promise<Product> =>
@@ -62,7 +65,11 @@ const api = {
   pricingTier: {
     getAll: (): Promise<PricingTier[]> => ipcRenderer.invoke(IPC.PRICING_TIER_GET_ALL),
     saveAll: (tiers: PricingTier[]): Promise<PricingTier[]> =>
-      ipcRenderer.invoke(IPC.PRICING_TIER_SAVE_ALL, tiers)
+      ipcRenderer.invoke(IPC.PRICING_TIER_SAVE_ALL, tiers),
+    previewImpact: (
+      tiers: PricingTier[]
+    ): Promise<{ affectedCount: number; sample: TierChangePreviewItem[] }> =>
+      ipcRenderer.invoke(IPC.PRICING_TIER_PREVIEW_IMPACT, tiers)
   },
   transaction: {
     create: (payload: CreateTransactionPayload): Promise<TransactionWithItems> =>

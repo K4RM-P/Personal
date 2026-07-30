@@ -437,16 +437,25 @@ export async function promoteAllCatalogProducts(db: PrismaClient): Promise<Promo
 
   const flush = async (): Promise<void> => {
     if (buffer.length === 0) return
-    // Use individual inserts to gracefully handle duplicates
-    for (const item of buffer) {
-      try {
-        await db.product.create({ data: item })
-        created++
-      } catch {
-        errors++
+    // SKUs and barcodes are already deduped in-memory above, so a single bulk
+    // insert covers the common case far more cheaply than a create-per-row loop.
+    // (SQLite's Prisma client rejects `skipDuplicates`, so on the rare residual
+    // unique-constraint clash we fall back to per-row inserts for this chunk.)
+    const chunk = buffer
+    buffer = []
+    try {
+      const result = await db.product.createMany({ data: chunk })
+      created += result.count
+    } catch {
+      for (const item of chunk) {
+        try {
+          await db.product.create({ data: item })
+          created++
+        } catch {
+          errors++
+        }
       }
     }
-    buffer = []
   }
 
   for (const item of catalogItems) {
@@ -488,7 +497,6 @@ export async function promoteAllCatalogProducts(db: PrismaClient): Promise<Promo
       lastSeenBatchId: item.importBatchId,
       lastCatalogSyncAt: new Date()
     })
-    created++
 
     if (buffer.length >= CREATE_CHUNK) {
       await flush()

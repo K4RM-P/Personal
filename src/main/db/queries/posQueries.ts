@@ -1,5 +1,10 @@
 import { PrismaClient, Product, Transaction } from '@prisma/client'
-import { calculateRetailPriceCents, PricingTier as EnginePricingTier } from '../../../shared/pricingEngine'
+import {
+  calculateRetailPriceCents,
+  previewTierChangeImpact,
+  PricingTier as EnginePricingTier,
+  TierChangePreviewItem
+} from '../../../shared/pricingEngine'
 import { CreateTransactionPayload, BulkImportProductInput, TransactionWithItems } from '../../../shared/types'
 import { customerLedgerInternals, getCreditSettings } from './customerQueries'
 
@@ -8,6 +13,59 @@ export async function getAllProducts(db: PrismaClient): Promise<Product[]> {
   return db.product.findMany({
     orderBy: { name: 'asc' }
   })
+}
+
+/**
+ * Server-side product search. With 50k+ products, the renderer must never load
+ * the whole table: it searches here and receives only the matches (capped).
+ * An empty query returns pinned items first, then alphabetical — a sensible
+ * default grid without shipping everything over IPC.
+ */
+export async function searchProducts(
+  db: PrismaClient,
+  query: string,
+  limit = 50
+): Promise<Product[]> {
+  const q = query.trim()
+  if (!q) {
+    return db.product.findMany({
+      orderBy: [{ isPinned: 'desc' }, { name: 'asc' }],
+      take: limit
+    })
+  }
+  // Stored barcodes are GTINs with leading zeros stripped (see gtinNorm), so a
+  // printed 12/13-digit UPC ("012345678905") must be normalized the same way to
+  // match the stored value ("12345678905").
+  const queryDigits = q.replace(/\D/g, '').replace(/^0+/, '')
+  return db.product.findMany({
+    where: {
+      OR: [
+        { name: { contains: q } },
+        { sku: { contains: q } },
+        { barcode: { contains: q } },
+        ...(queryDigits ? [{ barcode: { contains: queryDigits } }] : [])
+      ]
+    },
+    orderBy: { name: 'asc' },
+    take: limit
+  })
+}
+
+/**
+ * Compute the impact of a proposed tier table entirely in the main process,
+ * returning only a count plus a bounded sample. This keeps 50k product rows off
+ * the IPC boundary and out of the renderer.
+ */
+export async function previewTierImpact(
+  db: PrismaClient,
+  newTiers: EnginePricingTier[],
+  sampleSize = 200
+): Promise<{ affectedCount: number; sample: TierChangePreviewItem[] }> {
+  const products = await db.product.findMany({
+    select: { id: true, sku: true, name: true, costCents: true, priceCents: true }
+  })
+  const impact = previewTierChangeImpact(products, newTiers)
+  return { affectedCount: impact.length, sample: impact.slice(0, sampleSize) }
 }
 
 export async function getProductByBarcode(db: PrismaClient, barcode: string): Promise<Product | null> {
@@ -248,9 +306,13 @@ export async function createTransaction(
   })
 }
 
-export async function getAllTransactions(db: PrismaClient): Promise<TransactionWithItems[]> {
+export async function getAllTransactions(
+  db: PrismaClient,
+  limit = 25
+): Promise<TransactionWithItems[]> {
   return db.transaction.findMany({
     orderBy: { createdAt: 'desc' },
+    take: limit,
     include: {
       items: {
         include: {
