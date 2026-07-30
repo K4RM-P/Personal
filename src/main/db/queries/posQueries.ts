@@ -33,9 +33,18 @@ export async function searchProducts(
       take: limit
     })
   }
+  // Stored barcodes are GTINs with leading zeros stripped (see gtinNorm), so a
+  // printed 12/13-digit UPC ("012345678905") must be normalized the same way to
+  // match the stored value ("12345678905").
+  const queryDigits = q.replace(/\D/g, '').replace(/^0+/, '')
   return db.product.findMany({
     where: {
-      OR: [{ name: { contains: q } }, { sku: { contains: q } }, { barcode: { contains: q } }]
+      OR: [
+        { name: { contains: q } },
+        { sku: { contains: q } },
+        { barcode: { contains: q } },
+        ...(queryDigits ? [{ barcode: { contains: queryDigits } }] : [])
+      ]
     },
     orderBy: { name: 'asc' },
     take: limit
