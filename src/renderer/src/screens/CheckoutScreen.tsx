@@ -44,16 +44,6 @@ export function CheckoutScreen(): React.JSX.Element {
   const shortCents = Math.max(0, totalCents - tenderedCents)
 
   React.useEffect(() => {
-    const loadProducts = async (): Promise<void> => {
-      try {
-        if (window.api?.product) {
-          const list = await window.api.product.getAll()
-          setProducts(list)
-        }
-      } catch (err) {
-        console.error('Failed to load products:', err)
-      }
-    }
     const loadTransactions = async (): Promise<void> => {
       try {
         if (window.api?.transaction) {
@@ -64,9 +54,22 @@ export function CheckoutScreen(): React.JSX.Element {
         console.error('Failed to load transactions:', err)
       }
     }
-    void loadProducts()
     void loadTransactions()
   }, [])
+
+  // Product results come from the server, capped, and debounced. The register
+  // must never pull the whole catalogue into memory (50k+ rows) just to filter
+  // it in the browser — that was the source of the multi-second freeze.
+  React.useEffect(() => {
+    if (!window.api?.product) return
+    const timer = setTimeout(() => {
+      window.api.product
+        .search(searchQuery, 50)
+        .then(setProducts)
+        .catch((err) => console.error('Product search failed:', err))
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   const handleBarcode = React.useCallback(
     async (barcode: string): Promise<void> => {
@@ -276,12 +279,8 @@ export function CheckoutScreen(): React.JSX.Element {
 
   const customerBalance = attachedCustomer?.ledgerEntries?.[0]?.balanceCents ?? 0
 
-  const filteredProducts = products.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.barcode && p.barcode.includes(searchQuery))
-  )
+  // Results are already searched + capped server-side; render them as-is.
+  const filteredProducts = products
 
   return (
     <div className="mx-auto max-w-7xl space-y-4 p-4">

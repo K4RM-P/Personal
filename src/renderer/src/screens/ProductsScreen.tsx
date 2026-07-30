@@ -1,12 +1,8 @@
 import * as React from 'react'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
-import { Product, PricingTier, BulkImportProductInput } from '@shared/types'
+import { PricingTier, BulkImportProductInput } from '@shared/types'
 import { formatCurrency } from '@shared/formatCurrency'
-import {
-  calculateRetailPriceCents,
-  previewTierChangeImpact,
-  TierChangePreviewItem
-} from '@shared/pricingEngine'
+import { calculateRetailPriceCents, TierChangePreviewItem } from '@shared/pricingEngine'
 import { parseImportPreviewCsv } from '../lib/checkoutUi'
 import { McKessonCatalogTab } from '../components/McKessonCatalogTab'
 
@@ -30,7 +26,6 @@ type CatalogRow = {
 }
 
 export function ProductsScreen(): React.JSX.Element {
-  const [products, setProducts] = React.useState<Product[]>([])
   const [tiers, setTiers] = React.useState<PricingTier[]>([])
   const [catalogItems, setCatalogItems] = React.useState<CatalogRow[]>([])
   const [activeTab, setActiveTab] = React.useState<'catalog' | 'tiers' | 'import' | 'mckesson'>('catalog')
@@ -49,6 +44,8 @@ export function ProductsScreen(): React.JSX.Element {
   // Tier Edit & Preview State
   const [editableTiers, setEditableTiers] = React.useState<PricingTier[]>([])
   const [previewImpact, setPreviewImpact] = React.useState<TierChangePreviewItem[]>([])
+  const [previewAffectedCount, setPreviewAffectedCount] = React.useState(0)
+  const previewTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Bulk Import CSV State
   const [csvText, setCsvText] = React.useState('')
@@ -57,18 +54,14 @@ export function ProductsScreen(): React.JSX.Element {
 
   const loadData = async (): Promise<void> => {
     try {
-      if (window.api?.product) {
-        const prodList = await window.api.product.getAll()
-        setProducts(prodList)
-      }
       if (window.api?.pricingTier) {
         const tierList = await window.api.pricingTier.getAll()
         setTiers(tierList)
         setEditableTiers(tierList)
       }
       if (window.api?.catalog) {
-        // Use search with empty query to get the first 500 items
-        const catalog = await window.api.catalog.search('', null, 500)
+        // First page only — never the whole catalogue. Typing narrows it server-side.
+        const catalog = await window.api.catalog.search('', null, 100)
         setCatalogItems(catalog as CatalogRow[])
       }
     } catch (err) {
@@ -80,7 +73,7 @@ export function ProductsScreen(): React.JSX.Element {
     if (!window.api?.catalog) return
     setCatalogLoading(true)
     try {
-      const results = await window.api.catalog.search(query, null, 500)
+      const results = await window.api.catalog.search(query, null, 100)
       setCatalogItems(results as CatalogRow[])
     } catch (err) {
       console.error('Failed to search catalog:', err)
@@ -163,8 +156,19 @@ export function ProductsScreen(): React.JSX.Element {
   const handleTierMarkupChange = (index: number, newMarkup: number): void => {
     const updated = editableTiers.map((t, idx) => (idx === index ? { ...t, markupPercent: newMarkup } : t))
     setEditableTiers(updated)
-    const impact = previewTierChangeImpact(products, updated)
-    setPreviewImpact(impact)
+    // Impact is computed server-side against all 50k+ products; debounce so a
+    // burst of keystrokes fires one query, and only a bounded sample crosses IPC.
+    if (previewTimer.current) clearTimeout(previewTimer.current)
+    previewTimer.current = setTimeout(() => {
+      if (!window.api?.pricingTier) return
+      window.api.pricingTier
+        .previewImpact(updated)
+        .then((res) => {
+          setPreviewImpact(res.sample)
+          setPreviewAffectedCount(res.affectedCount)
+        })
+        .catch((err) => console.error('Tier preview failed:', err))
+    }, 250)
   }
 
   const handleSaveTiers = async (): Promise<void> => {
@@ -174,6 +178,7 @@ export function ProductsScreen(): React.JSX.Element {
         alert('Pricing Tiers saved successfully! Live retail prices updated across catalog.')
         loadData()
         setPreviewImpact([])
+        setPreviewAffectedCount(0)
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to save tiers'
@@ -488,10 +493,12 @@ export function ProductsScreen(): React.JSX.Element {
             <Card className="border-[var(--warning)]/30 bg-[var(--warning-bg)]">
               <CardHeader>
                 <CardTitle className="text-[var(--warning)]">
-                  Tier Change Impact Preview ({previewImpact.length} products affected)
+                  Tier Change Impact Preview ({previewAffectedCount} products affected)
                 </CardTitle>
                 <CardDescription className="text-[var(--warning)]/80">
                   Preview showing which catalog items will change retail price before saving tier edits.
+                  {previewAffectedCount > previewImpact.length &&
+                    ` Showing the first ${previewImpact.length} of ${previewAffectedCount}.`}
                 </CardDescription>
               </CardHeader>
               <div className="space-y-2 max-h-60 overflow-y-auto text-xs pr-1">
