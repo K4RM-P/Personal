@@ -9,10 +9,7 @@ import type {
   DailySalesRow,
   TenderBreakdownRow,
   CashierTotalRow,
-  InventoryValuation,
-  InventoryValuationRow,
-  CreditHealthSummary,
-  AlertsSummary
+  InventoryValuation
 } from '@shared/types'
 
 type ReportTab = 'dashboard' | 'sales' | 'inventory' | 'cashiers'
@@ -107,8 +104,8 @@ function downloadCsv(
   const header = `# Report: ${filename}\n# Generated: ${now.toISOString()}\n`
   const csv = [
     header,
-    headers.join(','),
-    ...rows.map((r) => r.join(','))
+    headers.map(csvEscape).join(','),
+    ...rows.map((r) => r.map(csvEscape).join(','))
   ].join('\n')
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)

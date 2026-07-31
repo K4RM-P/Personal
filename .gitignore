@@ -5,6 +5,8 @@ out/
 .DS_Store
 .eslintcache
 *.tsbuildinfo
+.claude/worktrees/
+.kilo/
 # SQLite dev database (created at runtime)
 *.db
 *.db-journal
