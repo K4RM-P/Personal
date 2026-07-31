@@ -67,12 +67,12 @@ export async function getCustomerDetail(db: PrismaClient, id: number) {
   return { ...customer, currentBalanceCents: customer.ledgerEntries[0]?.balanceAfterCents ?? 0, currentPoints: customer.pointEvents[0]?.pointsAfter ?? 0 }
 }
 
-async function appendCreditEntry(tx: Prisma.TransactionClient, customerId: number, type: CreditEntryType, amountCents: number, options: { transactionId?: string; note?: string; createdByUserId?: number } = {}) {
+async function appendCreditEntry(tx: Prisma.TransactionClient, customerId: number, type: CreditEntryType, amountCents: number, options: { transactionId?: string; refundId?: number; note?: string; createdByUserId?: number } = {}) {
   if (!Number.isInteger(amountCents) || amountCents === 0) throw new Error('Ledger amounts must be a non-zero integer number of cents.')
   if (type === 'MANUAL_ADJUSTMENT' && !options.note?.trim()) throw new Error('A note is required for a manual balance adjustment.')
   const previous = await tx.creditLedgerEntry.findFirst({ where: { customerId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] })
   const createdByUserId = options.createdByUserId ?? getSession()?.userId ?? null
-  return tx.creditLedgerEntry.create({ data: { customerId, type, amountCents, balanceAfterCents: (previous?.balanceAfterCents ?? 0) + amountCents, transactionId: options.transactionId, note: options.note?.trim() || null, createdByUserId } })
+  return tx.creditLedgerEntry.create({ data: { customerId, type, amountCents, balanceAfterCents: (previous?.balanceAfterCents ?? 0) + amountCents, transactionId: options.transactionId, refundId: options.refundId, note: options.note?.trim() || null, createdByUserId } })
 }
 
 async function appendPointEvent(tx: Prisma.TransactionClient, customerId: number, type: LoyaltyEventType, points: number, options: { transactionId?: string; note?: string } = {}) {

@@ -5,11 +5,17 @@ import type {
   Customer,
   PricingTier as DBPricingTier,
   Transaction as DBTransaction,
-  TransactionItem as DBTransactionItem
+  TransactionItem as DBTransactionItem,
+  Refund as DBRefund,
+  Discount as DBDiscount
 } from '@prisma/client'
 import type { PricingTier } from './pricingEngine'
 
-export type { FeatureFlag, Setting, Product, Customer, DBPricingTier, DBTransaction, DBTransactionItem, PricingTier }
+export type { FeatureFlag, Setting, Product, Customer, DBPricingTier, DBTransaction, DBTransactionItem, PricingTier, DBRefund, DBDiscount }
+
+export type RefundType = 'CASH' | 'CARD' | 'E_TRANSFER' | 'TAB_CREDIT'
+export type RefundStatus = 'COMPLETED' | 'PENDING'
+export type DiscountType = 'ITEM' | 'BILL'
 
 export interface CartItem {
   product: Product
@@ -36,6 +42,9 @@ export interface CreateTransactionPayload {
     quantity: number
     costCents: number
     unitPriceCents: number
+    /** Per-item discount in cents, applied at checkout. Cannot exceed unitPriceCents * quantity. */
+    discountCents?: number
+    discountReason?: string
   }[]
   taxRatePercent: number
   tenderType: 'CASH' | 'CARD' | 'E_TRANSFER' | 'PHARMACY_CREDIT' | 'SPLIT'
@@ -50,6 +59,12 @@ export interface CreateTransactionPayload {
   surchargeCents?: number
   /** Customer email for E-Transfer (optional, shown on receipt). */
   email?: string
+  /** Whole-bill discount in cents, applied to the pre-tax total after item discounts. */
+  billDiscountCents?: number
+  billDiscountReason?: string
+  /** Processor charge id + card last 4, captured from the CARD charge result — needed later for card refunds. */
+  processorTransactionId?: string
+  cardLast4?: string
 }
 
 export interface BulkImportProductInput {
@@ -66,6 +81,44 @@ export type TransactionWithItems = DBTransaction & {
   customer?: Customer | null
   user?: { id: number; fullName: string; role: string } | null
 }
+
+// ---------------------------------------------------------------- Refunds
+
+/** A row in the "Refund Past Sales" search results list. */
+export interface SaleSearchResult {
+  id: string
+  receiptNumber: string
+  createdAt: string
+  customerName: string | null
+  totalCents: number
+  tenderType: string
+  status: string
+  refundedCents: number
+}
+
+/** Full sale detail loaded when a manager drills into a specific sale to refund it. */
+export type SaleRefundDetail = TransactionWithItems & {
+  refunds: DBRefund[]
+  refundedCents: number
+  refundableCents: number
+}
+
+export interface ProcessRefundPayload {
+  transactionId: string
+  type: RefundType
+  amountCents: number
+  reason?: string
+  /** Required for E_TRANSFER. */
+  customerEmail?: string
+  /** Required for TAB_CREDIT when the sale has no customer attached yet. */
+  linkCustomerId?: number
+  /** The manager who authenticated for this refund (see AUTH_VERIFY_MANAGER). */
+  refundedByUserId: number
+}
+
+export type ProcessRefundResult = { refund: DBRefund; newTransactionStatus: string } | { error: string }
+
+export type VerifyManagerResult = { user: AuthUser } | { error: string }
 
 export interface StoreInfo {
   name: string

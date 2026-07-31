@@ -36,7 +36,12 @@ import type {
   CheckoutSettings,
   AuthUser,
   LoginResult,
-  UserRole
+  UserRole,
+  VerifyManagerResult,
+  SaleSearchResult,
+  SaleRefundDetail,
+  ProcessRefundPayload,
+  ProcessRefundResult
 } from '../shared/types'
 import type {
   AutoImportResult,
@@ -226,7 +231,9 @@ const api = {
       ipcRenderer.invoke(IPC.AUTH_LOGIN, { fullName, password }),
     logout: (): Promise<void> => ipcRenderer.invoke(IPC.AUTH_LOGOUT),
     setupFirstManager: (fullName: string, password: string): Promise<LoginResult> =>
-      ipcRenderer.invoke(IPC.AUTH_SETUP_FIRST_MANAGER, { fullName, password })
+      ipcRenderer.invoke(IPC.AUTH_SETUP_FIRST_MANAGER, { fullName, password }),
+    verifyManager: (fullName: string, password: string): Promise<VerifyManagerResult> =>
+      ipcRenderer.invoke(IPC.AUTH_VERIFY_MANAGER, { fullName, password })
   },
   user: {
     list: (): Promise<AuthUser[] | { error: string }> => ipcRenderer.invoke(IPC.USER_LIST),
@@ -236,6 +243,14 @@ const api = {
       ipcRenderer.invoke(IPC.USER_UPDATE, { userId, role, password }),
     delete: (userId: number): Promise<{ ok: true } | { error: string }> =>
       ipcRenderer.invoke(IPC.USER_DELETE, userId)
+  },
+  refund: {
+    searchSales: (query?: string): Promise<SaleSearchResult[]> =>
+      ipcRenderer.invoke(IPC.REFUND_SEARCH_SALES, query),
+    getSaleDetails: (transactionId: string): Promise<SaleRefundDetail> =>
+      ipcRenderer.invoke(IPC.REFUND_GET_SALE_DETAILS, transactionId),
+    process: (payload: ProcessRefundPayload): Promise<ProcessRefundResult> =>
+      ipcRenderer.invoke(IPC.REFUND_PROCESS, payload)
   }
 }
 

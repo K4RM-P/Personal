@@ -1,8 +1,8 @@
 import { ipcMain } from 'electron'
 import { PrismaClient } from '@prisma/client'
 import { IPC } from '../../shared/channels'
-import type { AuthUser, LoginResult, UserRole } from '../../shared/types'
-import { countUsers, createUser, deleteUser, listUsers, updateUser, verifyLogin } from '../db/queries/userQueries'
+import type { AuthUser, LoginResult, UserRole, VerifyManagerResult } from '../../shared/types'
+import { countUsers, createUser, deleteUser, listUsers, updateUser, verifyLogin, verifyManagerCredentials } from '../db/queries/userQueries'
 import { clearSession, getSession, requireManager, setSession } from '../auth/session'
 
 /** Wrap a handler so thrown errors come back to the renderer as { error }. */
@@ -30,6 +30,15 @@ export function registerUserHandlers(db: PrismaClient): void {
   })
 
   ipcMain.handle(IPC.AUTH_LOGOUT, (): void => clearSession())
+
+  // Re-authenticate a manager for a privileged in-checkout action (refunds) —
+  // intentionally does NOT call setSession, so the signed-in cashier's session
+  // is untouched. See verifyManagerCredentials for the role enforcement.
+  ipcMain.handle(IPC.AUTH_VERIFY_MANAGER, async (_e, { fullName, password }: { fullName: string; password: string }): Promise<VerifyManagerResult> => {
+    const user = await verifyManagerCredentials(db, fullName, password)
+    if (!user) return { error: 'Invalid name or password, or the account is not a Manager.' }
+    return { user }
+  })
 
   // First-boot setup: only allowed when zero users exist. Always creates a MANAGER.
   ipcMain.handle(IPC.AUTH_SETUP_FIRST_MANAGER, async (_e, { fullName, password }: { fullName: string; password: string }): Promise<LoginResult> => {

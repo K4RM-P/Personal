@@ -231,14 +231,35 @@ export async function createTransaction(
   db: PrismaClient,
   payload: CreateTransactionPayload
 ): Promise<TransactionWithItems> {
-  const subtotalCents = payload.items.reduce(
+  const rawSubtotalCents = payload.items.reduce(
     (sum, item) => sum + item.unitPriceCents * item.quantity,
     0
   )
-  const taxCents = Math.round((subtotalCents * payload.taxRatePercent) / 100)
+
+  // Item discounts reduce the subtotal directly; the whole-bill discount then
+  // reduces that further before tax is computed — tax is never charged on a
+  // discounted amount that was given back to the customer.
+  let itemDiscountTotal = 0
+  for (const item of payload.items) {
+    const discountCents = item.discountCents ?? 0
+    const lineRawCents = item.unitPriceCents * item.quantity
+    if (!Number.isInteger(discountCents) || discountCents < 0 || discountCents > lineRawCents) {
+      throw new Error('Item discount cannot exceed the line total.')
+    }
+    itemDiscountTotal += discountCents
+  }
+  const subtotalCents = rawSubtotalCents - itemDiscountTotal
+
+  const billDiscountCents = payload.billDiscountCents ?? 0
+  if (!Number.isInteger(billDiscountCents) || billDiscountCents < 0 || billDiscountCents > subtotalCents) {
+    throw new Error('Whole-bill discount cannot exceed the subtotal.')
+  }
+  const preTaxCents = subtotalCents - billDiscountCents
+
+  const taxCents = Math.round((preTaxCents * payload.taxRatePercent) / 100)
   const sessionUserId = getSession()?.userId ?? null
   const surchargeCents = payload.surchargeCents ?? 0
-  const totalCents = subtotalCents + taxCents + surchargeCents
+  const totalCents = preTaxCents + taxCents + surchargeCents
   const cashOverageToCreditCents = payload.cashOverageToCreditCents ?? 0
   const changeCents = cashOverageToCreditCents > 0 ? 0 : Math.max(0, payload.tenderedCents - totalCents)
   const receiptNumber = `RX-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`
@@ -282,30 +303,69 @@ export async function createTransaction(
         customerId: payload.customerId || null,
         tabAmountCents,
         surchargeCents,
+        billDiscountCents,
+        discountApplied: itemDiscountTotal + billDiscountCents,
+        processorTransactionId: payload.processorTransactionId || null,
+        cardLast4: payload.cardLast4 || null,
         email: payload.email || null,
         // Audit: attribute the sale to the signed-in cashier (server session,
         // not renderer-supplied). Null in tests / when no session is active.
         userId: sessionUserId,
-        cashierId: sessionUserId,
-        items: {
-          create: payload.items.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            costCents: item.costCents,
-            unitPriceCents: item.unitPriceCents,
-            totalCents: item.unitPriceCents * item.quantity
-          }))
-        }
+        cashierId: sessionUserId
       },
-      include: {
-        items: {
-          include: {
-            product: true
-          }
-        },
-        customer: true
-      }
+      include: { customer: true }
     })
+
+    // Created one at a time (rather than a nested `items: { create: [...] }`)
+    // so each item's discount audit row can link back to its real id and
+    // reason — a batch create's returned order isn't a safe key for that.
+    const items: TransactionWithItems['items'] = []
+    for (const item of payload.items) {
+      const discountCents = item.discountCents ?? 0
+      const lineRawCents = item.unitPriceCents * item.quantity
+      const created = await tx.transactionItem.create({
+        data: {
+          transactionId: transaction.id,
+          productId: item.productId,
+          quantity: item.quantity,
+          costCents: item.costCents,
+          unitPriceCents: item.unitPriceCents,
+          discountCents,
+          totalCents: lineRawCents - discountCents
+        },
+        include: { product: true }
+      })
+      items.push(created)
+
+      if (discountCents > 0) {
+        await tx.discount.create({
+          data: {
+            transactionId: transaction.id,
+            type: 'ITEM',
+            itemId: created.id,
+            amountCents: -discountCents,
+            originalCents: lineRawCents,
+            finalCents: lineRawCents - discountCents,
+            reason: item.discountReason?.trim() || null,
+            appliedByUserId: sessionUserId
+          }
+        })
+      }
+    }
+
+    if (billDiscountCents > 0) {
+      await tx.discount.create({
+        data: {
+          transactionId: transaction.id,
+          type: 'BILL',
+          amountCents: -billDiscountCents,
+          originalCents: subtotalCents,
+          finalCents: subtotalCents - billDiscountCents,
+          reason: payload.billDiscountReason?.trim() || null,
+          appliedByUserId: sessionUserId
+        }
+      })
+    }
 
     if (tabAmountCents > 0 && payload.customerId) {
       await customerLedgerInternals.appendCreditEntry(tx, payload.customerId, 'SALE_CHARGE', -tabAmountCents, { transactionId: transaction.id })
@@ -330,7 +390,7 @@ export async function createTransaction(
       await customerLedgerInternals.appendCreditEntry(tx, payload.customerId, 'FUNDS_ADDED', cashOverageToCreditCents, { transactionId: transaction.id, note: `Cash overpayment deposited from ${transaction.receiptNumber}` })
     }
 
-    return transaction
+    return { ...transaction, items }
   })
 }
 

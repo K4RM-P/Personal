@@ -111,3 +111,19 @@ export async function verifyLogin(
   const updated = await db.user.update({ where: { id: row.id }, data: { lastLogin: new Date() } })
   return toAuthUser(updated)
 }
+
+/**
+ * Re-authenticate a manager for a privileged in-checkout action (e.g. refunds)
+ * without disturbing the active session — the cashier stays logged in. Fails
+ * unless the credentials are valid AND the account is a MANAGER, so this
+ * cannot be used to unlock manager features with a cashier's own password.
+ */
+export async function verifyManagerCredentials(
+  db: PrismaClient,
+  fullName: string,
+  password: string
+): Promise<AuthUser | null> {
+  const user = await verifyLogin(db, fullName, password)
+  if (!user || user.role !== 'MANAGER') return null
+  return user
+}

@@ -30,14 +30,24 @@ export function buildReceiptHtml(options: ReceiptTemplateOptions): string {
   const dateStr = new Date(transaction.createdAt).toLocaleString()
 
   const lineItems = transaction.items
-    .map(
-      (item) => `
+    .map((item) => {
+      const lineRawCents = item.unitPriceCents * item.quantity
+      const discountCents = item.discountCents ?? 0
+      const discountRow =
+        discountCents > 0
+          ? `
+      <tr class="discount-row">
+        <td colspan="2">Discount</td>
+        <td class="price">-${formatCurrency(discountCents)}</td>
+      </tr>`
+          : ''
+      return `
       <tr>
         <td>${escapeHtml(item.product.name)}</td>
         <td class="qty">x${item.quantity}</td>
-        <td class="price">${formatCurrency(item.totalCents)}</td>
-      </tr>`
-    )
+        <td class="price">${formatCurrency(lineRawCents)}</td>
+      </tr>${discountRow}`
+    })
     .join('')
 
   const rxFooter = options.rxFooter
@@ -57,6 +67,7 @@ export function buildReceiptHtml(options: ReceiptTemplateOptions): string {
     td { padding: 2px 0; vertical-align: top; }
     td.qty { text-align: center; width: 30px; }
     td.price { text-align: right; width: 70px; }
+    .discount-row td { font-size: 10px; color: #444; padding-left: 8px; }
     .totals td { padding: 2px 0; }
     .totals .label { text-align: right; padding-right: 8px; }
     .totals .value { text-align: right; width: 70px; }
@@ -80,6 +91,7 @@ export function buildReceiptHtml(options: ReceiptTemplateOptions): string {
   <div class="divider"></div>
   <table class="totals">
     <tr><td class="label">Subtotal:</td><td class="value">${formatCurrency(transaction.subtotalCents)}</td></tr>
+    ${transaction.billDiscountCents ? `<tr><td class="label">Bill Discount:</td><td class="value">-${formatCurrency(transaction.billDiscountCents)}</td></tr>` : ''}
     <tr><td class="label">Tax:</td><td class="value">${formatCurrency(transaction.taxCents)}</td></tr>
     <tr class="grand-total"><td class="label">TOTAL:</td><td class="value">${formatCurrency(transaction.totalCents)}</td></tr>
     <tr><td class="label">Tendered:</td><td class="value">${formatCurrency(transaction.tenderedCents)}</td></tr>

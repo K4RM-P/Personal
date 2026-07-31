@@ -9,6 +9,7 @@ import { registerCatalogHandlers } from './catalogHandlers'
 import { registerCustomerHandlers } from './customerHandlers'
 import { registerReportHandlers } from './reportHandlers'
 import { registerUserHandlers } from './userHandlers'
+import { registerRefundHandlers } from './refundHandlers'
 
 export function registerAllHandlers(db: PrismaClient): void {
   registerUserHandlers(db)
@@ -21,4 +22,5 @@ export function registerAllHandlers(db: PrismaClient): void {
   registerCatalogHandlers(db)
   registerCustomerHandlers(db)
   registerReportHandlers(db)
+  registerRefundHandlers(db)
 }

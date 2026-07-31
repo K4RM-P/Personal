@@ -1,20 +1,30 @@
 import * as React from 'react'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
+import { DiscountModal } from '../components/DiscountModal'
+import { ManagerAuthModal } from '../components/ManagerAuthModal'
+import { RefundSalesScreen } from '../components/RefundSalesScreen'
 import { formatCurrency } from '@shared/formatCurrency'
-import type { Product, Customer, TransactionWithItems, ChargeResult } from '@shared/types'
+import type { Product, Customer, TransactionWithItems, ChargeResult, AuthUser } from '@shared/types'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
+import { useHasRole } from '../context/CurrentUserContext'
 import { Lock } from 'lucide-react'
 
 type ScanFeedback = { type: 'success' | 'error'; message: string } | null
 type PaymentMethod = 'CASH' | 'E_TRANSFER' | 'CARD' | 'PHARMACY_CREDIT' | null
 type CardType = 'DEBIT' | 'CREDIT' | null
+type CartItem = { product: Product; quantity: number; unitPriceCents: number; discountCents?: number; discountReason?: string }
 
 export function CheckoutScreen(): React.JSX.Element {
+  const isManager = useHasRole('MANAGER')
   const [products, setProducts] = React.useState<Product[]>([])
   const [searchQuery, setSearchQuery] = React.useState('')
-  const [cart, setCart] = React.useState<
-    { product: Product; quantity: number; unitPriceCents: number }[]
-  >([])
+  const [cart, setCart] = React.useState<CartItem[]>([])
+  const [discountItemTarget, setDiscountItemTarget] = React.useState<number | null>(null)
+  const [showBillDiscountModal, setShowBillDiscountModal] = React.useState(false)
+  const [billDiscountCents, setBillDiscountCents] = React.useState(0)
+  const [billDiscountReason, setBillDiscountReason] = React.useState<string | undefined>(undefined)
+  const [showRefundAuth, setShowRefundAuth] = React.useState(false)
+  const [refundManager, setRefundManager] = React.useState<AuthUser | null>(null)
   const [scanFeedback, setScanFeedback] = React.useState<ScanFeedback>(null)
   const [tenderedDollars, setTenderedDollars] = React.useState('')
   const [cardProcessing, setCardProcessing] = React.useState(false)
@@ -27,7 +37,7 @@ export function CheckoutScreen(): React.JSX.Element {
   const [printStatus, setPrintStatus] = React.useState<string | null>(null)
   const [receiptPdfUrl, setReceiptPdfUrl] = React.useState<string | null>(null)
   const [receiptError, setReceiptError] = React.useState(false)
-  const [parkedCarts, setParkedCarts] = React.useState<{ id: string; name: string; items: { product: Product; quantity: number; unitPriceCents: number }[] }[]>([])
+  const [parkedCarts, setParkedCarts] = React.useState<{ id: string; name: string; items: CartItem[] }[]>([])
   const [recentTransactions, setRecentTransactions] = React.useState<TransactionWithItems[]>([])
   const [paymentState, setPaymentState] = React.useState<'idle' | 'awaiting' | 'processing' | 'approved' | 'declined' | 'timeout'>('idle')
   const [paymentMessage, setPaymentMessage] = React.useState<string | null>(null)
@@ -55,13 +65,20 @@ export function CheckoutScreen(): React.JSX.Element {
 
   const tenderedCents = Math.round(parseFloat(tenderedDollars || '0') * 100)
 
-  const subtotalCents = cart.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0)
+  const rawSubtotalCents = cart.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0)
+  const itemDiscountTotalCents = cart.reduce((sum, item) => sum + (item.discountCents ?? 0), 0)
+  // Reflects item discounts already, matching the receipt's SUBTOTAL line.
+  const subtotalCents = rawSubtotalCents - itemDiscountTotalCents
+  const effectiveBillDiscountCents = Math.min(billDiscountCents, subtotalCents)
+  // Bill discount reduces the pre-tax total further; tax is never charged on
+  // an amount that was discounted away.
+  const preTaxCents = subtotalCents - effectiveBillDiscountCents
   const taxRatePercent = 13
-  const taxCents = Math.round((subtotalCents * taxRatePercent) / 100)
+  const taxCents = Math.round((preTaxCents * taxRatePercent) / 100)
   const surchargeCents = cardType === 'CREDIT' && applySurcharge
-    ? Math.floor(subtotalCents * checkoutSettings.cardSurchargePercent / 100)
+    ? Math.floor(preTaxCents * checkoutSettings.cardSurchargePercent / 100)
     : 0
-  const effectiveTotal = subtotalCents + taxCents + surchargeCents
+  const effectiveTotal = preTaxCents + taxCents + surchargeCents
   const changeCents = Math.max(0, tenderedCents - effectiveTotal)
   const shortCents = Math.max(0, effectiveTotal - tenderedCents)
   const customerBalance = attachedCustomer?.ledgerEntries?.[0]?.balanceCents ?? 0
@@ -180,7 +197,8 @@ export function CheckoutScreen(): React.JSX.Element {
     tabAmountCents?: number,
     cashOverageToCreditCents?: number,
     surchargeCentsArg?: number,
-    email?: string
+    email?: string,
+    cardMeta?: { processorTransactionId?: string; cardLast4?: string }
   ): Promise<void> => {
     if (cart.length === 0) return
     setCardProcessing(true)
@@ -195,7 +213,9 @@ export function CheckoutScreen(): React.JSX.Element {
           productId: item.product.id,
           quantity: item.quantity,
           costCents: item.product.costCents,
-          unitPriceCents: item.unitPriceCents
+          unitPriceCents: item.unitPriceCents,
+          discountCents: item.discountCents ?? 0,
+          discountReason: item.discountReason
         })),
         taxRatePercent,
         tenderedCents: finalTendered,
@@ -204,7 +224,11 @@ export function CheckoutScreen(): React.JSX.Element {
         tabAmountCents: tabAmountCents ?? 0,
         cashOverageToCreditCents: cashOverageToCreditCents ?? 0,
         surchargeCents: surchargeCentsArg ?? 0,
-        email: email || undefined
+        email: email || undefined,
+        billDiscountCents: effectiveBillDiscountCents,
+        billDiscountReason,
+        processorTransactionId: cardMeta?.processorTransactionId,
+        cardLast4: cardMeta?.cardLast4
       })
       setActiveReceipt(transaction)
       setCart([])
@@ -215,6 +239,8 @@ export function CheckoutScreen(): React.JSX.Element {
       setApplySurcharge(false)
       setETransferEmail('')
       setETransferConfirmed(false)
+      setBillDiscountCents(0)
+      setBillDiscountReason(undefined)
       setScanFeedback({ type: 'success', message: `Sale complete — ${transaction.receiptNumber}` })
     } catch (err) {
       setScanFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Transaction failed' })
@@ -244,7 +270,10 @@ export function CheckoutScreen(): React.JSX.Element {
     if (result.status === 'approved') {
       setPaymentState('approved')
       setPaymentMessage(`Card approved${result.cardLast4 ? ` (card •••• ${result.cardLast4})` : ''}`)
-      void completeSale('CARD', undefined, undefined, surchargeCents)
+      void completeSale('CARD', undefined, undefined, surchargeCents, undefined, {
+        processorTransactionId: result.transactionId,
+        cardLast4: result.cardLast4
+      })
     } else if (result.status === 'error') {
       setPaymentState('timeout')
       setPaymentMessage(result.message || 'Payment timed out.')
@@ -442,7 +471,17 @@ export function CheckoutScreen(): React.JSX.Element {
 
   return (
     <div className="mx-auto max-w-7xl space-y-4 p-4">
-      <h1 className="text-2xl font-bold text-[var(--foreground)]">Checkout</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-[var(--foreground)]">Checkout</h1>
+        {isManager && (
+          <button
+            onClick={() => setShowRefundAuth(true)}
+            className="min-h-9 rounded-[var(--radius)] border border-[var(--error)] px-3 text-xs font-semibold text-[var(--error)]"
+          >
+            Refund Past Sales
+          </button>
+        )}
+      </div>
 
       {/* Scan feedback */}
       {scanFeedback && (
@@ -635,24 +674,41 @@ export function CheckoutScreen(): React.JSX.Element {
                   Cart is empty. Search or scan to add items.
                 </div>
               ) : (
-                cart.map((item) => (
-                  <div key={item.product.id} className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-2.5 text-xs">
-                    <div className="flex-1 pr-2">
-                      <div className="font-medium text-[var(--foreground)]">{item.product.name}</div>
-                      <div className="text-[var(--muted-foreground)]">{formatCurrency(item.unitPriceCents)} × {item.quantity}</div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center rounded-[var(--radius)] border border-[var(--border)]">
-                        <button onClick={() => handleQuantityChange(item.product.id, -1)} className="px-2 py-1 text-[var(--foreground)]">−</button>
-                        <span className="px-2 text-[var(--foreground)]">{item.quantity}</span>
-                        <button onClick={() => handleQuantityChange(item.product.id, 1)} className="px-2 py-1 text-[var(--foreground)]">+</button>
+                cart.map((item) => {
+                  const lineRawCents = item.unitPriceCents * item.quantity
+                  const lineDiscountCents = item.discountCents ?? 0
+                  const lineTotalCents = lineRawCents - lineDiscountCents
+                  return (
+                    <div key={item.product.id} className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-2.5 text-xs">
+                      <div className="flex-1 pr-2">
+                        <div className="font-medium text-[var(--foreground)]">{item.product.name}</div>
+                        <div className="text-[var(--muted-foreground)]">
+                          {formatCurrency(item.unitPriceCents)} × {item.quantity}
+                          {lineDiscountCents > 0 && <span className="text-[var(--success)]"> · discount {formatCurrency(lineDiscountCents)}</span>}
+                        </div>
                       </div>
-                      <span className="w-14 text-right font-semibold text-[var(--foreground)]">
-                        {formatCurrency(item.unitPriceCents * item.quantity)}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center rounded-[var(--radius)] border border-[var(--border)]">
+                          <button onClick={() => handleQuantityChange(item.product.id, -1)} className="px-2 py-1 text-[var(--foreground)]">−</button>
+                          <span className="px-2 text-[var(--foreground)]">{item.quantity}</span>
+                          <button onClick={() => handleQuantityChange(item.product.id, 1)} className="px-2 py-1 text-[var(--foreground)]">+</button>
+                        </div>
+                        <button
+                          onClick={() => setDiscountItemTarget(item.product.id)}
+                          className={`min-h-7 rounded-[var(--radius)] border px-1.5 text-[10px] font-semibold ${lineDiscountCents > 0 ? 'border-[var(--success)] text-[var(--success)]' : 'border-[var(--border)] text-[var(--muted-foreground)]'}`}
+                        >
+                          {lineDiscountCents > 0 ? 'Edit' : 'Discount'}
+                        </button>
+                        <div className="w-14 text-right">
+                          {lineDiscountCents > 0 && (
+                            <div className="text-[10px] text-[var(--muted-foreground)] line-through">{formatCurrency(lineRawCents)}</div>
+                          )}
+                          <span className="font-semibold text-[var(--foreground)]">{formatCurrency(lineTotalCents)}</span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
 
@@ -661,6 +717,26 @@ export function CheckoutScreen(): React.JSX.Element {
                 <span>Subtotal</span>
                 <span>{formatCurrency(subtotalCents)}</span>
               </div>
+              {itemDiscountTotalCents > 0 && (
+                <div className="flex justify-between text-sm text-[var(--success)]">
+                  <span>Item discounts</span>
+                  <span>-{formatCurrency(itemDiscountTotalCents)}</span>
+                </div>
+              )}
+              {effectiveBillDiscountCents > 0 && (
+                <div className="flex items-center justify-between text-sm text-[var(--success)]">
+                  <span>Bill discount</span>
+                  <span className="flex items-center gap-2">
+                    -{formatCurrency(effectiveBillDiscountCents)}
+                    <button
+                      onClick={() => { setBillDiscountCents(0); setBillDiscountReason(undefined) }}
+                      className="text-[10px] text-[var(--muted-foreground)] underline"
+                    >
+                      remove
+                    </button>
+                  </span>
+                </div>
+              )}
               <div className="flex items-center justify-between text-sm text-[var(--muted-foreground)]">
                 <span>Tax ({taxRatePercent}%)</span>
                 <span>{formatCurrency(taxCents)}</span>
@@ -675,6 +751,13 @@ export function CheckoutScreen(): React.JSX.Element {
                 <span>Total due</span>
                 <span className="text-[var(--primary)]">{formatCurrency(effectiveTotal)}</span>
               </div>
+              <button
+                onClick={() => setShowBillDiscountModal(true)}
+                disabled={cart.length === 0}
+                className="w-full min-h-9 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-xs font-medium text-[var(--foreground)] disabled:opacity-50"
+              >
+                {effectiveBillDiscountCents > 0 ? 'Edit whole-bill discount' : 'Whole Bill Discount'}
+              </button>
             </div>
           </Card>
 
@@ -1023,6 +1106,60 @@ export function CheckoutScreen(): React.JSX.Element {
           </Card>
         </div>
       )}
+
+      {/* Per-item discount */}
+      {discountItemTarget !== null && (() => {
+        const item = cart.find((i) => i.product.id === discountItemTarget)
+        if (!item) return null
+        const lineTotalCents = item.unitPriceCents * item.quantity
+        return (
+          <DiscountModal
+            title={`Discount: ${item.product.name} (qty ${item.quantity})`}
+            baseLabel={`Line total: ${formatCurrency(lineTotalCents)}`}
+            baseCents={lineTotalCents}
+            initialDiscountCents={item.discountCents ?? 0}
+            initialReason={item.discountReason}
+            onApply={(discountCents, reason) => {
+              setCart((prev) =>
+                prev.map((i) => (i.product.id === discountItemTarget ? { ...i, discountCents, discountReason: reason } : i))
+              )
+              setDiscountItemTarget(null)
+            }}
+            onCancel={() => setDiscountItemTarget(null)}
+          />
+        )
+      })()}
+
+      {/* Whole-bill discount */}
+      {showBillDiscountModal && (
+        <DiscountModal
+          title="Whole Bill Discount"
+          baseLabel={`Current subtotal (pre-tax): ${formatCurrency(subtotalCents)}`}
+          baseCents={subtotalCents}
+          initialDiscountCents={billDiscountCents}
+          initialReason={billDiscountReason}
+          onApply={(discountCents, reason) => {
+            setBillDiscountCents(discountCents)
+            setBillDiscountReason(reason)
+            setShowBillDiscountModal(false)
+          }}
+          onCancel={() => setShowBillDiscountModal(false)}
+        />
+      )}
+
+      {/* Refund Past Sales — manager re-authentication, then the refund workspace */}
+      {showRefundAuth && (
+        <ManagerAuthModal
+          description="Refunds are restricted to Managers. Re-enter manager credentials to continue — this does not sign out the current cashier."
+          onCancel={() => setShowRefundAuth(false)}
+          onSuccess={(manager) => {
+            setRefundManager(manager)
+            setShowRefundAuth(false)
+          }}
+        />
+      )}
+
+      {refundManager && <RefundSalesScreen manager={refundManager} onExit={() => setRefundManager(null)} />}
     </div>
   )
 }

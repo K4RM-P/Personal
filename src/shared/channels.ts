@@ -87,6 +87,13 @@ export const IPC = {
   USER_CREATE: 'user:create',
   USER_UPDATE: 'user:update',
   USER_DELETE: 'user:delete',
+  /** Manager re-authentication for privileged in-checkout actions (refunds). Does not change the active session. */
+  AUTH_VERIFY_MANAGER: 'auth:verifyManager',
+
+  // Refund system (manager-only, authenticated)
+  REFUND_SEARCH_SALES: 'refund:searchSales',
+  REFUND_GET_SALE_DETAILS: 'refund:getSaleDetails',
+  REFUND_PROCESS: 'refund:process',
 
   // Compliance & ledger channels (Stage 6/8)
   COMPLIANCE_SEARCH_RX: 'compliance:searchRx',

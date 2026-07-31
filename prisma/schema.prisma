@@ -28,6 +28,7 @@ model User {
   lastLogin    DateTime?
   createdAt    DateTime      @default(now())
   transactions Transaction[]
+  refunds      Refund[]
 }
 
 model Product {
@@ -187,6 +188,7 @@ model CreditLedgerEntry {
   amountCents       Int
   balanceAfterCents Int
   transactionId     String?
+  refundId          Int?
   note              String?
   createdByUserId   Int?
   createdAt         DateTime        @default(now())
@@ -258,7 +260,14 @@ model Transaction {
   voidedByUserId         Int?
   /** Audit: manager who issued a discount (User.id). */
   discountIssuedByUserId Int?
+  /** Card refund reversal target: the processor's charge id and the card's last 4 digits, captured at charge time. */
+  processorTransactionId String?
+  cardLast4               String?
+  /** Whole-bill discount applied at checkout (see Discount model for the audit row). */
+  billDiscountCents       Int?     @default(0)
   items          TransactionItem[]
+  refunds        Refund[]
+  discounts      Discount[]
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
@@ -285,11 +294,73 @@ model TransactionItem {
   quantity      Int
   costCents     Int
   unitPriceCents Int
+  /** Per-item discount applied at checkout (see Discount model for the audit row). */
+  discountCents Int?        @default(0)
   totalCents    Int
   isVoided      Boolean     @default(false)
 
   @@index([transactionId])
   @@index([productId])
+}
+
+/// A refund issued against a past sale — cash/card/e-transfer/tab-credit.
+/// Card refunds reverse the original charge via the payment adapter; tab-credit
+/// refunds also produce a CreditLedgerEntry. See pharmacy-pos-feature-spec.md.
+model Refund {
+  id                Int          @id @default(autoincrement())
+  transactionId     String
+  transaction       Transaction  @relation(fields: [transactionId], references: [id])
+  type              RefundType
+  amountCents       Int
+  reason            String?
+  /** For E_TRANSFER refunds — where the manager must manually send funds. */
+  customerEmail     String?
+  /** Processor's refund id, for CARD refunds. */
+  providerRefundId  String?
+  refundedByUserId  Int
+  refundedBy        User         @relation(fields: [refundedByUserId], references: [id])
+  status            RefundStatus
+  createdAt         DateTime     @default(now())
+
+  @@index([transactionId])
+  @@index([refundedByUserId])
+}
+
+enum RefundType {
+  CASH
+  CARD
+  E_TRANSFER
+  TAB_CREDIT
+}
+
+enum RefundStatus {
+  COMPLETED
+  PENDING
+}
+
+/// Audit trail for a discount applied at checkout — one row per item discount,
+/// plus one BILL row if a whole-bill discount was applied.
+model Discount {
+  id              Int          @id @default(autoincrement())
+  transactionId   String
+  transaction     Transaction  @relation(fields: [transactionId], references: [id])
+  type            DiscountType
+  /** TransactionItem.id — set when type is ITEM. */
+  itemId          String?
+  amountCents     Int
+  originalCents   Int
+  finalCents      Int
+  reason          String?
+  appliedByUserId Int?
+  createdAt       DateTime     @default(now())
+
+  @@index([transactionId])
+  @@index([appliedByUserId])
+}
+
+enum DiscountType {
+  ITEM
+  BILL
 }
 
 // --- Reporting enums & models (spec §4) ---
