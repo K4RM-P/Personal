@@ -3,6 +3,8 @@ dist/
 out/
 *.log
 .DS_Store
+.eslintcache
+*.tsbuildinfo
 # SQLite dev database (created at runtime)
 *.db
 *.db-journal
