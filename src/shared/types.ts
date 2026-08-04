@@ -198,10 +198,32 @@ export interface DashboardSummary {
   lowStockCount: number
 }
 
-export interface BackupBundle {
+// ---------------------------------------------------------------------------
+// Data Backup System — docs/data-backup-system-spec.md
+// ---------------------------------------------------------------------------
+
+export interface ExternalDrive {
+  name: string
   path: string
+  totalBytes: number
+  freeBytes: number
+}
+
+export interface BackupRunResult {
+  backupDir: string
+  files: Array<{ name: string; sizeBytes: number }>
   createdAt: string
-  sizeBytes: number
+}
+
+export interface BackupLogSummary {
+  id: number
+  timestamp: string
+  backupPath: string
+  driveName: string
+  drivePath: string
+  backupSizeBytes: number
+  status: 'SUCCESS' | 'FAILED' | 'PARTIAL'
+  errorMessage: string | null
 }
 
 // ---------------------------------------------------------------------------

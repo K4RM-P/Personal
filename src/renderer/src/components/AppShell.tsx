@@ -2,6 +2,7 @@ import * as React from 'react'
 import { ShoppingCart, Package, Users, Settings, BarChart3, Receipt, UserCog, LogOut } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useCurrentUser } from '../context/CurrentUserContext'
+import { LogoutConfirmModal } from './LogoutConfirmModal'
 
 export type NavTab = 'checkout' | 'products' | 'customers' | 'settings' | 'reports' | 'users' | 'sales'
 
@@ -27,6 +28,22 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps) {
   // Managers have the full Reports screen (with date ranges), so the cashier-only
   // "Today's Sales" tab is omitted for them.
   const navItems = allNavItems.filter((item) => (item.managerOnly ? isManager : item.id !== 'sales' || !isManager))
+
+  const [showLogoutConfirm, setShowLogoutConfirm] = React.useState(false)
+
+  const handleLogoutClick = async (): Promise<void> => {
+    try {
+      const shouldPrompt = await window.api.backup.getPromptOnLogout()
+      if (shouldPrompt) {
+        setShowLogoutConfirm(true)
+      } else {
+        await logout()
+      }
+    } catch {
+      // If the setting can't be read, fall back to the safer default: prompt.
+      setShowLogoutConfirm(true)
+    }
+  }
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
@@ -76,7 +93,7 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps) {
             </div>
           )}
           <button
-            onClick={() => void logout()}
+            onClick={() => void handleLogoutClick()}
             className="flex w-full items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted)]"
           >
             <LogOut className="h-4 w-4" /> Log out
@@ -85,6 +102,8 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps) {
       </aside>
 
       <main className="flex-1 overflow-y-auto bg-[var(--background)] p-8">{children}</main>
+
+      {showLogoutConfirm && <LogoutConfirmModal onCancel={() => setShowLogoutConfirm(false)} />}
     </div>
   )
 }

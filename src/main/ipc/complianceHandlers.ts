@@ -12,9 +12,7 @@ import {
   scanDscsaBarcode,
   checkFsaHsaEligibility,
   getCustomerLedger,
-  postCustomerLedgerEntry,
-  createBackupBundle,
-  restoreBackupTest
+  postCustomerLedgerEntry
 } from '../db/queries/complianceQueries'
 
 export function registerComplianceHandlers(db: PrismaClient): void {
@@ -29,6 +27,4 @@ export function registerComplianceHandlers(db: PrismaClient): void {
   ipcMain.handle(IPC.COMPLIANCE_FSA_HSA_CHECK, (_e, productName: string) => checkFsaHsaEligibility(productName))
   ipcMain.handle(IPC.CUSTOMER_LEDGER_GET, (_e, customerId: number) => getCustomerLedger(db, customerId))
   ipcMain.handle(IPC.CUSTOMER_LEDGER_POST, (_e, payload) => postCustomerLedgerEntry(db, payload.customerId, payload.kind, payload.amountCents, payload.reference, payload.notes))
-  ipcMain.handle(IPC.BACKUP_CREATE, () => createBackupBundle())
-  ipcMain.handle(IPC.BACKUP_RESTORE_TEST, () => restoreBackupTest())
 }

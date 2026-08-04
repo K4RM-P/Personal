@@ -22,7 +22,9 @@ import type {
   PrescriptionRecord,
   ComplianceAuditEntry,
   CustomerLedgerEntry,
-  BackupBundle,
+  ExternalDrive,
+  BackupRunResult,
+  BackupLogSummary,
   SalesSummary,
   TopItemRow,
   SlowItemRow,
@@ -221,8 +223,14 @@ const api = {
     exportXlsx: (): Promise<{ path: string }> => ipcRenderer.invoke(IPC.REPORTS_EXPORT_XLSX)
   },
   backup: {
-    create: (): Promise<BackupBundle> => ipcRenderer.invoke(IPC.BACKUP_CREATE),
-    restoreTest: (): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke(IPC.BACKUP_RESTORE_TEST)
+    getExternalDrives: (): Promise<ExternalDrive[]> => ipcRenderer.invoke(IPC.BACKUP_GET_EXTERNAL_DRIVES),
+    pickFolder: (): Promise<string | null> => ipcRenderer.invoke(IPC.BACKUP_PICK_FOLDER),
+    run: (drivePath: string, driveName: string | undefined, initiatedByUserId: number): Promise<BackupRunResult> =>
+      ipcRenderer.invoke(IPC.BACKUP_RUN, { drivePath, driveName, initiatedByUserId }),
+    getLast: (): Promise<BackupLogSummary | null> => ipcRenderer.invoke(IPC.BACKUP_GET_LAST),
+    openFolder: (path: string): Promise<void> => ipcRenderer.invoke(IPC.BACKUP_OPEN_FOLDER, path),
+    getPromptOnLogout: (): Promise<boolean> => ipcRenderer.invoke(IPC.BACKUP_GET_PROMPT_ON_LOGOUT),
+    savePromptOnLogout: (enabled: boolean): Promise<void> => ipcRenderer.invoke(IPC.BACKUP_SAVE_PROMPT_ON_LOGOUT, enabled)
   },
   auth: {
     checkFirstBoot: (): Promise<boolean> => ipcRenderer.invoke(IPC.AUTH_CHECK_FIRST_BOOT),

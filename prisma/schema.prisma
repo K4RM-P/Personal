@@ -29,6 +29,7 @@ model User {
   createdAt    DateTime      @default(now())
   transactions Transaction[]
   refunds      Refund[]
+  backupLogs   BackupLog[]
 }
 
 model Product {
@@ -369,6 +370,32 @@ enum SaleType {
   NORMAL
   RETURN
   ADJUSTMENT
+}
+
+/// Audit trail for full-data backups (spec: docs/data-backup-system-spec.md).
+/// One row per backup attempt, success or failure; McKesson catalogue tables
+/// are never included in the backup this row describes.
+model BackupLog {
+  id                Int          @id @default(autoincrement())
+  timestamp         DateTime     @default(now())
+  backupPath        String
+  driveName         String
+  drivePath         String
+  backupSizeBytes   Int
+  dataSnapshot      String // JSON — same shape as backup-metadata.json's dataSnapshot
+  initiatedByUserId Int
+  initiatedBy       User         @relation(fields: [initiatedByUserId], references: [id])
+  status            BackupStatus
+  errorMessage      String?
+
+  @@index([initiatedByUserId])
+  @@index([timestamp])
+}
+
+enum BackupStatus {
+  SUCCESS
+  FAILED
+  PARTIAL
 }
 
 /// Manual inventory corrections (physical count, damage, expiry, stocking).

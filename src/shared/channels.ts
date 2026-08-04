@@ -121,8 +121,15 @@ export const IPC = {
   REPORTS_GET_ALERTS: 'reports:getAlerts',
   REPORTS_EXPORT_CSV: 'reports:exportCsv',
   REPORTS_EXPORT_XLSX: 'reports:exportXlsx',
-  BACKUP_CREATE: 'backup:create',
-  BACKUP_RESTORE_TEST: 'backup:restoreTest'
+
+  // Data Backup System (docs/data-backup-system-spec.md)
+  BACKUP_GET_EXTERNAL_DRIVES: 'backup:getExternalDrives',
+  BACKUP_PICK_FOLDER: 'backup:pickFolder',
+  BACKUP_RUN: 'backup:run',
+  BACKUP_GET_LAST: 'backup:getLast',
+  BACKUP_OPEN_FOLDER: 'backup:openFolder',
+  BACKUP_GET_PROMPT_ON_LOGOUT: 'backup:getPromptOnLogout',
+  BACKUP_SAVE_PROMPT_ON_LOGOUT: 'backup:savePromptOnLogout'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

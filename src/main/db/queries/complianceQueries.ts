@@ -193,16 +193,3 @@ export async function buildDashboardSummary(db: PrismaClient): Promise<any> {
     lowStockCount
   }
 }
-
-export async function createBackupBundle(): Promise<{ path: string; createdAt: string; sizeBytes: number }> {
-  const dir = join(process.cwd(), 'backup')
-  mkdirSync(dir, { recursive: true })
-  const path = join(dir, `backup-${Date.now()}.json`)
-  writeFileSync(path, JSON.stringify({ createdAt: new Date().toISOString(), status: 'ok' }))
-  const sizeBytes = 1024 + Math.round(Math.random() * 100)
-  return { path, createdAt: new Date().toISOString(), sizeBytes }
-}
-
-export async function restoreBackupTest(): Promise<{ ok: boolean; message: string }> {
-  return { ok: true, message: 'Backup restore test completed successfully.' }
-}

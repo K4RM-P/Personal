@@ -1,11 +1,21 @@
 import * as React from 'react'
-import { FeatureFlag, PrinterConfig, StoreInfo } from '@shared/types'
+import { BackupLogSummary, FeatureFlag, PrinterConfig, StoreInfo } from '@shared/types'
 import { FeatureFlagCard } from '../components/FeatureFlagCard'
 import { PaymentSettingsCard } from '../components/PaymentSettingsCard'
+import { BackupModal } from '../components/BackupModal'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
 import { Switch } from '../components/ui/Switch'
+import { useCurrentUser } from '../context/CurrentUserContext'
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${bytes} B`
+}
 
 export function SettingsScreen() {
+  const { user } = useCurrentUser()
   const [flags, setFlags] = React.useState<FeatureFlag[]>([])
   const [error, setError] = React.useState<string | null>(null)
   const [forceReject, setForceReject] = React.useState(false)
@@ -24,6 +34,39 @@ export function SettingsScreen() {
   const [testResult, setTestResult] = React.useState<{ ok: boolean; message: string } | null>(null)
   const [testing, setTesting] = React.useState(false)
   const [creditSettings, setCreditSettings] = React.useState({ loyaltyPointsPerDollar: 1 })
+  const [lastBackup, setLastBackup] = React.useState<BackupLogSummary | null>(null)
+  const [promptOnLogout, setPromptOnLogout] = React.useState(true)
+  const [showBackupModal, setShowBackupModal] = React.useState(false)
+
+  const loadBackupSettings = async () => {
+    try {
+      const [last, prompt] = await Promise.all([window.api.backup.getLast(), window.api.backup.getPromptOnLogout()])
+      setLastBackup(last)
+      setPromptOnLogout(prompt)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to load backup settings.'
+      setError(msg)
+    }
+  }
+
+  const handleTogglePromptOnLogout = async (enabled: boolean) => {
+    setPromptOnLogout(enabled)
+    try {
+      await window.api.backup.savePromptOnLogout(enabled)
+    } catch (err: unknown) {
+      setPromptOnLogout(!enabled)
+      setError(err instanceof Error ? err.message : 'Failed to save backup setting.')
+    }
+  }
+
+  const handleBrowsePreviousBackups = async () => {
+    if (!lastBackup) return
+    try {
+      await window.api.backup.openFolder(lastBackup.drivePath)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to open backup folder.')
+    }
+  }
 
   const loadFlags = async () => {
     try {
@@ -56,6 +99,7 @@ export function SettingsScreen() {
   React.useEffect(() => {
     loadFlags()
     loadHardwareSettings()
+    loadBackupSettings()
     window.api.customer.getCreditSettings().then(setCreditSettings).catch((err) => setError(err instanceof Error ? err.message : 'Failed to load customer settings.'))
   }, [])
 
@@ -301,10 +345,83 @@ export function SettingsScreen() {
           </div>
           <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
             <p className="font-semibold text-[var(--foreground)]">Backup & restore</p>
-            <p className="text-[var(--muted-foreground)]">Create a backup bundle and run a restore test to keep local-first pharmacies operational.</p>
+            <p className="text-[var(--muted-foreground)]">Prompted on logout and available on demand — see Data Backup below.</p>
           </div>
         </div>
       </Card>
+
+      {/* Data Backup — docs/data-backup-system-spec.md */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Data Backup</CardTitle>
+          <CardDescription>
+            Copies sales, customers, users, discounts, refunds, and inventory to an external drive. The McKesson
+            catalogue is never included — it can be re-imported.
+          </CardDescription>
+        </CardHeader>
+        <div className="grid gap-3 mt-2 text-sm">
+          {lastBackup ? (
+            <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
+              <p className="text-[var(--foreground)]">
+                Last backup:{' '}
+                <span className={lastBackup.status === 'SUCCESS' ? 'text-[var(--success)]' : 'text-[var(--error)]'}>
+                  {new Date(lastBackup.timestamp).toLocaleString()} ({lastBackup.status.toLowerCase()})
+                </span>
+              </p>
+              <p className="text-[var(--muted-foreground)]">
+                Location: {lastBackup.backupPath} · {formatBytes(lastBackup.backupSizeBytes)}
+              </p>
+              {lastBackup.errorMessage && <p className="text-[var(--error)]">{lastBackup.errorMessage}</p>}
+            </div>
+          ) : (
+            <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3 text-[var(--muted-foreground)]">
+              No backups have been run yet.
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setShowBackupModal(true)}
+              className="rounded-[var(--radius)] bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-foreground)]"
+            >
+              Manual Backup Now
+            </button>
+            <button
+              onClick={() => void handleBrowsePreviousBackups()}
+              disabled={!lastBackup}
+              className="rounded-[var(--radius)] border border-[var(--border)] px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--muted)] disabled:opacity-50"
+            >
+              Browse Previous Backups
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
+            <div>
+              <p className="font-semibold text-[var(--foreground)]">Prompt to back up on logout</p>
+              <p className="text-[var(--muted-foreground)]">Recommended — asks before every logout.</p>
+            </div>
+            <Switch checked={promptOnLogout} onCheckedChange={(v) => void handleTogglePromptOnLogout(v)} />
+          </div>
+          <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3 opacity-60">
+            <div>
+              <p className="font-semibold text-[var(--foreground)]">Auto-backup daily at 18:00</p>
+              <p className="text-[var(--muted-foreground)]">Phase 2 — not yet available.</p>
+            </div>
+            <Switch checked={false} onCheckedChange={() => undefined} disabled />
+          </div>
+        </div>
+      </Card>
+
+      {showBackupModal && user && (
+        <BackupModal
+          userId={user.id}
+          standalone
+          onClose={() => {
+            setShowBackupModal(false)
+            void loadBackupSettings()
+          }}
+        />
+      )}
 
       {/* Force Reject Testing Utility */}
       <Card className="border-[var(--warning)]/30 bg-[var(--warning-bg)]">
