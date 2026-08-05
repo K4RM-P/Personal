@@ -1,11 +1,13 @@
 import * as React from 'react'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
+import { Alert } from '../components/ui/Alert'
+import { EmptyState } from '../components/ui/EmptyState'
 import { DiscountModal } from '../components/DiscountModal'
 import { RefundsScreen } from './RefundsScreen'
 import { formatCurrency } from '@shared/formatCurrency'
 import type { Product, Customer, TransactionWithItems, ChargeResult } from '@shared/types'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
-import { Lock, RotateCcw } from 'lucide-react'
+import { Lock, RotateCcw, ShoppingCart, SearchX, ScanLine, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 
 type ScanFeedback = { type: 'success' | 'error'; message: string } | null
 type PaymentMethod = 'CASH' | 'E_TRANSFER' | 'CARD' | 'PHARMACY_CREDIT' | null
@@ -481,17 +483,7 @@ export function CheckoutScreen(): React.JSX.Element {
       </div>
 
       {/* Scan feedback */}
-      {scanFeedback && (
-        <div
-          className={`rounded-[var(--radius)] border p-3 text-xs ${
-            scanFeedback.type === 'success'
-              ? 'border-[var(--success)]/30 bg-[var(--success-bg)] text-[var(--success)]'
-              : 'border-[var(--error)]/30 bg-[var(--error-bg)] text-[var(--error)]'
-          }`}
-        >
-          {scanFeedback.message}
-        </div>
-      )}
+      {scanFeedback && <Alert variant={scanFeedback.type}>{scanFeedback.message}</Alert>}
 
       <div className="grid grid-cols-12 gap-4">
         {/* Left: Customer attachment + Product search + selectable items */}
@@ -554,8 +546,9 @@ export function CheckoutScreen(): React.JSX.Element {
               {attachedCustomer && (
                 <div className="rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm">
                   <div className="text-xs text-[var(--muted-foreground)]">Pharmacy Credit balance</div>
-                  <div className={`font-semibold ${customerBalance >= 0 ? 'text-[var(--success)]' : 'text-[var(--owed)]'}`}>
-                    {customerBalance >= 0 ? 'Credit available' : 'Customer owes'}: {formatCurrency(Math.abs(customerBalance))}
+                  <div className={`flex items-center gap-1.5 font-semibold ${customerBalance >= 0 ? 'text-[var(--success)]' : 'text-[var(--owed)]'}`}>
+                    {customerBalance >= 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+                    <span>{customerBalance >= 0 ? 'Credit available' : 'Customer owes'}: {formatCurrency(Math.abs(customerBalance))}</span>
                   </div>
                 </div>
               )}
@@ -574,9 +567,15 @@ export function CheckoutScreen(): React.JSX.Element {
             </div>
 
             {filteredProducts.length === 0 ? (
-              <div className="rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-6 text-center text-sm text-[var(--muted-foreground)]">
-                {searchQuery.trim() ? `No results for "${searchQuery}". Try checking the spelling or scanning the barcode directly.` : 'Search to load items — type a name, SKU, or barcode, or scan an item.'}
-              </div>
+              <EmptyState
+                icon={searchQuery.trim() ? SearchX : ScanLine}
+                title={searchQuery.trim() ? `No results for "${searchQuery}"` : 'Search to load items'}
+                description={
+                  searchQuery.trim()
+                    ? 'Try checking the spelling, or scan the barcode directly.'
+                    : 'Type a name, SKU, or barcode, or scan an item.'
+                }
+              />
             ) : (
               <div className="grid max-h-[420px] grid-cols-2 gap-2 overflow-y-auto pr-1">
                 {filteredProducts.map((product) => (
@@ -643,9 +642,7 @@ export function CheckoutScreen(): React.JSX.Element {
 
             <div className="mt-3 max-h-[180px] space-y-2 overflow-y-auto pr-1">
               {cart.length === 0 ? (
-                <div className="rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-4 text-center text-sm text-[var(--muted-foreground)]">
-                  Cart is empty. Search or scan to add items.
-                </div>
+                <EmptyState icon={ShoppingCart} title="Cart is empty" description="Search or scan to add items." className="p-4" />
               ) : (
                 cart.map((item) => {
                   const lineRawCents = item.unitPriceCents * item.quantity
@@ -943,11 +940,11 @@ export function CheckoutScreen(): React.JSX.Element {
                           Available: {formatCurrency(customerBalance)} | Applying: {formatCurrency(effectiveTotal)}
                         </div>
                         {customerBalance < effectiveTotal && (
-                          <div className={`rounded-[var(--radius)] border p-3 text-xs ${checkoutSettings.allowShortPayToTab ? 'border-[var(--warning)]/30 bg-[var(--warning-bg)] text-[var(--foreground)]' : 'border-[var(--error)]/30 bg-[var(--error-bg)] text-[var(--error)]'}`}>
+                          <Alert variant={checkoutSettings.allowShortPayToTab ? 'warning' : 'error'}>
                             {checkoutSettings.allowShortPayToTab
                               ? `Balance is short by ${formatCurrency(effectiveTotal - customerBalance)}; this will push the tab negative.`
                               : 'Balance insufficient; short-pay to tab is disabled. Add another tender.'}
-                          </div>
+                          </Alert>
                         )}
                         <button
                           onClick={handlePharmacyCreditCheckout}
@@ -961,21 +958,24 @@ export function CheckoutScreen(): React.JSX.Element {
                   </div>
                 )}
 
-                {/* Payment status message */}
+                {/* Payment status message — approved/declined/timeout are visually
+                    distinct per the design guide (a decline ≠ a timeout: retrying a
+                    genuinely-declined card wastes time, but retrying a timeout risks
+                    a double-charge). */}
                 {paymentMessage && (
-                  <div
-                    className={`rounded-[var(--radius)] border px-3 py-2 text-xs ${
+                  <Alert
+                    variant={
                       paymentState === 'approved'
-                        ? 'border-[var(--success)]/30 bg-[var(--success-bg)] text-[var(--success)]'
+                        ? 'success'
                         : paymentState === 'declined'
-                          ? 'border-[var(--error)]/30 bg-[var(--error-bg)] text-[var(--error)]'
-                        : paymentState === 'timeout'
-                          ? 'border-[var(--warning)]/30 bg-[var(--warning-bg)] text-[var(--warning)]'
-                        : 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]'
-                    }`}
+                          ? 'error'
+                          : paymentState === 'timeout'
+                            ? 'warning'
+                            : 'pending'
+                    }
                   >
                     {paymentMessage}
-                  </div>
+                  </Alert>
                 )}
               </div>
             )}
@@ -988,11 +988,7 @@ export function CheckoutScreen(): React.JSX.Element {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <Card className="w-[440px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-3">
             <CardTitle className="text-[var(--foreground)]">Add new customer</CardTitle>
-            {customerCreationError && (
-              <div className="rounded-[var(--radius)] border border-[var(--error)]/30 bg-[var(--error-bg)] px-3 py-2 text-xs text-[var(--error)]">
-                {customerCreationError}
-              </div>
-            )}
+            {customerCreationError && <Alert variant="error">{customerCreationError}</Alert>}
             <div className="grid grid-cols-2 gap-2">
               <input placeholder="First name" value={newCustomer.firstName} onChange={(e) => setNewCustomer((p) => ({ ...p, firstName: e.target.value }))} className="rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm" />
               <input placeholder="Last name" value={newCustomer.lastName} onChange={(e) => setNewCustomer((p) => ({ ...p, lastName: e.target.value }))} className="rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm" />
@@ -1064,11 +1060,7 @@ export function CheckoutScreen(): React.JSX.Element {
               </CardDescription>
             </div>
 
-            {printStatus && (
-              <div className={`rounded-[var(--radius)] border px-3 py-2 text-xs ${receiptError ? 'border-[var(--error)]/30 bg-[var(--error-bg)] text-[var(--error)]' : 'border-[var(--success)]/30 bg-[var(--success-bg)] text-[var(--success)]'}`}>
-                {printStatus}
-              </div>
-            )}
+            {printStatus && <Alert variant={receiptError ? 'error' : 'success'}>{printStatus}</Alert>}
 
             {!receiptError ? (
               <div className="grid grid-cols-2 gap-2">
