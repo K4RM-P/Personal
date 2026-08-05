@@ -1,10 +1,11 @@
 import * as React from 'react'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
 import { DiscountModal } from '../components/DiscountModal'
+import { RefundsScreen } from './RefundsScreen'
 import { formatCurrency } from '@shared/formatCurrency'
 import type { Product, Customer, TransactionWithItems, ChargeResult } from '@shared/types'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
-import { Lock } from 'lucide-react'
+import { Lock, RotateCcw } from 'lucide-react'
 
 type ScanFeedback = { type: 'success' | 'error'; message: string } | null
 type PaymentMethod = 'CASH' | 'E_TRANSFER' | 'CARD' | 'PHARMACY_CREDIT' | null
@@ -36,6 +37,7 @@ export function CheckoutScreen(): React.JSX.Element {
   const [paymentMessage, setPaymentMessage] = React.useState<string | null>(null)
   const [manualPrompt, setManualPrompt] = React.useState<{ amountCents: number; orderRef: string } | null>(null)
   const [manualRef, setManualRef] = React.useState('')
+  const [showRefunds, setShowRefunds] = React.useState(false)
 
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod>(null)
   const [cardType, setCardType] = React.useState<CardType>(null)
@@ -470,6 +472,12 @@ export function CheckoutScreen(): React.JSX.Element {
     <div className="mx-auto max-w-7xl space-y-4 p-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-[var(--foreground)]">Checkout</h1>
+        <button
+          onClick={() => setShowRefunds(true)}
+          className="flex items-center gap-2 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--card)]"
+        >
+          <RotateCcw className="h-4 w-4" /> Refunds
+        </button>
       </div>
 
       {/* Scan feedback */}
@@ -1131,6 +1139,8 @@ export function CheckoutScreen(): React.JSX.Element {
           onCancel={() => setShowBillDiscountModal(false)}
         />
       )}
+
+      {showRefunds && <RefundsScreen onClose={() => setShowRefunds(false)} />}
 
     </div>
   )

@@ -27,11 +27,8 @@ const UsersScreen = React.lazy(() =>
 const SalesHistoryScreen = React.lazy(() =>
   import('./screens/SalesHistoryScreen').then((m) => ({ default: m.SalesHistoryScreen }))
 )
-const RefundsScreen = React.lazy(() =>
-  import('./screens/RefundsScreen').then((m) => ({ default: m.RefundsScreen }))
-)
 
-const MANAGER_ONLY: NavTab[] = ['products', 'customers', 'settings', 'reports', 'users', 'refunds']
+const MANAGER_ONLY: NavTab[] = ['products', 'customers', 'settings', 'reports', 'users']
 
 function PermissionDenied(): React.JSX.Element {
   return (
@@ -60,8 +57,6 @@ function AuthedApp(): React.JSX.Element {
         return <CheckoutScreen />
       case 'sales':
         return <SalesHistoryScreen />
-      case 'refunds':
-        return <RefundsScreen />
       case 'products':
         return <ProductsScreen />
       case 'customers':
