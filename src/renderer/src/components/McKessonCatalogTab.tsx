@@ -1,5 +1,7 @@
 import * as React from 'react'
+import { UploadCloud, CheckCircle2 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription } from './ui/Card'
+import { Alert } from './ui/Alert'
 import { formatCurrency } from '@shared/formatCurrency'
 import type {
   AutoImportResult,
@@ -7,6 +9,44 @@ import type {
 } from '@shared/catalogTypes'
 
 type Phase = 'idle' | 'importing' | 'done' | 'failed'
+
+const STEP_LABELS = ['Upload file', 'Import progress', 'Review results']
+
+function stepForPhase(phase: Phase): number {
+  if (phase === 'importing') return 2
+  if (phase === 'done' || phase === 'failed') return 3
+  return 1
+}
+
+function StepIndicator({ phase }: { phase: Phase }): React.JSX.Element {
+  const current = stepForPhase(phase)
+  return (
+    <div className="flex items-center gap-2 text-xs font-medium text-[var(--muted-foreground)]">
+      {STEP_LABELS.map((label, idx) => {
+        const step = idx + 1
+        const active = step === current
+        const complete = step < current
+        return (
+          <React.Fragment key={label}>
+            {idx > 0 && <div className="h-px w-6 shrink-0 bg-[var(--border)]" aria-hidden="true" />}
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${
+                  active || complete
+                    ? 'bg-[var(--primary)] text-[var(--primary-foreground)]'
+                    : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
+                }`}
+              >
+                {step}
+              </span>
+              <span className={active ? 'text-[var(--foreground)]' : ''}>{label}</span>
+            </div>
+          </React.Fragment>
+        )
+      })}
+    </div>
+  )
+}
 
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback
@@ -70,6 +110,8 @@ export function McKessonCatalogTab(): React.JSX.Element {
 
   return (
     <div className="space-y-6">
+      <StepIndicator phase={phase} />
+
       <Card>
         <CardHeader>
           <CardTitle>McKesson Catalogue Upload</CardTitle>
@@ -79,15 +121,17 @@ export function McKessonCatalogTab(): React.JSX.Element {
             with the latest pricing and availability.
           </CardDescription>
         </CardHeader>
-        <div className="space-y-3 text-xs">
-          <button
-            onClick={handleUpload}
-            disabled={phase === 'importing'}
-            className="rounded-[var(--radius)] bg-[var(--primary)] px-4 py-2 text-xs font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
-          >
-            {phase === 'importing' ? 'Importing…' : 'Upload WEBCAT file'}
-          </button>
-        </div>
+        <button
+          onClick={handleUpload}
+          disabled={phase === 'importing'}
+          className="flex min-h-24 w-full flex-col items-center justify-center gap-2 rounded-[var(--radius)] border-2 border-dashed border-[var(--border)] bg-[var(--muted)] px-4 py-6 text-center transition-colors hover:border-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <UploadCloud className="h-6 w-6 text-[var(--muted-foreground)]" aria-hidden="true" />
+          <span className="text-sm font-semibold text-[var(--foreground)]">
+            {phase === 'importing' ? 'Importing…' : 'Click to choose a WEBCAT file'}
+          </span>
+          <span className="text-xs text-[var(--muted-foreground)]">Existing products are updated automatically</span>
+        </button>
       </Card>
 
       {/* Progress */}
@@ -96,10 +140,10 @@ export function McKessonCatalogTab(): React.JSX.Element {
           <CardHeader>
             <CardTitle>Import Progress</CardTitle>
           </CardHeader>
-          <div className="space-y-2 text-xs">
+          <div className="space-y-3 text-xs">
             <div className="flex items-center justify-between">
               <span className="font-semibold text-[var(--foreground)]">{phaseLabel(progress.phase)}</span>
-              <span className="text-[var(--muted-foreground)]">
+              <span className="tabular-nums text-[var(--muted-foreground)]">
                 {progress.linesRead.toLocaleString()} / {progress.totalLines.toLocaleString()} lines ({progress.percent}%)
               </span>
             </div>
@@ -114,17 +158,16 @@ export function McKessonCatalogTab(): React.JSX.Element {
       )}
 
       {/* Error */}
-      {error && (
-        <div className="rounded-[var(--radius)] border border-[var(--error)]/30 bg-[var(--error-bg)] p-3 text-xs text-[var(--error)]">
-          {error}
-        </div>
-      )}
+      {error && <Alert variant="error">{error}</Alert>}
 
       {/* Success result */}
       {result && phase === 'done' && (
         <Card className="border-[var(--success)]/30 bg-[var(--success-bg)]">
           <CardHeader>
-            <CardTitle className="text-[var(--success)]">Catalogue imported successfully</CardTitle>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--success)]" aria-hidden="true" />
+              <CardTitle className="text-[var(--success)]">Catalogue imported successfully</CardTitle>
+            </div>
             <CardDescription>
               {result.filename} &mdash; {result.catalogProductsTotal.toLocaleString()} products in catalogue
               {result.repricedCount > 0 && ` • ${result.repricedCount} repriced`}
@@ -135,28 +178,28 @@ export function McKessonCatalogTab(): React.JSX.Element {
 
           {result.newItems.length > 0 && (
             <div>
-              <h4 className="mb-2 px-6 text-xs font-semibold text-[var(--foreground)]">
+              <h4 className="mb-3 px-6 text-xs font-semibold text-[var(--foreground)]">
                 New items added to catalogue ({result.newItems.length.toLocaleString()})
               </h4>
               <div className="max-h-96 space-y-1 overflow-y-auto px-6 pb-6">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-left text-[var(--muted-foreground)]">
-                      <th className="pb-1 pr-2 font-medium">Product Code</th>
-                      <th className="pb-1 pr-2 font-medium">Description</th>
-                      <th className="pb-1 pr-2 text-right font-medium">Unit Cost ($)</th>
-                      <th className="pb-1 pr-2 text-right font-medium">Retail Price ($)</th>
-                      <th className="pb-1 text-right font-medium">UPC / Barcode</th>
+                      <th className="pb-2 pr-2 font-medium">Product Code</th>
+                      <th className="pb-2 pr-2 font-medium">Description</th>
+                      <th className="pb-2 pr-2 text-right font-medium">Unit Cost ($)</th>
+                      <th className="pb-2 pr-2 text-right font-medium">Retail Price ($)</th>
+                      <th className="pb-2 text-right font-medium">UPC / Barcode</th>
                     </tr>
                   </thead>
                   <tbody>
                     {result.newItems.map((item) => (
                       <tr key={item.productId} className="border-t border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
-                        <td className="py-1 pr-2 text-[var(--muted-foreground)] font-mono">{item.itemNumber}</td>
-                        <td className="py-1 pr-2 font-medium text-[var(--foreground)]">{item.name}</td>
-                        <td className="py-1 pr-2 text-right text-[var(--foreground)]">{formatCurrency(item.costCents)}</td>
-                        <td className="py-1 pr-2 text-right text-[var(--primary)] font-semibold">{formatCurrency(item.priceCents)}</td>
-                        <td className="py-1 text-right text-[var(--muted-foreground)] font-mono">{item.barcode || 'N/A'}</td>
+                        <td className="py-2 pr-2 text-[var(--muted-foreground)] font-mono">{item.itemNumber}</td>
+                        <td className="py-2 pr-2 font-medium text-[var(--foreground)]">{item.name}</td>
+                        <td className="py-2 pr-2 text-right tabular-nums text-[var(--foreground)]">{formatCurrency(item.costCents)}</td>
+                        <td className="py-2 pr-2 text-right tabular-nums text-[var(--primary)] font-semibold">{formatCurrency(item.priceCents)}</td>
+                        <td className="py-2 text-right text-[var(--muted-foreground)] font-mono">{item.barcode || 'N/A'}</td>
                       </tr>
                     ))}
                   </tbody>
