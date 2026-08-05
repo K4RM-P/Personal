@@ -36,6 +36,8 @@ export const IPC = {
   CUSTOMER_ADJUST_POINTS: 'customer:adjustPoints',
   CUSTOMER_GET_CREDIT_SETTINGS: 'customer:getCreditSettings',
   CUSTOMER_SAVE_CREDIT_SETTINGS: 'customer:saveCreditSettings',
+  CUSTOMER_EXPORT_DATA: 'customer:exportData',
+  CUSTOMER_DELETE_DATA: 'customer:deleteData',
 
   // Receipt Printing Channels (Stage 4)
   RECEIPT_PRINT: 'receipt:print',

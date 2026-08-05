@@ -173,6 +173,10 @@ model Customer {
   updatedAt        DateTime            @updatedAt
   /** Audit: user who created this customer record (User.id). Soft linkage only. */
   createdByUserId  Int?
+  /** PIPEDA deletion-on-request (B7): set when PII is anonymized. Financial
+   *  ledger/transaction rows are kept for accounting integrity — only the
+   *  identifying fields (name, phone, address, email, notes) are scrubbed. */
+  deletedAt        DateTime?
   ledgerEntries    CreditLedgerEntry[]
   pointEvents      LoyaltyPointEvent[]
   transactions     Transaction[]

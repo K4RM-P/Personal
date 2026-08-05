@@ -21,6 +21,8 @@ export type LogEventType =
   | 'BACKUP_RUN'
   | 'BACKUP_FAILED'
   | 'RESTORE_STAGED'
+  | 'CUSTOMER_DATA_EXPORTED'
+  | 'CUSTOMER_DATA_DELETED'
   | 'ERROR'
 
 const RETENTION_DAYS = 90

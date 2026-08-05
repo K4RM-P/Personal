@@ -164,7 +164,11 @@ const api = {
     saveCreditSettings: (input: {
       loyaltyPointsPerDollar: number
     }): Promise<{ loyaltyPointsPerDollar: number }> =>
-      ipcRenderer.invoke(IPC.CUSTOMER_SAVE_CREDIT_SETTINGS, input)
+      ipcRenderer.invoke(IPC.CUSTOMER_SAVE_CREDIT_SETTINGS, input),
+    exportData: (customerId: number): Promise<{ path: string } | null> =>
+      ipcRenderer.invoke(IPC.CUSTOMER_EXPORT_DATA, customerId),
+    deleteData: (customerId: number): Promise<Customer> =>
+      ipcRenderer.invoke(IPC.CUSTOMER_DELETE_DATA, customerId)
   },
   receipt: {
     print: (transaction: TransactionWithItems): Promise<PrintReceiptResult> =>
