@@ -1,5 +1,7 @@
 import * as React from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription } from './ui/Card'
+import { Alert } from './ui/Alert'
 import type {
   PaymentProviderName,
   PaymentEnvironment,
@@ -40,9 +42,6 @@ const PROVIDERS: ProviderMeta[] = [
   { value: 'mock', label: 'Simulated (testing only)', category: 'Offline — auto-approves', needsKey: false }
 ]
 
-const inputCls =
-  'w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]'
-
 export function PaymentSettingsCard(): React.JSX.Element {
   const [provider, setProvider] = React.useState<PaymentProviderName>('manual')
   const [environment, setEnvironment] = React.useState<PaymentEnvironment>('sandbox')
@@ -54,6 +53,7 @@ export function PaymentSettingsCard(): React.JSX.Element {
   const [reader, setReader] = React.useState<ReaderStatus | null>(null)
   const [checking, setChecking] = React.useState(false)
   const [wizardOpen, setWizardOpen] = React.useState(false)
+  const [showApiKey, setShowApiKey] = React.useState(false)
 
   const meta = PROVIDERS.find((p) => p.value === provider)!
 
@@ -170,10 +170,10 @@ export function PaymentSettingsCard(): React.JSX.Element {
         </div>
       )}
 
-      <div className="grid gap-3 mt-4">
+      <div className="space-y-4 mt-4">
         <div>
           <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Processor</label>
-          <select value={provider} onChange={(e) => setProvider(e.target.value as PaymentProviderName)} className={inputCls}>
+          <select value={provider} onChange={(e) => setProvider(e.target.value as PaymentProviderName)} className="input">
             {PROVIDERS.map((p) => (
               <option key={p.value} value={p.value}>
                 {p.label} — {p.category}
@@ -194,7 +194,7 @@ export function PaymentSettingsCard(): React.JSX.Element {
           <>
             <div>
               <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Environment</label>
-              <select value={environment} onChange={(e) => setEnvironment(e.target.value as PaymentEnvironment)} className={inputCls}>
+              <select value={environment} onChange={(e) => setEnvironment(e.target.value as PaymentEnvironment)} className="input">
                 <option value="sandbox">Sandbox / Test</option>
                 <option value="production">Production / Live</option>
               </select>
@@ -203,19 +203,29 @@ export function PaymentSettingsCard(): React.JSX.Element {
               <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
                 Terminal / Reader id {meta.terminalHint ? `— ${meta.terminalHint}` : ''}
               </label>
-              <input type="text" value={terminalId} onChange={(e) => setTerminalId(e.target.value)} className={inputCls} />
+              <input type="text" value={terminalId} onChange={(e) => setTerminalId(e.target.value)} className="input" />
             </div>
             <div>
               <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
                 API credentials {meta.keyHint ? `— ${meta.keyHint}` : ''}
               </label>
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder={hasApiKey ? '•••••••• (stored — leave blank to keep)' : 'Enter to store securely'}
-                className={inputCls}
-              />
+              <div className="relative">
+                <input
+                  type={showApiKey ? 'text' : 'password'}
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder={hasApiKey ? '•••••••• (stored — leave blank to keep)' : 'Enter to store securely'}
+                  className="input pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey((v) => !v)}
+                  aria-label={showApiKey ? 'Hide API credentials' : 'Show API credentials'}
+                  className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                >
+                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
                 Stored encrypted via your OS keychain (Electron safeStorage) — never in plaintext.
               </p>
@@ -224,25 +234,26 @@ export function PaymentSettingsCard(): React.JSX.Element {
         )}
 
         <div className="flex items-center gap-3 flex-wrap">
-          <button onClick={handleSave} className="rounded-[var(--radius)] bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-foreground)]">
+          <button onClick={handleSave} className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-medium text-[var(--primary-foreground)]">
             Save Payment Settings
           </button>
           <button
             onClick={handleCheckReader}
             disabled={checking}
-            className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-4 py-2 text-sm text-[var(--foreground)] disabled:opacity-50"
+            className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-4 text-sm text-[var(--foreground)] disabled:opacity-50"
           >
             {checking ? 'Checking…' : 'Check Reader Status'}
           </button>
-          {saved && <span className="text-xs text-[var(--success)]">{saved}</span>}
-          {error && <span className="text-xs text-[var(--error)]">{error}</span>}
         </div>
 
+        {saved && <Alert variant="success">{saved}</Alert>}
+        {error && <Alert variant="error">{error}</Alert>}
+
         {reader && (
-          <div className={`rounded-[var(--radius)] border px-3 py-2 text-xs ${reader.connected ? 'border-[var(--success)]/30 bg-[var(--success-bg)] text-[var(--success)]' : 'border-[var(--warning)]/30 bg-[var(--warning-bg)] text-[var(--warning)]'}`}>
+          <Alert variant={reader.connected ? 'success' : 'warning'}>
             {reader.connected ? 'Connected' : 'Pending'} — {reader.label ?? reader.provider}
             {reader.message ? ` · ${reader.message}` : ''}
-          </div>
+          </Alert>
         )}
       </div>
     </Card>

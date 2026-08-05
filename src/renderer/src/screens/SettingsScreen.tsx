@@ -13,6 +13,7 @@ import { PaymentSettingsCard } from '../components/PaymentSettingsCard'
 import { BackupModal } from '../components/BackupModal'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
 import { Switch } from '../components/ui/Switch'
+import { Alert } from '../components/ui/Alert'
 import { useCurrentUser } from '../context/CurrentUserContext'
 
 function formatBytes(bytes: number): string {
@@ -242,22 +243,18 @@ export function SettingsScreen() {
       </div>
 
       {error && (
-        <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--error)]/30 bg-[var(--error-bg)] p-4 text-sm text-[var(--error)]">
-          <div>
-            <span className="font-semibold">Error: </span>
-            {error}
-          </div>
-          <button onClick={() => setError(null)} className="text-xs underline hover:text-[var(--foreground)]">
+        <div className="flex items-start gap-3">
+          <Alert variant="error" className="flex-1">{error}</Alert>
+          <button
+            onClick={() => setError(null)}
+            className="min-h-11 shrink-0 rounded-[var(--radius)] border border-[var(--border)] px-3 text-xs font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+          >
             Dismiss
           </button>
         </div>
       )}
 
-      {settingsSaved && (
-        <div className="rounded-[var(--radius)] border border-[var(--success)]/30 bg-[var(--success-bg)] p-4 text-sm text-[var(--success)]">
-          {settingsSaved}
-        </div>
-      )}
+      {settingsSaved && <Alert variant="success">{settingsSaved}</Alert>}
 
       {/* Store Info for Receipt Header */}
       <Card>
@@ -265,14 +262,14 @@ export function SettingsScreen() {
           <CardTitle>Store Information</CardTitle>
           <CardDescription>Printed on every receipt header and used for the till summary.</CardDescription>
         </CardHeader>
-        <div className="grid gap-3 mt-2">
+        <div className="space-y-4 mt-4">
           <div>
             <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Store Name</label>
             <input
               type="text"
               value={storeInfo.name}
               onChange={(e) => setStoreInfo((s) => ({ ...s, name: e.target.value }))}
-              className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
+              className="input"
             />
           </div>
           <div>
@@ -281,7 +278,7 @@ export function SettingsScreen() {
               type="text"
               value={storeInfo.address}
               onChange={(e) => setStoreInfo((s) => ({ ...s, address: e.target.value }))}
-              className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
+              className="input"
             />
           </div>
           <div>
@@ -290,7 +287,7 @@ export function SettingsScreen() {
               type="text"
               value={storeInfo.phone}
               onChange={(e) => setStoreInfo((s) => ({ ...s, phone: e.target.value }))}
-              className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
+              className="input"
             />
           </div>
         </div>
@@ -304,7 +301,7 @@ export function SettingsScreen() {
             Network thermal (port 9100) is primary. System print queue and PDF are fallbacks.
           </CardDescription>
         </CardHeader>
-        <div className="grid gap-3 mt-2">
+        <div className="space-y-4 mt-4">
           <div>
             <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Printer Type</label>
             <select
@@ -315,7 +312,7 @@ export function SettingsScreen() {
                   type: e.target.value as PrinterConfig['type']
                 }))
               }
-              className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
+              className="input"
             >
               <option value="NETWORK">Network Thermal (ESC/POS, port 9100)</option>
               <option value="SYSTEM">System / USB Print Queue</option>
@@ -334,7 +331,7 @@ export function SettingsScreen() {
                   onChange={(e) =>
                     setPrinterConfig((c) => ({ ...c, ipAddress: e.target.value }))
                   }
-                  className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
+                  className="input"
                 />
               </div>
               <div>
@@ -345,7 +342,7 @@ export function SettingsScreen() {
                   onChange={(e) =>
                     setPrinterConfig((c) => ({ ...c, port: parseInt(e.target.value, 10) || 9100 }))
                   }
-                  className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
+                  className="input w-28"
                 />
               </div>
               <div className="flex items-center gap-3">
@@ -377,7 +374,7 @@ export function SettingsScreen() {
                   <select
                     value={printerConfig.deviceName ?? ''}
                     onChange={(e) => setPrinterConfig((c) => ({ ...c, deviceName: e.target.value || undefined }))}
-                    className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
+                    className="input"
                   >
                     <option value="">Use OS default printer</option>
                     {systemPrinters.map((p) => (
@@ -415,10 +412,25 @@ export function SettingsScreen() {
       </div>
 
       <Card>
-        <CardHeader><CardTitle>Customer Credit & Loyalty</CardTitle><CardDescription>Tab shortfalls are allowed for an attached customer. Set the loyalty earn rate here.</CardDescription></CardHeader>
-        <div className="grid gap-3 mt-2">
-          <div><label className="mb-1 block text-xs text-[var(--muted-foreground)]">Loyalty points earned per dollar spent</label><input type="number" min="0" step="0.1" value={creditSettings.loyaltyPointsPerDollar} onChange={e => setCreditSettings(s => ({ ...s, loyaltyPointsPerDollar: Number(e.target.value) }))} className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"/></div>
-          <button onClick={() => void saveCreditSettings()} className="w-fit rounded-[var(--radius)] bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-foreground)]">Save customer settings</button>
+        <CardHeader>
+          <CardTitle>Customer Credit & Loyalty</CardTitle>
+          <CardDescription>Tab shortfalls are allowed for an attached customer. Set the loyalty earn rate here.</CardDescription>
+        </CardHeader>
+        <div className="space-y-4 mt-4">
+          <div>
+            <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Loyalty points earned per dollar spent</label>
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={creditSettings.loyaltyPointsPerDollar}
+              onChange={(e) => setCreditSettings((s) => ({ ...s, loyaltyPointsPerDollar: Number(e.target.value) }))}
+              className="input w-24"
+            />
+          </div>
+          <button onClick={() => void saveCreditSettings()} className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-medium text-[var(--primary-foreground)]">
+            Save customer settings
+          </button>
         </div>
       </Card>
 
@@ -427,7 +439,7 @@ export function SettingsScreen() {
           <CardTitle>Compliance & Operations</CardTitle>
           <CardDescription>Rx lookup, aging reports, signature capture, PSE checks, DSCSA scan, and FSA/HSA eligibility are available from the tills.</CardDescription>
         </CardHeader>
-        <div className="grid gap-3 mt-2 text-sm text-[#cbd5e1]">
+        <div className="space-y-3 mt-4 text-sm text-[var(--foreground)]">
           <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
             <p className="font-semibold text-[var(--foreground)]">Rx lookup / pickup status</p>
             <p className="text-[var(--muted-foreground)]">Search by patient, Rx number, or drug name from the register to confirm pickup state and outstanding balance.</p>
@@ -452,7 +464,7 @@ export function SettingsScreen() {
             catalogue is never included — it can be re-imported.
           </CardDescription>
         </CardHeader>
-        <div className="grid gap-3 mt-2 text-sm">
+        <div className="space-y-3 mt-4 text-sm">
           {lastBackup ? (
             <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
               <p className="text-[var(--foreground)]">
@@ -623,7 +635,7 @@ export function SettingsScreen() {
             <CardTitle>Optional Modules</CardTitle>
             <CardDescription>Each module defaults to off until a pharmacy opts in.</CardDescription>
           </CardHeader>
-          <div className="space-y-3 text-sm text-[#cbd5e1]">
+          <div className="space-y-3 text-sm text-[var(--foreground)]">
             <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
               <div>
                 <p className="font-semibold text-[var(--foreground)]">Reward points</p>
@@ -660,7 +672,7 @@ export function SettingsScreen() {
             <CardTitle>Reporting Snapshot</CardTitle>
             <CardDescription>A simple owner dashboard and export-ready analytics are now wired to the shared reporting layer.</CardDescription>
           </CardHeader>
-          <div className="space-y-3 text-sm text-[#cbd5e1]">
+          <div className="space-y-3 text-sm text-[var(--foreground)]">
             <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
               <p className="font-semibold text-[var(--foreground)]">Daily sales summary</p>
               <p className="text-[var(--muted-foreground)]">Track transaction counts, revenue, top movers, and low-stock counts from one dashboard.</p>
