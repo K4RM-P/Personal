@@ -1,21 +1,17 @@
 import * as React from 'react'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
 import { DiscountModal } from '../components/DiscountModal'
-import { ManagerAuthModal } from '../components/ManagerAuthModal'
-import { RefundSalesScreen } from '../components/RefundSalesScreen'
 import { formatCurrency } from '@shared/formatCurrency'
-import type { Product, Customer, TransactionWithItems, ChargeResult, AuthUser } from '@shared/types'
+import type { Product, Customer, TransactionWithItems, ChargeResult } from '@shared/types'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
-import { useHasRole } from '../context/CurrentUserContext'
 import { Lock } from 'lucide-react'
 
 type ScanFeedback = { type: 'success' | 'error'; message: string } | null
 type PaymentMethod = 'CASH' | 'E_TRANSFER' | 'CARD' | 'PHARMACY_CREDIT' | null
 type CardType = 'DEBIT' | 'CREDIT' | null
-type CartItem = { product: Product; quantity: number; unitPriceCents: number; discountCents?: number; discountReason?: string }
+type CartItem = { product: Product; quantity: number; unitPriceCents: number; discountCents?: number; discountReason?: string; hstApplied?: boolean }
 
 export function CheckoutScreen(): React.JSX.Element {
-  const isManager = useHasRole('MANAGER')
   const [products, setProducts] = React.useState<Product[]>([])
   const [searchQuery, setSearchQuery] = React.useState('')
   const [cart, setCart] = React.useState<CartItem[]>([])
@@ -23,8 +19,6 @@ export function CheckoutScreen(): React.JSX.Element {
   const [showBillDiscountModal, setShowBillDiscountModal] = React.useState(false)
   const [billDiscountCents, setBillDiscountCents] = React.useState(0)
   const [billDiscountReason, setBillDiscountReason] = React.useState<string | undefined>(undefined)
-  const [showRefundAuth, setShowRefundAuth] = React.useState(false)
-  const [refundManager, setRefundManager] = React.useState<AuthUser | null>(null)
   const [scanFeedback, setScanFeedback] = React.useState<ScanFeedback>(null)
   const [tenderedDollars, setTenderedDollars] = React.useState('')
   const [cardProcessing, setCardProcessing] = React.useState(false)
@@ -38,7 +32,6 @@ export function CheckoutScreen(): React.JSX.Element {
   const [receiptPdfUrl, setReceiptPdfUrl] = React.useState<string | null>(null)
   const [receiptError, setReceiptError] = React.useState(false)
   const [parkedCarts, setParkedCarts] = React.useState<{ id: string; name: string; items: CartItem[] }[]>([])
-  const [recentTransactions, setRecentTransactions] = React.useState<TransactionWithItems[]>([])
   const [paymentState, setPaymentState] = React.useState<'idle' | 'awaiting' | 'processing' | 'approved' | 'declined' | 'timeout'>('idle')
   const [paymentMessage, setPaymentMessage] = React.useState<string | null>(null)
   const [manualPrompt, setManualPrompt] = React.useState<{ amountCents: number; orderRef: string } | null>(null)
@@ -74,7 +67,18 @@ export function CheckoutScreen(): React.JSX.Element {
   // an amount that was discounted away.
   const preTaxCents = subtotalCents - effectiveBillDiscountCents
   const taxRatePercent = 13
-  const taxCents = Math.round((preTaxCents * taxRatePercent) / 100)
+  // Only items with HST applied contribute to the taxable amount; the whole-bill
+  // discount is spread proportionally across taxable vs. non-taxable lines.
+  const taxableSubtotalCents = cart.reduce((sum, item) => {
+    if (item.hstApplied === false) return sum
+    const lineRawCents = item.unitPriceCents * item.quantity
+    const lineDiscountCents = item.discountCents ?? 0
+    return sum + (lineRawCents - lineDiscountCents)
+  }, 0)
+  const taxableAfterBillDiscountCents =
+    subtotalCents > 0 ? taxableSubtotalCents - (effectiveBillDiscountCents * taxableSubtotalCents) / subtotalCents : 0
+  const taxCents = Math.round((taxableAfterBillDiscountCents * taxRatePercent) / 100)
+  const allHstOn = cart.length > 0 && cart.every((item) => item.hstApplied !== false)
   const surchargeCents = cardType === 'CREDIT' && applySurcharge
     ? Math.floor(preTaxCents * checkoutSettings.cardSurchargePercent / 100)
     : 0
@@ -82,20 +86,6 @@ export function CheckoutScreen(): React.JSX.Element {
   const changeCents = Math.max(0, tenderedCents - effectiveTotal)
   const shortCents = Math.max(0, effectiveTotal - tenderedCents)
   const customerBalance = attachedCustomer?.ledgerEntries?.[0]?.balanceCents ?? 0
-
-  React.useEffect(() => {
-    const loadTransactions = async (): Promise<void> => {
-      try {
-        if (window.api?.transaction) {
-          const txs = await window.api.transaction.getAll()
-          setRecentTransactions(txs)
-        }
-      } catch (err) {
-        console.error('Failed to load transactions:', err)
-      }
-    }
-    void loadTransactions()
-  }, [])
 
   React.useEffect(() => {
     const loadSettings = async (): Promise<void> => {
@@ -178,6 +168,21 @@ export function CheckoutScreen(): React.JSX.Element {
 
   useBarcodeScanner({ onScan: handleBarcode, pauseRefs: [searchRef, tenderRef] })
 
+  const handleToggleItemHst = (productId: number): void => {
+    setCart((prev) =>
+      prev.map((item) =>
+        item.product.id === productId ? { ...item, hstApplied: item.hstApplied === false } : item
+      )
+    )
+  }
+
+  const handleToggleWholeCartHst = (): void => {
+    setCart((prev) => {
+      const nextValue = !allHstOn
+      return prev.map((item) => ({ ...item, hstApplied: nextValue }))
+    })
+  }
+
   const handleQuantityChange = (productId: number, delta: number): void => {
     setCart((prev) =>
       prev
@@ -215,7 +220,8 @@ export function CheckoutScreen(): React.JSX.Element {
           costCents: item.product.costCents,
           unitPriceCents: item.unitPriceCents,
           discountCents: item.discountCents ?? 0,
-          discountReason: item.discountReason
+          discountReason: item.discountReason,
+          hstApplied: item.hstApplied !== false
         })),
         taxRatePercent,
         tenderedCents: finalTendered,
@@ -446,15 +452,6 @@ export function CheckoutScreen(): React.JSX.Element {
     setPrintStatus(null)
     setReceiptPdfUrl(null)
     setReceiptError(false)
-    void (async () => {
-      if (window.api?.transaction) {
-        try {
-          setRecentTransactions(await window.api.transaction.getAll())
-        } catch {
-          /* non-fatal */
-        }
-      }
-    })()
   }
 
   const resetPaymentMethod = (): void => {
@@ -473,14 +470,6 @@ export function CheckoutScreen(): React.JSX.Element {
     <div className="mx-auto max-w-7xl space-y-4 p-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-[var(--foreground)]">Checkout</h1>
-        {isManager && (
-          <button
-            onClick={() => setShowRefundAuth(true)}
-            className="min-h-9 rounded-[var(--radius)] border border-[var(--error)] px-3 text-xs font-semibold text-[var(--error)]"
-          >
-            Refund Past Sales
-          </button>
-        )}
       </div>
 
       {/* Scan feedback */}
@@ -634,30 +623,6 @@ export function CheckoutScreen(): React.JSX.Element {
               </div>
             </Card>
           )}
-
-          {/* Recent Transactions */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Completed Transactions</CardTitle>
-              <CardDescription>Persisted sales records</CardDescription>
-            </CardHeader>
-            <div className="space-y-2 mt-2">
-              {recentTransactions.map((tx) => (
-                <div
-                  key={tx.id}
-                  className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3 text-xs"
-                >
-                  <div>
-                    <div className="font-bold text-[var(--foreground)]">{tx.receiptNumber}</div>
-                    <div className="text-[var(--muted-foreground)]">
-                      {new Date(tx.createdAt).toLocaleTimeString()} • {tx.items.length} items • {tx.tenderType}
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-[var(--primary)]">{formatCurrency(tx.totalCents)}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
         </div>
 
         {/* Right: Cart + Payment */}
@@ -678,6 +643,7 @@ export function CheckoutScreen(): React.JSX.Element {
                   const lineRawCents = item.unitPriceCents * item.quantity
                   const lineDiscountCents = item.discountCents ?? 0
                   const lineTotalCents = lineRawCents - lineDiscountCents
+                  const itemHstOn = item.hstApplied !== false
                   return (
                     <div key={item.product.id} className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-2.5 text-xs">
                       <div className="flex-1 pr-2">
@@ -699,6 +665,18 @@ export function CheckoutScreen(): React.JSX.Element {
                         >
                           {lineDiscountCents > 0 ? 'Edit' : 'Discount'}
                         </button>
+                        <label
+                          className={`flex min-h-7 items-center gap-1 rounded-[var(--radius)] border px-1.5 text-[10px] font-semibold ${itemHstOn ? 'border-[var(--border)] text-[var(--foreground)]' : 'border-[var(--warning)] text-[var(--warning)]'}`}
+                          title="Charge HST on this item"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={itemHstOn}
+                            onChange={() => handleToggleItemHst(item.product.id)}
+                            className="h-3 w-3"
+                          />
+                          HST
+                        </label>
                         <div className="w-14 text-right">
                           {lineDiscountCents > 0 && (
                             <div className="text-[10px] text-[var(--muted-foreground)] line-through">{formatCurrency(lineRawCents)}</div>
@@ -738,7 +716,7 @@ export function CheckoutScreen(): React.JSX.Element {
                 </div>
               )}
               <div className="flex items-center justify-between text-sm text-[var(--muted-foreground)]">
-                <span>Tax ({taxRatePercent}%)</span>
+                <span>HST ({taxRatePercent}%)</span>
                 <span>{formatCurrency(taxCents)}</span>
               </div>
               {surchargeCents > 0 && (
@@ -757,6 +735,13 @@ export function CheckoutScreen(): React.JSX.Element {
                 className="w-full min-h-9 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-xs font-medium text-[var(--foreground)] disabled:opacity-50"
               >
                 {effectiveBillDiscountCents > 0 ? 'Edit whole-bill discount' : 'Whole Bill Discount'}
+              </button>
+              <button
+                onClick={handleToggleWholeCartHst}
+                disabled={cart.length === 0}
+                className={`w-full min-h-9 rounded-[var(--radius)] border px-3 text-xs font-medium disabled:opacity-50 ${allHstOn ? 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]' : 'border-[var(--warning)] bg-[var(--warning-bg)] text-[var(--warning)]'}`}
+              >
+                {allHstOn ? 'Remove HST from Whole Cart' : 'Charge HST on Whole Cart'}
               </button>
             </div>
           </Card>
@@ -1147,19 +1132,6 @@ export function CheckoutScreen(): React.JSX.Element {
         />
       )}
 
-      {/* Refund Past Sales — manager re-authentication, then the refund workspace */}
-      {showRefundAuth && (
-        <ManagerAuthModal
-          description="Refunds are restricted to Managers. Re-enter manager credentials to continue — this does not sign out the current cashier."
-          onCancel={() => setShowRefundAuth(false)}
-          onSuccess={(manager) => {
-            setRefundManager(manager)
-            setShowRefundAuth(false)
-          }}
-        />
-      )}
-
-      {refundManager && <RefundSalesScreen manager={refundManager} onExit={() => setRefundManager(null)} />}
     </div>
   )
 }

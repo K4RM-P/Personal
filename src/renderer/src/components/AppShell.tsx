@@ -1,10 +1,10 @@
 import * as React from 'react'
-import { ShoppingCart, Package, Users, Settings, BarChart3, Receipt, UserCog, LogOut } from 'lucide-react'
+import { ShoppingCart, Package, Users, Settings, BarChart3, Receipt, UserCog, LogOut, RotateCcw } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useCurrentUser } from '../context/CurrentUserContext'
 import { LogoutConfirmModal } from './LogoutConfirmModal'
 
-export type NavTab = 'checkout' | 'products' | 'customers' | 'settings' | 'reports' | 'users' | 'sales'
+export type NavTab = 'checkout' | 'products' | 'customers' | 'settings' | 'reports' | 'users' | 'sales' | 'refunds'
 
 interface AppShellProps {
   activeTab: NavTab
@@ -15,6 +15,7 @@ interface AppShellProps {
 const allNavItems: { id: NavTab; label: string; icon: React.ElementType; managerOnly: boolean }[] = [
   { id: 'checkout', label: 'Checkout', icon: ShoppingCart, managerOnly: false },
   { id: 'sales', label: "Today's Sales", icon: Receipt, managerOnly: false },
+  { id: 'refunds', label: 'Refunds', icon: RotateCcw, managerOnly: true },
   { id: 'customers', label: 'Customers', icon: Users, managerOnly: true },
   { id: 'products', label: 'Products', icon: Package, managerOnly: true },
   { id: 'reports', label: 'Reports', icon: BarChart3, managerOnly: true },

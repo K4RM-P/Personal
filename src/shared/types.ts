@@ -45,6 +45,8 @@ export interface CreateTransactionPayload {
     /** Per-item discount in cents, applied at checkout. Cannot exceed unitPriceCents * quantity. */
     discountCents?: number
     discountReason?: string
+    /** Whether HST is charged on this line item. Defaults to true. */
+    hstApplied?: boolean
   }[]
   taxRatePercent: number
   tenderType: 'CASH' | 'CARD' | 'E_TRANSFER' | 'PHARMACY_CREDIT' | 'SPLIT'

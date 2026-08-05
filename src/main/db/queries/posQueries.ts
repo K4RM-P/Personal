@@ -256,7 +256,16 @@ export async function createTransaction(
   }
   const preTaxCents = subtotalCents - billDiscountCents
 
-  const taxCents = Math.round((preTaxCents * payload.taxRatePercent) / 100)
+  // Only items with HST applied contribute to the taxable amount; the whole-bill
+  // discount is spread proportionally across taxable vs. non-taxable lines.
+  const taxableSubtotalCents = payload.items.reduce((sum, item) => {
+    if (item.hstApplied === false) return sum
+    const discountCents = item.discountCents ?? 0
+    return sum + (item.unitPriceCents * item.quantity - discountCents)
+  }, 0)
+  const taxableAfterBillDiscountCents =
+    subtotalCents > 0 ? taxableSubtotalCents - (billDiscountCents * taxableSubtotalCents) / subtotalCents : 0
+  const taxCents = Math.round((taxableAfterBillDiscountCents * payload.taxRatePercent) / 100)
   const sessionUserId = getSession()?.userId ?? null
   const surchargeCents = payload.surchargeCents ?? 0
   const totalCents = preTaxCents + taxCents + surchargeCents
@@ -331,7 +340,8 @@ export async function createTransaction(
           costCents: item.costCents,
           unitPriceCents: item.unitPriceCents,
           discountCents,
-          totalCents: lineRawCents - discountCents
+          totalCents: lineRawCents - discountCents,
+          hstApplied: item.hstApplied !== false
         },
         include: { product: true }
       })

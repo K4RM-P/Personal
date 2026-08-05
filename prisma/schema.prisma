@@ -299,6 +299,8 @@ model TransactionItem {
   discountCents Int?        @default(0)
   totalCents    Int
   isVoided      Boolean     @default(false)
+  /** Whether HST was charged on this line item. Defaults to true. */
+  hstApplied    Boolean     @default(true)
 
   @@index([transactionId])
   @@index([productId])

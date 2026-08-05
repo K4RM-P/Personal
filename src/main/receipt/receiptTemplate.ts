@@ -41,9 +41,10 @@ export function buildReceiptHtml(options: ReceiptTemplateOptions): string {
         <td class="price">-${formatCurrency(discountCents)}</td>
       </tr>`
           : ''
+      const hstLabel = item.hstApplied === false ? ' (HST exempt)' : ''
       return `
       <tr>
-        <td>${escapeHtml(item.product.name)}</td>
+        <td>${escapeHtml(item.product.name)}${hstLabel}</td>
         <td class="qty">x${item.quantity}</td>
         <td class="price">${formatCurrency(lineRawCents)}</td>
       </tr>${discountRow}`
