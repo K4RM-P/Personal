@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { BackupLogSummary, FeatureFlag, PrinterConfig, StoreInfo } from '@shared/types'
+import { BackupDestination, BackupLogSummary, ExternalDrive, FeatureFlag, PrinterConfig, StoreInfo } from '@shared/types'
 import { FeatureFlagCard } from '../components/FeatureFlagCard'
 import { PaymentSettingsCard } from '../components/PaymentSettingsCard'
 import { BackupModal } from '../components/BackupModal'
@@ -37,15 +37,55 @@ export function SettingsScreen() {
   const [lastBackup, setLastBackup] = React.useState<BackupLogSummary | null>(null)
   const [promptOnLogout, setPromptOnLogout] = React.useState(true)
   const [showBackupModal, setShowBackupModal] = React.useState(false)
+  const [backupDestination, setBackupDestination] = React.useState<BackupDestination | null>(null)
+  const [availableDrives, setAvailableDrives] = React.useState<ExternalDrive[]>([])
+  const [savingDestination, setSavingDestination] = React.useState(false)
 
   const loadBackupSettings = async () => {
     try {
-      const [last, prompt] = await Promise.all([window.api.backup.getLast(), window.api.backup.getPromptOnLogout()])
+      const [last, prompt, destination, drives] = await Promise.all([
+        window.api.backup.getLast(),
+        window.api.backup.getPromptOnLogout(),
+        window.api.backup.getDrivePath(),
+        window.api.backup.getExternalDrives()
+      ])
       setLastBackup(last)
       setPromptOnLogout(prompt)
+      setBackupDestination(destination)
+      setAvailableDrives(drives)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load backup settings.'
       setError(msg)
+    }
+  }
+
+  const handleSelectBackupDestination = async (drivePath: string, driveName: string): Promise<void> => {
+    setSavingDestination(true)
+    setError(null)
+    try {
+      await window.api.backup.saveDrivePath(drivePath, driveName)
+      setBackupDestination({ drivePath, driveName })
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save backup destination.')
+    } finally {
+      setSavingDestination(false)
+    }
+  }
+
+  const handleBrowseBackupDestination = async (): Promise<void> => {
+    try {
+      const path = await window.api.backup.pickFolder()
+      if (path) await handleSelectBackupDestination(path, path.split('/').pop() || path)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to open folder picker.')
+    }
+  }
+
+  const handleRescanDrives = async (): Promise<void> => {
+    try {
+      setAvailableDrives(await window.api.backup.getExternalDrives())
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to scan for external drives.')
     }
   }
 
@@ -379,6 +419,64 @@ export function SettingsScreen() {
             </div>
           )}
 
+          <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3 space-y-2">
+            <div>
+              <p className="font-semibold text-[var(--foreground)]">Backup destination (USB drive)</p>
+              <p className="text-[var(--muted-foreground)]">
+                Manual Backup Now writes straight here. When a new backup finishes, the previous one on this drive is
+                deleted automatically.
+              </p>
+            </div>
+
+            {backupDestination ? (
+              <p className="text-[var(--foreground)]">
+                Currently: <span className="font-medium">{backupDestination.driveName}</span>{' '}
+                <span className="text-[var(--muted-foreground)]">({backupDestination.drivePath})</span>
+              </p>
+            ) : (
+              <p className="text-[var(--muted-foreground)]">No destination configured yet — choose one below.</p>
+            )}
+
+            {availableDrives.length > 0 && (
+              <div className="space-y-1">
+                {availableDrives.map((drive) => (
+                  <label
+                    key={drive.path}
+                    className="flex cursor-pointer items-center gap-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]"
+                  >
+                    <input
+                      type="radio"
+                      name="settings-backup-drive"
+                      checked={backupDestination?.drivePath === drive.path}
+                      disabled={savingDestination}
+                      onChange={() => void handleSelectBackupDestination(drive.path, drive.name)}
+                    />
+                    <span className="flex-1">{drive.name}</span>
+                    <span className="text-xs text-[var(--muted-foreground)]">
+                      {formatBytes(drive.freeBytes)} free of {formatBytes(drive.totalBytes)}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => void handleRescanDrives()}
+                className="rounded-[var(--radius)] border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--foreground)] hover:bg-[var(--card)]"
+              >
+                Rescan Drives
+              </button>
+              <button
+                onClick={() => void handleBrowseBackupDestination()}
+                disabled={savingDestination}
+                className="rounded-[var(--radius)] border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--foreground)] hover:bg-[var(--card)] disabled:opacity-50"
+              >
+                Browse…
+              </button>
+            </div>
+          </div>
+
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setShowBackupModal(true)}
@@ -416,6 +514,11 @@ export function SettingsScreen() {
         <BackupModal
           userId={user.id}
           standalone
+          presetDrive={
+            backupDestination
+              ? { path: backupDestination.drivePath, name: backupDestination.driveName }
+              : undefined
+          }
           onClose={() => {
             setShowBackupModal(false)
             void loadBackupSettings()

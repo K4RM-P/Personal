@@ -5,7 +5,12 @@ import { basename, isAbsolute, join } from 'path'
 import { IPC } from '../../shared/channels'
 import { getExternalDrives } from '../backup/drives'
 import { performBackup, getLastBackupLog, type BackupEnv } from '../backup/backupService'
-import { getBackupPromptOnLogout, saveBackupPromptOnLogout } from '../db/queries/settingsQueries'
+import {
+  getBackupPromptOnLogout,
+  saveBackupPromptOnLogout,
+  getBackupDestination,
+  saveBackupDestination
+} from '../db/queries/settingsQueries'
 
 function resolveDbFilePath(): string {
   const raw = process.env.DATABASE_URL ?? 'file:./dev.db'
@@ -77,5 +82,17 @@ export function registerBackupHandlers(db: PrismaClient): void {
     guard('Save backup prompt setting', async (_e: Electron.IpcMainInvokeEvent, enabled: boolean) => {
       await saveBackupPromptOnLogout(db, enabled)
     })
+  )
+
+  ipcMain.handle(IPC.BACKUP_GET_DRIVE_PATH, guard('Get backup destination', async () => getBackupDestination(db)))
+
+  ipcMain.handle(
+    IPC.BACKUP_SAVE_DRIVE_PATH,
+    guard(
+      'Save backup destination',
+      async (_e: Electron.IpcMainInvokeEvent, args: { drivePath: string; driveName: string }) => {
+        await saveBackupDestination(db, args.drivePath, args.driveName)
+      }
+    )
   )
 }

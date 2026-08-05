@@ -21,7 +21,9 @@ const DEFAULTS = {
   'payment.allowCreditCardSurcharge': 'false',
   'payment.cardSurchargePercent': '2',
   'customer.allowShortPayToTab': 'false',
-  'backup.promptOnLogout': 'true'
+  'backup.promptOnLogout': 'true',
+  'backup.drivePath': '',
+  'backup.driveName': ''
 } as const
 
 async function getSetting(db: PrismaClient, key: string): Promise<string> {
@@ -128,4 +130,17 @@ export async function getBackupPromptOnLogout(db: PrismaClient): Promise<boolean
 
 export async function saveBackupPromptOnLogout(db: PrismaClient, enabled: boolean): Promise<void> {
   await setSetting(db, 'backup.promptOnLogout', String(enabled))
+}
+
+/** The manager-configured USB drive backups are written to automatically. Null when not yet set. */
+export async function getBackupDestination(db: PrismaClient): Promise<{ drivePath: string; driveName: string } | null> {
+  const drivePath = await getSetting(db, 'backup.drivePath')
+  if (!drivePath) return null
+  const driveName = await getSetting(db, 'backup.driveName')
+  return { drivePath, driveName: driveName || drivePath }
+}
+
+export async function saveBackupDestination(db: PrismaClient, drivePath: string, driveName: string): Promise<void> {
+  await setSetting(db, 'backup.drivePath', drivePath)
+  await setSetting(db, 'backup.driveName', driveName)
 }

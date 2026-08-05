@@ -215,6 +215,12 @@ export interface BackupRunResult {
   createdAt: string
 }
 
+/** The manager-configured USB drive backups are written to automatically. */
+export interface BackupDestination {
+  drivePath: string
+  driveName: string
+}
+
 export interface BackupLogSummary {
   id: number
   timestamp: string

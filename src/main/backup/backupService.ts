@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client'
-import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'fs'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { sha256File } from './checksum'
 import {
@@ -31,6 +31,24 @@ export interface BackupEnv {
 
 function timestampForDirName(date: Date): string {
   return date.toISOString().replace(/[:.]/g, '-').replace('T', '_').replace('Z', '')
+}
+
+/**
+ * Only the most recent backup is kept on the destination drive — deletes every other
+ * `PHARMACY_POS_BACKUP_*` directory there. Best-effort: a prune failure doesn't fail
+ * the backup that just succeeded.
+ */
+function pruneOldBackups(drivePath: string, keepDir: string): void {
+  try {
+    for (const entry of readdirSync(drivePath, { withFileTypes: true })) {
+      const entryPath = join(drivePath, entry.name)
+      if (entry.isDirectory() && entry.name.startsWith('PHARMACY_POS_BACKUP_') && entryPath !== keepDir) {
+        rmSync(entryPath, { recursive: true, force: true })
+      }
+    }
+  } catch {
+    // best-effort — failing to prune old backups doesn't invalidate the new one
+  }
 }
 
 /** Strips the McKesson catalogue from a *copy* of the database — never touches the live db. */
@@ -171,6 +189,9 @@ export async function performBackup(
       initiatedByUserId,
       status: 'SUCCESS'
     })
+
+    // 5. Retention: this drive should only ever hold the backup that just completed.
+    pruneOldBackups(drivePath, backupDir)
 
     return { backupDir, files, createdAt: startedAt.toISOString() }
   } catch (error) {

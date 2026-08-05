@@ -25,6 +25,7 @@ import type {
   ExternalDrive,
   BackupRunResult,
   BackupLogSummary,
+  BackupDestination,
   SalesSummary,
   TopItemRow,
   SlowItemRow,
@@ -230,7 +231,10 @@ const api = {
     getLast: (): Promise<BackupLogSummary | null> => ipcRenderer.invoke(IPC.BACKUP_GET_LAST),
     openFolder: (path: string): Promise<void> => ipcRenderer.invoke(IPC.BACKUP_OPEN_FOLDER, path),
     getPromptOnLogout: (): Promise<boolean> => ipcRenderer.invoke(IPC.BACKUP_GET_PROMPT_ON_LOGOUT),
-    savePromptOnLogout: (enabled: boolean): Promise<void> => ipcRenderer.invoke(IPC.BACKUP_SAVE_PROMPT_ON_LOGOUT, enabled)
+    savePromptOnLogout: (enabled: boolean): Promise<void> => ipcRenderer.invoke(IPC.BACKUP_SAVE_PROMPT_ON_LOGOUT, enabled),
+    getDrivePath: (): Promise<BackupDestination | null> => ipcRenderer.invoke(IPC.BACKUP_GET_DRIVE_PATH),
+    saveDrivePath: (drivePath: string, driveName: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.BACKUP_SAVE_DRIVE_PATH, { drivePath, driveName })
   },
   auth: {
     checkFirstBoot: (): Promise<boolean> => ipcRenderer.invoke(IPC.AUTH_CHECK_FIRST_BOOT),

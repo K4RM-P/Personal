@@ -129,7 +129,9 @@ export const IPC = {
   BACKUP_GET_LAST: 'backup:getLast',
   BACKUP_OPEN_FOLDER: 'backup:openFolder',
   BACKUP_GET_PROMPT_ON_LOGOUT: 'backup:getPromptOnLogout',
-  BACKUP_SAVE_PROMPT_ON_LOGOUT: 'backup:savePromptOnLogout'
+  BACKUP_SAVE_PROMPT_ON_LOGOUT: 'backup:savePromptOnLogout',
+  BACKUP_GET_DRIVE_PATH: 'backup:getDrivePath',
+  BACKUP_SAVE_DRIVE_PATH: 'backup:saveDrivePath'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

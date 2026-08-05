@@ -15,13 +15,15 @@ interface BackupModalProps {
   userId: number
   /** true when launched from Settings' "Manual Backup Now" — shows "Close" instead of "Logout" on success. */
   standalone?: boolean
+  /** The manager's configured backup destination (Settings). When set, skips drive selection and backs up immediately. */
+  presetDrive?: { path: string; name: string }
   onClose: () => void
 }
 
-export function BackupModal({ userId, standalone = false, onClose }: BackupModalProps): React.JSX.Element {
-  const [step, setStep] = React.useState<Step>('scanning')
+export function BackupModal({ userId, standalone = false, presetDrive, onClose }: BackupModalProps): React.JSX.Element {
+  const [step, setStep] = React.useState<Step>(presetDrive ? 'running' : 'scanning')
   const [drives, setDrives] = React.useState<ExternalDrive[]>([])
-  const [selected, setSelected] = React.useState<{ path: string; name: string } | null>(null)
+  const [selected, setSelected] = React.useState<{ path: string; name: string } | null>(presetDrive ?? null)
   const [result, setResult] = React.useState<BackupRunResult | null>(null)
   const [error, setError] = React.useState<string | null>(null)
 
@@ -37,10 +39,6 @@ export function BackupModal({ userId, standalone = false, onClose }: BackupModal
     }
   }, [])
 
-  React.useEffect(() => {
-    void scanDrives()
-  }, [scanDrives])
-
   const browse = async (): Promise<void> => {
     try {
       const path = await window.api.backup.pickFolder()
@@ -51,19 +49,33 @@ export function BackupModal({ userId, standalone = false, onClose }: BackupModal
     }
   }
 
-  const runBackup = async (): Promise<void> => {
-    if (!selected) return
-    setStep('running')
-    setError(null)
-    try {
-      const backupResult = await window.api.backup.run(selected.path, selected.name, userId)
-      setResult(backupResult)
-      setStep('success')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Backup failed for an unknown reason.')
-      setStep('error')
+  const runBackup = React.useCallback(
+    async (destination?: { path: string; name: string }): Promise<void> => {
+      const target = destination ?? selected
+      if (!target) return
+      setStep('running')
+      setError(null)
+      try {
+        const backupResult = await window.api.backup.run(target.path, target.name, userId)
+        setResult(backupResult)
+        setStep('success')
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Backup failed for an unknown reason.')
+        setStep('error')
+      }
+    },
+    [selected, userId]
+  )
+
+  React.useEffect(() => {
+    if (presetDrive) {
+      void runBackup(presetDrive)
+    } else {
+      void scanDrives()
     }
-  }
+    // Only run once on mount — presetDrive/scanDrives/runBackup are stable for the modal's lifetime.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
