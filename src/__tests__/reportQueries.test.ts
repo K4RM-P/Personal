@@ -201,6 +201,64 @@ describe('Reports System — MVP Phase 1 Queries', () => {
     rmSync(workDir, { recursive: true, force: true })
   })
 
+  // A7 regression: partial refunds (transaction stays COMPLETED, only a
+  // Refund row exists) must still reduce net sales in the daily summary.
+  // Isolated on its own day (2026-06-15) so it doesn't perturb the other
+  // month/tender/cashier/top-item assertions that reuse the shared 07-28..30 seed.
+  it('daily summary subtracts a partial refund even though the parent sale stays COMPLETED', async () => {
+    const tx = await prisma.transaction.create({
+      data: {
+        receiptNumber: 'RPT-PARTIAL-REFUND',
+        status: 'COMPLETED',
+        tenderType: 'CASH',
+        subtotalCents: 1000,
+        taxCents: 100,
+        totalCents: 1100,
+        tenderedCents: 1100,
+        changeCents: 0,
+        userId,
+        createdAt: new Date('2026-06-15T11:00:00'),
+        items: {
+          create: [{ productId: productId3, quantity: 1, costCents: 1000, unitPriceCents: 1000, totalCents: 1000 }]
+        }
+      }
+    })
+    await prisma.refund.create({
+      data: {
+        transactionId: tx.id,
+        type: 'CASH',
+        amountCents: 300,
+        status: 'COMPLETED',
+        refundedByUserId: userId,
+        createdAt: new Date('2026-06-15T12:00:00')
+      }
+    })
+    clearReportCache()
+
+    const summary = await getDailySalesSummary(prisma, '2026-06-15', '2026-06-15')
+    expect(summary.grossCents).toBe(1100)
+    // Only the $3.00 actually refunded should appear as a return, not the
+    // full $11.00 transaction (which would happen if status flip were relied on).
+    expect(summary.returnsCents).toBe(-300)
+    expect(summary.netCents).toBe(1100 - 300)
+
+    // A PENDING (not yet completed) refund must not be counted as money out yet.
+    await prisma.refund.create({
+      data: {
+        transactionId: tx.id,
+        type: 'E_TRANSFER',
+        amountCents: 200,
+        status: 'PENDING',
+        refundedByUserId: userId,
+        customerEmail: 'test@example.com',
+        createdAt: new Date('2026-06-15T13:00:00')
+      }
+    })
+    clearReportCache()
+    const summary2 = await getDailySalesSummary(prisma, '2026-06-15', '2026-06-15')
+    expect(summary2.returnsCents).toBe(-300)
+  })
+
   // Test 1: Dashboard cards show correct totals
   it('dashboard totals match manually-calculated sums', async () => {
     const dashboard = await getDashboardData(prisma)

@@ -82,9 +82,24 @@ export function localDateString(date: Date): string {
   return `${y}-${m}-${d}`
 }
 
-/** Parse an ISO date string (from the renderer) into a Date, defaulting to now. */
+/**
+ * Parse a date string from the renderer into a Date, defaulting to now.
+ *
+ * A bare `YYYY-MM-DD` string (no time/offset) is parsed by `new Date()` as
+ * UTC midnight per the ISO 8601 spec — in any timezone behind UTC that lands
+ * on the *previous* local calendar day once `startOfDay`/`endOfDay` apply
+ * local `setHours`, silently shifting every date-range report back a day.
+ * Construct those explicitly in local time instead. Strings that already
+ * carry a time or offset (e.g. from `Date.toISOString()`) are left to the
+ * normal parser.
+ */
 function parseDate(value: string | undefined | null): Date {
   if (!value) return new Date()
+  const bareDateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (bareDateMatch) {
+    const [, y, m, d] = bareDateMatch
+    return new Date(Number(y), Number(m) - 1, Number(d))
+  }
   const d = new Date(value)
   return isNaN(d.getTime()) ? new Date() : d
 }
@@ -99,8 +114,12 @@ function parseDate(value: string | undefined | null): Date {
  * Sales summary for a date range: gross, net, COGS, margin, transaction count,
  * average transaction value, and new vs. repeat customers.
  *
- * - Gross = sum of totalCents for COMPLETED sales (saleType NORMAL)
- * - Returns = sum of totalCents for RETURN/REFUNDED transactions (negative)
+ * - Gross = sum of totalCents for COMPLETED/REFUNDED sales (saleType NORMAL)
+ * - Returns = sum of actual Refund.amountCents (status COMPLETED) whose refund
+ *   was *issued* in the period — not inferred from transaction.status, since a
+ *   partial refund leaves the parent transaction status COMPLETED and would
+ *   otherwise vanish from every report entirely. Attributed to the day the
+ *   refund happened, not the day of the original sale.
  * - Net = gross + returns (returns are negative)
  * - COGS = sum of (costCents × quantity) for line items in the period
  * - Margin = net - COGS
@@ -117,26 +136,29 @@ export async function getDailySalesSummary(
   const from = startOfDay(parseDate(fromDate))
   const to = endOfDay(parseDate(toDate))
 
-  const transactions = await db.transaction.findMany({
-    where: {
-      createdAt: { gte: from, lte: to },
-      status: { in: ['COMPLETED', 'REFUNDED'] }
-    },
-    include: { items: true }
-  })
+  const [transactions, refunds] = await Promise.all([
+    db.transaction.findMany({
+      where: {
+        createdAt: { gte: from, lte: to },
+        status: { in: ['COMPLETED', 'REFUNDED'] }
+      },
+      include: { items: true }
+    }),
+    db.refund.findMany({
+      where: {
+        createdAt: { gte: from, lte: to },
+        status: 'COMPLETED'
+      },
+      select: { amountCents: true }
+    })
+  ])
 
   let grossCents = 0
-  let returnsCents = 0
   let cogsCents = 0
   const customerIds = new Set<number>()
 
   for (const tx of transactions) {
-    const isReturn = tx.status === 'REFUNDED' || tx.saleType === 'RETURN'
-    if (isReturn) {
-      returnsCents -= tx.totalCents
-    } else {
-      grossCents += tx.totalCents
-    }
+    grossCents += tx.totalCents
     for (const item of tx.items) {
       if (item.isVoided) continue
       cogsCents += item.costCents * item.quantity
@@ -145,6 +167,8 @@ export async function getDailySalesSummary(
       customerIds.add(tx.customerId)
     }
   }
+
+  const returnsCents = -refunds.reduce((sum, r) => sum + r.amountCents, 0)
 
   const netCents = grossCents + returnsCents
   const marginCents = netCents - cogsCents
