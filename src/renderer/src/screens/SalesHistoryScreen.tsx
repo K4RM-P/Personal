@@ -1,6 +1,8 @@
 import * as React from 'react'
+import { Receipt } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
 import { RefundWorkflowModal } from '../components/RefundWorkflowModal'
+import { EmptyState } from '../components/ui/EmptyState'
 import { formatCurrency } from '@shared/formatCurrency'
 import { useCurrentUser } from '../context/CurrentUserContext'
 import type { SaleSearchResult } from '@shared/types'
@@ -81,7 +83,7 @@ export function SalesHistoryScreen(): React.JSX.Element {
                   value={fromDate}
                   max={toDate}
                   onChange={(e) => setFromDate(e.target.value)}
-                  className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
+                  className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
                 />
               </div>
               <div>
@@ -92,7 +94,7 @@ export function SalesHistoryScreen(): React.JSX.Element {
                   min={fromDate}
                   max={today}
                   onChange={(e) => setToDate(e.target.value)}
-                  className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
+                  className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
                 />
               </div>
             </>
@@ -104,7 +106,7 @@ export function SalesHistoryScreen(): React.JSX.Element {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="e.g. R-1024"
-              className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
+              className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
             />
           </div>
           {isManager && (
@@ -114,7 +116,7 @@ export function SalesHistoryScreen(): React.JSX.Element {
                 setToDate(today)
                 setQuery('')
               }}
-              className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--card)]"
+              className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-4 text-sm text-[var(--foreground)] transition-colors duration-150 hover:bg-[var(--card)]"
             >
               Reset to Today
             </button>
@@ -133,16 +135,14 @@ export function SalesHistoryScreen(): React.JSX.Element {
         </CardHeader>
         <div className="mt-2 space-y-2">
           {!loading && sales.length === 0 && (
-            <div className="rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-6 text-center text-sm text-[var(--muted-foreground)]">
-              No sales match this filter.
-            </div>
+            <EmptyState icon={Receipt} title="No sales match this filter" description="Try a different date range or sale number." />
           )}
           {sales.map((sale) => {
             const isRefundable = isManager && sale.status !== 'VOIDED' && sale.refundedCents < sale.totalCents
             return (
               <div
                 key={sale.id}
-                className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3 text-xs"
+                className="flex min-h-11 items-center justify-between gap-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3 text-xs"
               >
                 <div>
                   <div className="font-bold text-[var(--foreground)]">{sale.receiptNumber}</div>
@@ -163,7 +163,7 @@ export function SalesHistoryScreen(): React.JSX.Element {
                       onClick={() => setRefundTargetId(sale.id)}
                       disabled={!isRefundable}
                       title={!isRefundable ? 'This sale has already been fully refunded or was voided.' : undefined}
-                      className="min-h-9 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-xs font-semibold text-[var(--primary-foreground)] disabled:opacity-40"
+                      className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-xs font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       Refund
                     </button>

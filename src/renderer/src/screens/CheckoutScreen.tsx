@@ -7,7 +7,7 @@ import { RefundsScreen } from './RefundsScreen'
 import { formatCurrency } from '@shared/formatCurrency'
 import type { Product, Customer, TransactionWithItems, ChargeResult } from '@shared/types'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
-import { Lock, RotateCcw, ShoppingCart, SearchX, ScanLine, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { Lock, RotateCcw, ShoppingCart, SearchX, ScanLine, ArrowUpRight, ArrowDownRight, Banknote, Send, CreditCard, HeartHandshake, ChevronLeft } from 'lucide-react'
 
 type ScanFeedback = { type: 'success' | 'error'; message: string } | null
 type PaymentMethod = 'CASH' | 'E_TRANSFER' | 'CARD' | 'PHARMACY_CREDIT' | null
@@ -760,47 +760,55 @@ export function CheckoutScreen(): React.JSX.Element {
             </CardHeader>
 
             {paymentMethod === null ? (
-              <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="mt-3 grid grid-cols-2 gap-3">
                 <button
                   onClick={() => setPaymentMethod('CASH')}
                   disabled={cart.length === 0}
-                  className="min-h-14 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] disabled:opacity-50"
+                  className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
+                  <Banknote className="h-5 w-5" />
                   CASH
                 </button>
                 <button
                   onClick={() => setPaymentMethod('E_TRANSFER')}
                   disabled={cart.length === 0}
-                  className="min-h-14 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] disabled:opacity-50"
+                  className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
+                  <Send className="h-5 w-5" />
                   E-TRANSFER
                 </button>
                 <button
                   onClick={() => setPaymentMethod('CARD')}
                   disabled={cart.length === 0}
-                  className="min-h-14 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] disabled:opacity-50"
+                  className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
+                  <CreditCard className="h-5 w-5" />
                   CARD (Debit/Credit)
                 </button>
                 <button
                   onClick={() => setPaymentMethod('PHARMACY_CREDIT')}
                   disabled={cart.length === 0 || !attachedCustomer}
                   title={!attachedCustomer ? 'Attach a customer to use Pharmacy Credit' : undefined}
-                  className="min-h-14 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+                  className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
+                  <HeartHandshake className="h-5 w-5" />
                   PHARMACY CREDIT
                 </button>
                 <button
                   onClick={handleParkSale}
                   disabled={cart.length === 0}
-                  className="col-span-2 min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-xs font-medium text-[var(--foreground)] disabled:opacity-50"
+                  className="col-span-2 flex min-h-11 items-center justify-center gap-1.5 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-xs font-medium text-[var(--foreground)] transition-colors duration-150 hover:bg-[var(--card)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <span className="flex items-center justify-center gap-1"><Lock className="h-3.5 w-3.5" />Hold / Park sale</span>
+                  <Lock className="h-3.5 w-3.5" />
+                  Hold / Park sale
                 </button>
               </div>
             ) : (
               <div className="mt-3 space-y-3 text-xs">
-                <button onClick={resetPaymentMethod} className="text-[var(--primary)]">← Back to payment methods</button>
+                <button onClick={resetPaymentMethod} className="flex min-h-9 items-center gap-1 rounded-[var(--radius)] px-1 text-[var(--primary)] hover:bg-[var(--muted)]">
+                  <ChevronLeft className="h-4 w-4" />
+                  Back to payment methods
+                </button>
 
                 {/* CASH */}
                 {paymentMethod === 'CASH' && (
