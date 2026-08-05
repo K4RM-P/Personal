@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import {
   getDailySalesSummary,
   getDailySalesBreakdown,
+  localDateString,
   getTopItems,
   getSlowItems,
   getSalesByTender,
@@ -257,6 +258,58 @@ describe('Reports System — MVP Phase 1 Queries', () => {
     clearReportCache()
     const summary2 = await getDailySalesSummary(prisma, '2026-06-15', '2026-06-15')
     expect(summary2.returnsCents).toBe(-300)
+  })
+
+  // B11: a sale at 11:58pm and one at 12:02am must land on their own
+  // respective local calendar days in the daily breakdown, not bleed across
+  // the midnight boundary due to UTC conversion.
+  it('sales at 11:58pm and 12:02am land on the correct respective local days', async () => {
+    const lateNight = await prisma.transaction.create({
+      data: {
+        receiptNumber: 'RPT-BOUNDARY-1',
+        status: 'COMPLETED',
+        tenderType: 'CASH',
+        subtotalCents: 100,
+        taxCents: 10,
+        totalCents: 110,
+        tenderedCents: 110,
+        changeCents: 0,
+        userId,
+        createdAt: new Date('2026-05-10T23:58:00'),
+        items: { create: [{ productId: productId1, quantity: 1, costCents: 200, unitPriceCents: 100, totalCents: 100 }] }
+      }
+    })
+    const earlyMorning = await prisma.transaction.create({
+      data: {
+        receiptNumber: 'RPT-BOUNDARY-2',
+        status: 'COMPLETED',
+        tenderType: 'CASH',
+        subtotalCents: 200,
+        taxCents: 20,
+        totalCents: 220,
+        tenderedCents: 220,
+        changeCents: 0,
+        userId,
+        createdAt: new Date('2026-05-11T00:02:00'),
+        items: { create: [{ productId: productId1, quantity: 1, costCents: 200, unitPriceCents: 200, totalCents: 200 }] }
+      }
+    })
+    expect(localDateString(lateNight.createdAt)).toBe('2026-05-10')
+    expect(localDateString(earlyMorning.createdAt)).toBe('2026-05-11')
+    clearReportCache()
+
+    const day10 = await getDailySalesSummary(prisma, '2026-05-10', '2026-05-10')
+    const day11 = await getDailySalesSummary(prisma, '2026-05-11', '2026-05-11')
+    expect(day10.grossCents).toBe(110)
+    expect(day10.transactionCount).toBe(1)
+    expect(day11.grossCents).toBe(220)
+    expect(day11.transactionCount).toBe(1)
+
+    const breakdown = await getDailySalesBreakdown(prisma, '2026-05-10', '2026-05-11')
+    const row10 = breakdown.find((r) => r.date === '2026-05-10')
+    const row11 = breakdown.find((r) => r.date === '2026-05-11')
+    expect(row10?.grossCents).toBe(110)
+    expect(row11?.grossCents).toBe(220)
   })
 
   // Test 1: Dashboard cards show correct totals
