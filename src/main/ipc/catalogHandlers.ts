@@ -19,6 +19,7 @@ import {
   searchCatalog
 } from '../catalog/catalogQueries'
 import { getCatalogProvince, setCatalogProvince } from '../db/queries/settingsQueries'
+import { log } from '../logging/logger'
 
 /** Wraps a handler so a thrown error surfaces as a clean message, not an unhandled rejection. */
 function guard<A extends unknown[], R>(
@@ -45,9 +46,7 @@ export function registerCatalogHandlers(db: PrismaClient): void {
       const result = await dialog.showOpenDialog({
         title: 'Select McKesson WEBCAT file',
         properties: ['openFile'],
-        filters: [
-          { name: 'Catalogue file', extensions: ['txt', 'dat', 'webcat', 'WEBCAT', '*'] }
-        ]
+        filters: [{ name: 'Catalogue file', extensions: ['txt', 'dat', 'webcat', 'WEBCAT', '*'] }]
       })
       if (result.canceled || result.filePaths.length === 0) return null
       return result.filePaths[0]
@@ -72,7 +71,13 @@ export function registerCatalogHandlers(db: PrismaClient): void {
       async (
         _e: Electron.IpcMainInvokeEvent,
         payload: { batchId: number; confirmations?: string[] }
-      ) => commitImport(db, payload.batchId, { confirmations: payload.confirmations })
+      ) => {
+        const result = await commitImport(db, payload.batchId, {
+          confirmations: payload.confirmations
+        })
+        log('CATALOG_IMPORT', { batchId: payload.batchId })
+        return result
+      }
     )
   )
 
@@ -121,8 +126,10 @@ export function registerCatalogHandlers(db: PrismaClient): void {
 
   ipcMain.handle(
     IPC.CATALOG_PROMOTE,
-    guard('Promote catalogue item', async (_e: Electron.IpcMainInvokeEvent, catalogProductId: number) =>
-      promoteCatalogProduct(db, catalogProductId)
+    guard(
+      'Promote catalogue item',
+      async (_e: Electron.IpcMainInvokeEvent, catalogProductId: number) =>
+        promoteCatalogProduct(db, catalogProductId)
     )
   )
 

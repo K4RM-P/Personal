@@ -6,6 +6,7 @@ import { getDb, closeDb } from './db/prisma'
 import { registerAllHandlers } from './ipc'
 import { applyPendingRestoreIfStaged } from './backup/backupService'
 import { resolveDbFilePath } from './backup/dbPath'
+import { initLogger, log } from './logging/logger'
 
 function createWindow(): void {
   // Create the browser window.
@@ -44,10 +45,23 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  applyPendingRestoreIfStaged(resolveDbFilePath())
+  initLogger(join(app.getPath('userData'), 'logs'))
+
+  const restore = applyPendingRestoreIfStaged(resolveDbFilePath())
+  if (restore.applied) log('RESTORE_STAGED', { dbFilePath: resolveDbFilePath() })
 
   const db = getDb()
   registerAllHandlers(db)
+
+  process.on('uncaughtException', (error) => {
+    log('ERROR', { message: error.message, stack: error.stack, source: 'uncaughtException' })
+  })
+  process.on('unhandledRejection', (reason) => {
+    log('ERROR', {
+      message: reason instanceof Error ? reason.message : String(reason),
+      source: 'unhandledRejection'
+    })
+  })
 
   createWindow()
 

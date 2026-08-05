@@ -19,6 +19,7 @@ import {
   saveBackupDestination
 } from '../db/queries/settingsQueries'
 import { requireManager } from '../auth/session'
+import { log } from '../logging/logger'
 
 function buildBackupEnv(): BackupEnv {
   return {
@@ -71,11 +72,21 @@ export function registerBackupHandlers(db: PrismaClient): void {
         args: { drivePath: string; driveName?: string; initiatedByUserId: number }
       ) => {
         const driveName = args.driveName ?? basename(args.drivePath) ?? args.drivePath
-        return performBackup(
-          db,
-          { drivePath: args.drivePath, driveName, initiatedByUserId: args.initiatedByUserId },
-          buildBackupEnv()
-        )
+        try {
+          const result = await performBackup(
+            db,
+            { drivePath: args.drivePath, driveName, initiatedByUserId: args.initiatedByUserId },
+            buildBackupEnv()
+          )
+          log('BACKUP_RUN', { backupDir: result.backupDir, driveName })
+          return result
+        } catch (error) {
+          log('BACKUP_FAILED', {
+            driveName,
+            message: error instanceof Error ? error.message : String(error)
+          })
+          throw error
+        }
       }
     )
   )

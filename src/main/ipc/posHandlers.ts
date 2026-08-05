@@ -15,6 +15,7 @@ import {
   voidTransaction
 } from '../db/queries/posQueries'
 import { refundTabAmount } from '../db/queries/customerQueries'
+import { log } from '../logging/logger'
 
 export function registerPosHandlers(db: PrismaClient): void {
   // Products
@@ -31,7 +32,17 @@ export function registerPosHandlers(db: PrismaClient): void {
   ipcMain.handle(IPC.PRICING_TIER_PREVIEW_IMPACT, (_e, tiers) => previewTierImpact(db, tiers))
 
   // Transactions
-  ipcMain.handle(IPC.TRANSACTION_CREATE, (_e, payload) => createTransaction(db, payload))
+  ipcMain.handle(IPC.TRANSACTION_CREATE, async (_e, payload) => {
+    const result = await createTransaction(db, payload)
+    log('SALE_COMPLETED', {
+      transactionId: result.id,
+      totalCents: result.totalCents,
+      tenderType: result.tenderType
+    })
+    return result
+  })
   ipcMain.handle(IPC.TRANSACTION_VOID, (_e, { id, reason }) => voidTransaction(db, id, reason))
-  ipcMain.handle(IPC.TRANSACTION_REFUND_TAB, (_e, { id, amountCents }) => refundTabAmount(db, id, amountCents))
+  ipcMain.handle(IPC.TRANSACTION_REFUND_TAB, (_e, { id, amountCents }) =>
+    refundTabAmount(db, id, amountCents)
+  )
 }
