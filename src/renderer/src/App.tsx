@@ -28,7 +28,7 @@ const SalesHistoryScreen = React.lazy(() =>
   import('./screens/SalesHistoryScreen').then((m) => ({ default: m.SalesHistoryScreen }))
 )
 
-const MANAGER_ONLY: NavTab[] = ['products', 'customers', 'settings', 'reports', 'users']
+const MANAGER_ONLY: NavTab[] = ['products', 'customers', 'settings', 'reports', 'users', 'sales']
 
 function PermissionDenied(): React.JSX.Element {
   return (

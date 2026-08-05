@@ -14,9 +14,10 @@ interface AppShellProps {
 
 // Refunds is not a nav tab — it's reached from a button on Checkout, gated by
 // manager auth there (see RefundsScreen). Cashiers never see it in the sidebar.
+// Past Sales is manager-only too — cashiers only get the Refunds button.
 const allNavItems: { id: NavTab; label: string; icon: React.ElementType; managerOnly: boolean }[] = [
   { id: 'checkout', label: 'Checkout', icon: ShoppingCart, managerOnly: false },
-  { id: 'sales', label: "Today's Sales", icon: Receipt, managerOnly: false },
+  { id: 'sales', label: 'Past Sales', icon: Receipt, managerOnly: true },
   { id: 'customers', label: 'Customers', icon: Users, managerOnly: true },
   { id: 'products', label: 'Products', icon: Package, managerOnly: true },
   { id: 'reports', label: 'Reports', icon: BarChart3, managerOnly: true },
@@ -27,9 +28,7 @@ const allNavItems: { id: NavTab; label: string; icon: React.ElementType; manager
 export function AppShell({ activeTab, onTabChange, children }: AppShellProps) {
   const { user, logout } = useCurrentUser()
   const isManager = user?.role === 'MANAGER'
-  // Managers have the full Reports screen (with date ranges), so the cashier-only
-  // "Today's Sales" tab is omitted for them.
-  const navItems = allNavItems.filter((item) => (item.managerOnly ? isManager : item.id !== 'sales' || !isManager))
+  const navItems = allNavItems.filter((item) => !item.managerOnly || isManager)
 
   const [showLogoutConfirm, setShowLogoutConfirm] = React.useState(false)
 
