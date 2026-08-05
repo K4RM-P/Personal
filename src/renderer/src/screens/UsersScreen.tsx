@@ -1,6 +1,8 @@
 import * as React from 'react'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
-import { Pencil, Trash2, Plus } from 'lucide-react'
+import { Alert } from '../components/ui/Alert'
+import { EmptyState } from '../components/ui/EmptyState'
+import { Pencil, Trash2, Plus, Eye, EyeOff, Users as UsersIcon } from 'lucide-react'
 import type { AuthUser, UserRole } from '@shared/types'
 import { useCurrentUser } from '../context/CurrentUserContext'
 
@@ -48,37 +50,45 @@ export function UsersScreen(): React.JSX.Element {
         </button>
       </div>
 
-      {loadError && (
-        <div className="rounded-[var(--radius)] border border-[var(--error)]/30 bg-[var(--error-bg)] px-3 py-2 text-xs text-[var(--error)]">{loadError}</div>
-      )}
+      {loadError && <Alert variant="error">{loadError}</Alert>}
 
       <Card>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[var(--border)] text-left text-xs text-[var(--muted-foreground)]">
-              <th className="py-2 pr-4 font-medium">Full Name</th>
-              <th className="py-2 pr-4 font-medium">Role</th>
-              <th className="py-2 pr-4 font-medium">Created</th>
-              <th className="py-2 pr-4 font-medium">Last Login</th>
-              <th className="py-2 pr-4 font-medium text-right">Actions</th>
+              <th className="py-3 pr-4 font-medium">Full Name</th>
+              <th className="py-3 pr-4 font-medium">Role</th>
+              <th className="py-3 pr-4 font-medium">Created</th>
+              <th className="py-3 pr-4 font-medium">Last Login</th>
+              <th className="py-3 pr-4 font-medium text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {users.map((u) => (
               <tr key={u.id} className="border-b border-[var(--border)] last:border-0 text-[var(--foreground)]">
-                <td className="py-2 pr-4 font-medium">
+                <td className="py-3 pr-4 font-medium">
                   {u.fullName}
                   {currentUser?.id === u.id && <span className="ml-2 text-xs text-[var(--muted-foreground)]">(you)</span>}
                 </td>
-                <td className="py-2 pr-4">{u.role === 'MANAGER' ? 'Manager' : 'Cashier'}</td>
-                <td className="py-2 pr-4 text-[var(--muted-foreground)]">{new Date(u.createdAt).toLocaleDateString()}</td>
-                <td className="py-2 pr-4 text-[var(--muted-foreground)]">{u.lastLogin ? new Date(u.lastLogin).toLocaleString() : 'Never'}</td>
-                <td className="py-2 pr-4">
+                <td className="py-3 pr-4">{u.role === 'MANAGER' ? 'Manager' : 'Cashier'}</td>
+                <td className="py-3 pr-4 text-[var(--muted-foreground)]">{new Date(u.createdAt).toLocaleDateString()}</td>
+                <td className="py-3 pr-4 text-[var(--muted-foreground)]">{u.lastLogin ? new Date(u.lastLogin).toLocaleString() : 'Never'}</td>
+                <td className="py-3 pr-4">
                   <div className="flex items-center justify-end gap-2">
-                    <button onClick={() => setEditing(u)} title="Edit" className="rounded-[var(--radius)] border border-[var(--border)] p-2 text-[var(--foreground)] hover:bg-[var(--muted)]">
+                    <button
+                      onClick={() => setEditing(u)}
+                      title="Edit"
+                      aria-label={`Edit ${u.fullName}`}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--muted)]"
+                    >
                       <Pencil className="h-4 w-4" />
                     </button>
-                    <button onClick={() => setDeleting(u)} title="Delete" className="rounded-[var(--radius)] border border-[var(--border)] p-2 text-[var(--error)] hover:bg-[var(--error-bg)]">
+                    <button
+                      onClick={() => setDeleting(u)}
+                      title="Delete"
+                      aria-label={`Delete ${u.fullName}`}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] text-[var(--error)] hover:bg-[var(--error-bg)]"
+                    >
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
@@ -86,7 +96,11 @@ export function UsersScreen(): React.JSX.Element {
               </tr>
             ))}
             {users.length === 0 && !loadError && (
-              <tr><td colSpan={5} className="py-6 text-center text-sm text-[var(--muted-foreground)]">No users yet.</td></tr>
+              <tr>
+                <td colSpan={5} className="py-2">
+                  <EmptyState icon={UsersIcon} title="No users yet" description="Add a staff account to get started." />
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
@@ -95,6 +109,37 @@ export function UsersScreen(): React.JSX.Element {
       {showAdd && <AddUserModal onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); void refresh() }} />}
       {editing && <EditUserModal user={editing} isSelf={editing.id === currentUser?.id} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void refresh() }} />}
       {deleting && <DeleteUserDialog user={deleting} onClose={() => setDeleting(null)} onDeleted={() => { setDeleting(null); void refresh() }} />}
+    </div>
+  )
+}
+
+function PasswordField({
+  value,
+  onChange,
+  placeholder
+}: {
+  value: string
+  onChange: (v: string) => void
+  placeholder: string
+}): React.JSX.Element {
+  const [show, setShow] = React.useState(false)
+  return (
+    <div className="relative">
+      <input
+        type={show ? 'text' : 'password'}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${inputCls} pr-10`}
+      />
+      <button
+        type="button"
+        onClick={() => setShow((v) => !v)}
+        aria-label={show ? 'Hide password' : 'Show password'}
+        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+      >
+        {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
     </div>
   )
 }
@@ -136,14 +181,14 @@ function AddUserModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         <CardTitle>Add New User</CardTitle>
         <CardDescription>Create a staff account.</CardDescription>
       </CardHeader>
-      {error && <div className="rounded-[var(--radius)] border border-[var(--error)]/30 bg-[var(--error-bg)] px-3 py-2 text-xs text-[var(--error)]">{error}</div>}
+      {error && <Alert variant="error">{error}</Alert>}
       <input placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} className={inputCls} />
       <select value={role} onChange={(e) => setRole(e.target.value as UserRole)} className={inputCls}>
         <option value="CASHIER">Cashier</option>
         <option value="MANAGER">Manager</option>
       </select>
-      <input type="password" placeholder="Password (min 8 characters)" value={password} onChange={(e) => setPassword(e.target.value)} className={inputCls} />
-      <input type="password" placeholder="Confirm password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className={inputCls} />
+      <PasswordField value={password} onChange={setPassword} placeholder="Password (min 8 characters)" />
+      <PasswordField value={confirm} onChange={setConfirm} placeholder="Confirm password" />
       <div className="grid grid-cols-2 gap-2 pt-1">
         <button onClick={onClose} disabled={busy} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)] disabled:opacity-50">Cancel</button>
         <button onClick={() => void submit()} disabled={busy} className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50">{busy ? 'Saving…' : 'Create User'}</button>
@@ -179,7 +224,7 @@ function EditUserModal({ user, isSelf, onClose, onSaved }: { user: AuthUser; isS
         <CardTitle>Edit User</CardTitle>
         <CardDescription>{user.fullName}</CardDescription>
       </CardHeader>
-      {error && <div className="rounded-[var(--radius)] border border-[var(--error)]/30 bg-[var(--error-bg)] px-3 py-2 text-xs text-[var(--error)]">{error}</div>}
+      {error && <Alert variant="error">{error}</Alert>}
       <div>
         <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Full name (username — not editable)</label>
         <input value={user.fullName} disabled className={`${inputCls} opacity-60`} />
@@ -192,8 +237,8 @@ function EditUserModal({ user, isSelf, onClose, onSaved }: { user: AuthUser; isS
         </select>
         {isSelf && <p className="mt-1 text-xs text-[var(--muted-foreground)]">You cannot change your own role.</p>}
       </div>
-      <input type="password" placeholder="New password (leave blank to keep current)" value={password} onChange={(e) => setPassword(e.target.value)} className={inputCls} />
-      {password !== '' && <input type="password" placeholder="Confirm new password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className={inputCls} />}
+      <PasswordField value={password} onChange={setPassword} placeholder="New password (leave blank to keep current)" />
+      {password !== '' && <PasswordField value={confirm} onChange={setConfirm} placeholder="Confirm new password" />}
       <div className="grid grid-cols-2 gap-2 pt-1">
         <button onClick={onClose} disabled={busy} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)] disabled:opacity-50">Cancel</button>
         <button onClick={() => void submit()} disabled={busy} className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50">{busy ? 'Saving…' : 'Save Changes'}</button>
@@ -223,7 +268,7 @@ function DeleteUserDialog({ user, onClose, onDeleted }: { user: AuthUser; onClos
       <CardTitle>Delete user</CardTitle>
       <p className="text-sm text-[var(--foreground)]">Are you sure you want to delete {user.fullName}? This action cannot be undone.</p>
       <p className="text-xs text-[var(--muted-foreground)]">Their sales history and other records stay attributed to them for audit purposes.</p>
-      {error && <div className="rounded-[var(--radius)] border border-[var(--error)]/30 bg-[var(--error-bg)] px-3 py-2 text-xs text-[var(--error)]">{error}</div>}
+      {error && <Alert variant="error">{error}</Alert>}
       <div className="grid grid-cols-2 gap-2 pt-1">
         <button onClick={onClose} disabled={busy} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)] disabled:opacity-50">Cancel</button>
         <button onClick={() => void confirmDelete()} disabled={busy} className="min-h-11 rounded-[var(--radius)] bg-[var(--error)] px-3 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Deleting…' : 'Delete'}</button>
