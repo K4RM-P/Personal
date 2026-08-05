@@ -71,8 +71,9 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps) {
                 <button
                   key={item.id}
                   onClick={() => onTabChange(item.id)}
+                  aria-current={isActive ? 'page' : undefined}
                   className={cn(
-                    'flex w-full items-center space-x-3 rounded-[var(--radius)] px-4 py-3 text-sm font-medium',
+                    'flex w-full items-center gap-3 rounded-[var(--radius)] px-4 py-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2',
                     isActive
                       ? 'bg-[var(--primary)] text-[var(--primary-foreground)]'
                       : 'text-[var(--secondary-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
@@ -95,7 +96,7 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps) {
           )}
           <button
             onClick={() => void handleLogoutClick()}
-            className="flex w-full items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted)]"
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--foreground)] transition-colors duration-150 hover:bg-[var(--muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
           >
             <LogOut className="h-4 w-4" /> Log out
           </button>
