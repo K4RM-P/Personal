@@ -11,7 +11,18 @@ import type {
 } from '@prisma/client'
 import type { PricingTier } from './pricingEngine'
 
-export type { FeatureFlag, Setting, Product, Customer, DBPricingTier, DBTransaction, DBTransactionItem, PricingTier, DBRefund, DBDiscount }
+export type {
+  FeatureFlag,
+  Setting,
+  Product,
+  Customer,
+  DBPricingTier,
+  DBTransaction,
+  DBTransactionItem,
+  PricingTier,
+  DBRefund,
+  DBDiscount
+}
 
 export type RefundType = 'CASH' | 'CARD' | 'E_TRANSFER' | 'TAB_CREDIT'
 export type RefundStatus = 'COMPLETED' | 'PENDING'
@@ -126,7 +137,8 @@ export interface ProcessRefundPayload {
   refundedByUserId: number
 }
 
-export type ProcessRefundResult = { refund: DBRefund; newTransactionStatus: string } | { error: string }
+export type ProcessRefundResult =
+  { refund: DBRefund; newTransactionStatus: string } | { error: string }
 
 export type VerifyManagerResult = { user: AuthUser } | { error: string }
 
@@ -248,6 +260,21 @@ export interface BackupLogSummary {
   backupSizeBytes: number
   status: 'SUCCESS' | 'FAILED' | 'PARTIAL'
   errorMessage: string | null
+}
+
+/** A `PHARMACY_POS_BACKUP_*` folder found on a drive, valid enough to consider restoring. */
+export interface RestorableBackup {
+  backupDir: string
+  timestamp: string
+  posVersion: string
+  dataSnapshot: Record<string, number>
+}
+
+export interface RestoreBackupResult {
+  backupDir: string
+  restoredAt: string
+  /** True once the app must be restarted for the restored data to take effect. */
+  restartRequired: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -393,13 +420,7 @@ export type ReportExportFormat = 'csv'
  *  - `globalpayments` — Global Payments (GP-API) semi-integrated gateway
  */
 export type PaymentProviderName =
-  | 'manual'
-  | 'mock'
-  | 'stripe'
-  | 'square'
-  | 'clover'
-  | 'moneris'
-  | 'globalpayments'
+  'manual' | 'mock' | 'stripe' | 'square' | 'clover' | 'moneris' | 'globalpayments'
 
 export type PaymentEnvironment = 'sandbox' | 'production'
 

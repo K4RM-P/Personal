@@ -4,6 +4,8 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { getDb, closeDb } from './db/prisma'
 import { registerAllHandlers } from './ipc'
+import { applyPendingRestoreIfStaged } from './backup/backupService'
+import { resolveDbFilePath } from './backup/dbPath'
 
 function createWindow(): void {
   // Create the browser window.
@@ -42,6 +44,8 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
+  applyPendingRestoreIfStaged(resolveDbFilePath())
+
   const db = getDb()
   registerAllHandlers(db)
 
@@ -59,4 +63,3 @@ app.on('window-all-closed', () => {
     }
   })
 })
-

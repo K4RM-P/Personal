@@ -42,25 +42,54 @@ describe('Reports System — MVP Phase 1 Queries', () => {
 
     // Seed products
     const p1 = await prisma.product.create({
-      data: { sku: 'RPT-001', name: 'Test Item A', costCents: 200, priceCents: 500, currentOnHand: 100, categoryCode: 'OTC' }
+      data: {
+        sku: 'RPT-001',
+        name: 'Test Item A',
+        costCents: 200,
+        priceCents: 500,
+        currentOnHand: 100,
+        categoryCode: 'OTC'
+      }
     })
     const p2 = await prisma.product.create({
-      data: { sku: 'RPT-002', name: 'Test Item B', costCents: 500, priceCents: 1200, currentOnHand: 50, categoryCode: 'OTC' }
+      data: {
+        sku: 'RPT-002',
+        name: 'Test Item B',
+        costCents: 500,
+        priceCents: 1200,
+        currentOnHand: 50,
+        categoryCode: 'OTC'
+      }
     })
     const p3 = await prisma.product.create({
-      data: { sku: 'RPT-003', name: 'Test Item C', costCents: 1000, priceCents: 2500, currentOnHand: 20, categoryCode: 'RX' }
+      data: {
+        sku: 'RPT-003',
+        name: 'Test Item C',
+        costCents: 1000,
+        priceCents: 2500,
+        currentOnHand: 20,
+        categoryCode: 'RX'
+      }
     })
     productId1 = p1.id
     productId2 = p2.id
     productId3 = p3.id
 
     // Seed a user
-    const user = await prisma.user.create({ data: { fullName: `Test Cashier ${Date.now()}`, passwordHash: 'x', role: 'CASHIER' } })
+    const user = await prisma.user.create({
+      data: { fullName: `Test Cashier ${Date.now()}`, passwordHash: 'x', role: 'CASHIER' }
+    })
     userId = user.id
 
     // Seed a customer
     const customer = await prisma.customer.create({
-      data: { firstName: 'Test', lastName: 'Customer', phone: '555-9999', phoneNormalized: '5559999', address: '1 Test St' }
+      data: {
+        firstName: 'Test',
+        lastName: 'Customer',
+        phone: '555-9999',
+        phoneNormalized: '5559999',
+        address: '1 Test St'
+      }
     })
 
     // Seed transactions with items
@@ -81,8 +110,20 @@ describe('Reports System — MVP Phase 1 Queries', () => {
         createdAt: new Date('2026-07-28T10:00:00'),
         items: {
           create: [
-            { productId: productId1, quantity: 1, costCents: 200, unitPriceCents: 500, totalCents: 500 },
-            { productId: productId2, quantity: 2, costCents: 500, unitPriceCents: 600, totalCents: 1200 }
+            {
+              productId: productId1,
+              quantity: 1,
+              costCents: 200,
+              unitPriceCents: 500,
+              totalCents: 500
+            },
+            {
+              productId: productId2,
+              quantity: 2,
+              costCents: 500,
+              unitPriceCents: 600,
+              totalCents: 1200
+            }
           ]
         }
       }
@@ -107,7 +148,13 @@ describe('Reports System — MVP Phase 1 Queries', () => {
         createdAt: new Date('2026-07-29T14:00:00'),
         items: {
           create: [
-            { productId: productId3, quantity: 1, costCents: 1000, unitPriceCents: 2500, totalCents: 2500 }
+            {
+              productId: productId3,
+              quantity: 1,
+              costCents: 1000,
+              unitPriceCents: 2500,
+              totalCents: 2500
+            }
           ]
         }
       }
@@ -129,7 +176,13 @@ describe('Reports System — MVP Phase 1 Queries', () => {
         createdAt: new Date('2026-07-29T15:00:00'),
         items: {
           create: [
-            { productId: productId1, quantity: 2, costCents: 200, unitPriceCents: 250, totalCents: 500 }
+            {
+              productId: productId1,
+              quantity: 2,
+              costCents: 200,
+              unitPriceCents: 250,
+              totalCents: 500
+            }
           ]
         }
       }
@@ -152,7 +205,13 @@ describe('Reports System — MVP Phase 1 Queries', () => {
         createdAt: new Date('2026-07-29T16:00:00'),
         items: {
           create: [
-            { productId: productId2, quantity: 1, costCents: 500, unitPriceCents: 100, totalCents: 100 }
+            {
+              productId: productId2,
+              quantity: 1,
+              costCents: 500,
+              unitPriceCents: 100,
+              totalCents: 100
+            }
           ]
         }
       }
@@ -175,7 +234,13 @@ describe('Reports System — MVP Phase 1 Queries', () => {
         createdAt: new Date('2026-07-30T09:00:00'),
         items: {
           create: [
-            { productId: productId2, quantity: 1, costCents: 500, unitPriceCents: 1000, totalCents: 1000 }
+            {
+              productId: productId2,
+              quantity: 1,
+              costCents: 500,
+              unitPriceCents: 1000,
+              totalCents: 1000
+            }
           ]
         }
       }
@@ -220,7 +285,15 @@ describe('Reports System — MVP Phase 1 Queries', () => {
         userId,
         createdAt: new Date('2026-06-15T11:00:00'),
         items: {
-          create: [{ productId: productId3, quantity: 1, costCents: 1000, unitPriceCents: 1000, totalCents: 1000 }]
+          create: [
+            {
+              productId: productId3,
+              quantity: 1,
+              costCents: 1000,
+              unitPriceCents: 1000,
+              totalCents: 1000
+            }
+          ]
         }
       }
     })
@@ -276,7 +349,17 @@ describe('Reports System — MVP Phase 1 Queries', () => {
         changeCents: 0,
         userId,
         createdAt: new Date('2026-05-10T23:58:00'),
-        items: { create: [{ productId: productId1, quantity: 1, costCents: 200, unitPriceCents: 100, totalCents: 100 }] }
+        items: {
+          create: [
+            {
+              productId: productId1,
+              quantity: 1,
+              costCents: 200,
+              unitPriceCents: 100,
+              totalCents: 100
+            }
+          ]
+        }
       }
     })
     const earlyMorning = await prisma.transaction.create({
@@ -291,7 +374,17 @@ describe('Reports System — MVP Phase 1 Queries', () => {
         changeCents: 0,
         userId,
         createdAt: new Date('2026-05-11T00:02:00'),
-        items: { create: [{ productId: productId1, quantity: 1, costCents: 200, unitPriceCents: 200, totalCents: 200 }] }
+        items: {
+          create: [
+            {
+              productId: productId1,
+              quantity: 1,
+              costCents: 200,
+              unitPriceCents: 200,
+              totalCents: 200
+            }
+          ]
+        }
       }
     })
     expect(localDateString(lateNight.createdAt)).toBe('2026-05-10')
@@ -441,7 +534,14 @@ describe('Reports System — MVP Phase 1 Queries', () => {
   it('slow items shows items with zero or near-zero sales', async () => {
     // Create a product with no sales
     await prisma.product.create({
-      data: { sku: 'RPT-SLOW', name: 'Slow Item', costCents: 100, priceCents: 300, currentOnHand: 10, categoryCode: 'OTC' }
+      data: {
+        sku: 'RPT-SLOW',
+        name: 'Slow Item',
+        costCents: 100,
+        priceCents: 300,
+        currentOnHand: 10,
+        categoryCode: 'OTC'
+      }
     })
 
     const slowItems = await getSlowItems(prisma, '2026-07-28', '2026-07-30', 1)

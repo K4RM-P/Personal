@@ -1,5 +1,15 @@
 import { PrismaClient } from '@prisma/client'
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs'
+import {
+  copyFileSync,
+  Dirent,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from 'fs'
 import { join } from 'path'
 import { sha256File } from './checksum'
 import {
@@ -10,9 +20,21 @@ import {
   exportRefunds,
   exportInventorySnapshot
 } from './exporters'
-import type { BackupLogSummary, BackupRunResult } from '../../shared/types'
+import type {
+  BackupLogSummary,
+  BackupRunResult,
+  RestorableBackup,
+  RestoreBackupResult
+} from '../../shared/types'
 
-const JSON_FILES = ['sales.json', 'customers.json', 'users.json', 'discounts.json', 'refunds.json', 'inventory-snapshot.json'] as const
+const JSON_FILES = [
+  'sales.json',
+  'customers.json',
+  'users.json',
+  'discounts.json',
+  'refunds.json',
+  'inventory-snapshot.json'
+] as const
 const ALL_FILES = ['backup.sqlite', ...JSON_FILES, 'backup-metadata.json'] as const
 
 /**
@@ -42,7 +64,11 @@ function pruneOldBackups(drivePath: string, keepDir: string): void {
   try {
     for (const entry of readdirSync(drivePath, { withFileTypes: true })) {
       const entryPath = join(drivePath, entry.name)
-      if (entry.isDirectory() && entry.name.startsWith('PHARMACY_POS_BACKUP_') && entryPath !== keepDir) {
+      if (
+        entry.isDirectory() &&
+        entry.name.startsWith('PHARMACY_POS_BACKUP_') &&
+        entryPath !== keepDir
+      ) {
         rmSync(entryPath, { recursive: true, force: true })
       }
     }
@@ -139,21 +165,32 @@ export async function performBackup(
       checksums[file] = `sha256:${await sha256File(join(backupDir, file))}`
     }
 
-    const initiatedBy = await db.user.findUnique({ where: { id: initiatedByUserId }, select: { fullName: true } })
+    const initiatedBy = await db.user.findUnique({
+      where: { id: initiatedByUserId },
+      select: { fullName: true }
+    })
     const dataSnapshot = {
       salesCount: sales.sales.length,
       customersCount: customers.customers.length,
       usersCount: users.users.length,
       discountsCount: discounts.discounts.length,
       refundsCount: refunds.refunds.length,
-      creditLedgerEntriesCount: (customers.customers as Array<{ creditLedger: unknown[] }>).reduce((sum, c) => sum + c.creditLedger.length, 0),
-      loyaltyPointEventsCount: (customers.customers as Array<{ loyaltyHistory: unknown[] }>).reduce((sum, c) => sum + c.loyaltyHistory.length, 0),
+      creditLedgerEntriesCount: (customers.customers as Array<{ creditLedger: unknown[] }>).reduce(
+        (sum, c) => sum + c.creditLedger.length,
+        0
+      ),
+      loyaltyPointEventsCount: (customers.customers as Array<{ loyaltyHistory: unknown[] }>).reduce(
+        (sum, c) => sum + c.loyaltyHistory.length,
+        0
+      ),
       productsCount: inventory.products.length
     }
 
     let databaseVersion = 0
     try {
-      databaseVersion = readdirSync(env.migrationsDir, { withFileTypes: true }).filter((f) => f.isDirectory()).length
+      databaseVersion = readdirSync(env.migrationsDir, { withFileTypes: true }).filter((f) =>
+        f.isDirectory()
+      ).length
     } catch {
       databaseVersion = 0
     }
@@ -212,6 +249,128 @@ export async function performBackup(
     }
     throw new Error(message)
   }
+}
+
+/** Suffix appended to `dbFilePath` for a validated-but-not-yet-swapped-in restore. Checked on app startup. */
+export function pendingRestoreMarkerPath(dbFilePath: string): string {
+  return `${dbFilePath}.pending-restore`
+}
+
+/**
+ * Scans a drive for `PHARMACY_POS_BACKUP_*` folders that have a readable,
+ * checksummed `backup-metadata.json` — i.e. backups actually restorable, not
+ * a folder that merely looks like one.
+ */
+export function listRestorableBackups(drivePath: string): RestorableBackup[] {
+  const results: RestorableBackup[] = []
+  let entries: Dirent[]
+  try {
+    entries = readdirSync(drivePath, { withFileTypes: true })
+  } catch {
+    return []
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !entry.name.startsWith('PHARMACY_POS_BACKUP_')) continue
+    const backupDir = join(drivePath, entry.name)
+    const metadataPath = join(backupDir, 'backup-metadata.json')
+    if (!existsSync(metadataPath) || !existsSync(join(backupDir, 'backup.sqlite'))) continue
+    try {
+      const metadata = JSON.parse(readFileSync(metadataPath, 'utf-8'))
+      results.push({
+        backupDir,
+        timestamp: metadata.timestamp,
+        posVersion: metadata.posVersion,
+        dataSnapshot: metadata.dataSnapshot ?? {}
+      })
+    } catch {
+      // unreadable/corrupt metadata — skip it rather than offer a broken restore
+    }
+  }
+  return results.sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1))
+}
+
+/**
+ * Validates a backup folder against its own checksums, then stages the
+ * database file next to the live one as `<dbFilePath>.pending-restore`.
+ *
+ * The live process already holds the current SQLite file open (via Prisma),
+ * so the swap itself cannot happen in this process — `applyPendingRestore`
+ * performs it on the next app startup, before Prisma connects. This function
+ * only validates and stages; it never touches the live database file.
+ */
+export async function restoreBackup(
+  args: { backupDir: string; dbFilePath: string },
+  requesterRole: 'MANAGER' | 'CASHIER'
+): Promise<RestoreBackupResult> {
+  if (requesterRole !== 'MANAGER')
+    throw new Error('Restoring from backup must be authorized by a Manager.')
+
+  const { backupDir, dbFilePath } = args
+  const metadataPath = join(backupDir, 'backup-metadata.json')
+  const dbBackupPath = join(backupDir, 'backup.sqlite')
+  if (!existsSync(metadataPath))
+    throw new Error('This folder is missing backup-metadata.json — not a valid backup.')
+  if (!existsSync(dbBackupPath))
+    throw new Error('This folder is missing backup.sqlite — not a valid backup.')
+
+  const metadata = JSON.parse(readFileSync(metadataPath, 'utf-8')) as {
+    checksums?: Record<string, string>
+  }
+  const expectedChecksum = metadata.checksums?.['backup.sqlite']
+  if (!expectedChecksum)
+    throw new Error('Backup metadata has no checksum for backup.sqlite — cannot verify integrity.')
+
+  const actualChecksum = `sha256:${await sha256File(dbBackupPath)}`
+  if (actualChecksum !== expectedChecksum) {
+    throw new Error(
+      'backup.sqlite failed checksum verification — the file may be corrupt or tampered with. Restore aborted.'
+    )
+  }
+
+  const stagedPath = pendingRestoreMarkerPath(dbFilePath)
+  copyFileSync(dbBackupPath, stagedPath)
+  for (const ext of ['-wal', '-shm']) {
+    const src = dbBackupPath + ext
+    if (existsSync(src)) {
+      try {
+        copyFileSync(src, stagedPath + ext)
+      } catch {
+        // best-effort sidecar copy — the main .sqlite file is what's authoritative
+      }
+    }
+  }
+
+  return { backupDir, restoredAt: new Date().toISOString(), restartRequired: true }
+}
+
+/**
+ * Runs at app startup, before Prisma connects. If a validated restore was
+ * staged by `restoreBackup`, swaps it into place as the live database —
+ * keeping a `.pre-restore-backup` safety copy of whatever was live before,
+ * so a bad restore is itself recoverable.
+ */
+export function applyPendingRestoreIfStaged(dbFilePath: string): { applied: boolean } {
+  const stagedPath = pendingRestoreMarkerPath(dbFilePath)
+  if (!existsSync(stagedPath)) return { applied: false }
+
+  if (existsSync(dbFilePath)) {
+    copyFileSync(dbFilePath, `${dbFilePath}.pre-restore-backup`)
+  }
+  copyFileSync(stagedPath, dbFilePath)
+  rmSync(stagedPath, { force: true })
+
+  // Stale WAL/SHM sidecars from the pre-restore database would otherwise be
+  // replayed on top of the just-restored file and corrupt it.
+  for (const ext of ['-wal', '-shm']) {
+    rmSync(dbFilePath + ext, { force: true })
+    const stagedSidecar = stagedPath + ext
+    if (existsSync(stagedSidecar)) {
+      copyFileSync(stagedSidecar, dbFilePath + ext)
+      rmSync(stagedSidecar, { force: true })
+    }
+  }
+
+  return { applied: true }
 }
 
 export async function getLastBackupLog(db: PrismaClient): Promise<BackupLogSummary | null> {

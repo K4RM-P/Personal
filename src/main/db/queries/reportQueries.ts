@@ -508,8 +508,16 @@ export async function getSalesByTender(
   const result: TenderBreakdownRow[] = [
     { tender: 'Cash', amountCents: cashCents, percent: total > 0 ? (cashCents / total) * 100 : 0 },
     { tender: 'Card', amountCents: cardCents, percent: total > 0 ? (cardCents / total) * 100 : 0 },
-    { tender: 'Pharmacy Credit', amountCents: creditCents, percent: total > 0 ? (creditCents / total) * 100 : 0 },
-    { tender: 'Points Redeemed', amountCents: pointsCents, percent: total > 0 ? (pointsCents / total) * 100 : 0 }
+    {
+      tender: 'Pharmacy Credit',
+      amountCents: creditCents,
+      percent: total > 0 ? (creditCents / total) * 100 : 0
+    },
+    {
+      tender: 'Points Redeemed',
+      amountCents: pointsCents,
+      percent: total > 0 ? (pointsCents / total) * 100 : 0
+    }
   ]
 
   setCached(cacheKey, result)
@@ -601,9 +609,7 @@ export async function getCashierTotals(
  * Current inventory valuation at cost and retail, grouped by category.
  * cost value = sum(costCents × currentOnHand), retail value = sum(priceCents × currentOnHand)
  */
-export async function getCurrentInventoryValuation(
-  db: PrismaClient
-): Promise<InventoryValuation> {
+export async function getCurrentInventoryValuation(db: PrismaClient): Promise<InventoryValuation> {
   const cacheKey = 'inventoryValuation'
   const cached = getCached<InventoryValuation>(cacheKey)
   if (cached) return cached

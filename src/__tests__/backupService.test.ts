@@ -1,10 +1,18 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { performBackup, getLastBackupLog, type BackupEnv } from '../main/backup/backupService'
+import {
+  performBackup,
+  getLastBackupLog,
+  restoreBackup,
+  applyPendingRestoreIfStaged,
+  listRestorableBackups,
+  pendingRestoreMarkerPath,
+  type BackupEnv
+} from '../main/backup/backupService'
 import { sha256File } from '../main/backup/checksum'
 
 /**
@@ -45,16 +53,39 @@ describe('data backup system', () => {
       data: { fullName: 'Alice Manager', passwordHash: 'x', role: 'MANAGER' }
     })
     const product = await db.product.create({
-      data: { sku: 'SKU-1', name: 'Cough Drops', costCents: 50, priceCents: 312, currentOnHand: 10, categoryCode: 'OTC' }
+      data: {
+        sku: 'SKU-1',
+        name: 'Cough Drops',
+        costCents: 50,
+        priceCents: 312,
+        currentOnHand: 10,
+        categoryCode: 'OTC'
+      }
     })
     const customer = await db.customer.create({
-      data: { firstName: 'Jane', lastName: 'Doe', phone: '555-0100', phoneNormalized: '5550100', address: '123 Main St' }
+      data: {
+        firstName: 'Jane',
+        lastName: 'Doe',
+        phone: '555-0100',
+        phoneNormalized: '5550100',
+        address: '123 Main St'
+      }
     })
     await db.creditLedgerEntry.create({
-      data: { customerId: customer.id, type: 'FUNDS_ADDED', amountCents: 5000, balanceAfterCents: 5000 }
+      data: {
+        customerId: customer.id,
+        type: 'FUNDS_ADDED',
+        amountCents: 5000,
+        balanceAfterCents: 5000
+      }
     })
     await db.creditLedgerEntry.create({
-      data: { customerId: customer.id, type: 'SALE_CHARGE', amountCents: -3750, balanceAfterCents: 1250 }
+      data: {
+        customerId: customer.id,
+        type: 'SALE_CHARGE',
+        amountCents: -3750,
+        balanceAfterCents: 1250
+      }
     })
     await db.loyaltyPointEvent.create({
       data: { customerId: customer.id, type: 'EARNED', points: 47, pointsAfter: 47 }
@@ -71,7 +102,15 @@ describe('data backup system', () => {
         tenderedCents: 705,
         changeCents: 0,
         items: {
-          create: [{ productId: product.id, quantity: 2, costCents: 50, unitPriceCents: 312, totalCents: 624 }]
+          create: [
+            {
+              productId: product.id,
+              quantity: 2,
+              costCents: 50,
+              unitPriceCents: 312,
+              totalCents: 624
+            }
+          ]
         }
       }
     })
@@ -116,7 +155,11 @@ describe('data backup system', () => {
 
   it('writes all 8 backup files with correct, checksummed, catalogue-free content', async () => {
     const user = await db.user.findFirstOrThrow()
-    const result = await performBackup(db, { drivePath: driveDir, driveName: 'Test Drive', initiatedByUserId: user.id }, env)
+    const result = await performBackup(
+      db,
+      { drivePath: driveDir, driveName: 'Test Drive', initiatedByUserId: user.id },
+      env
+    )
 
     const requiredFiles = [
       'backup.sqlite',
@@ -153,11 +196,15 @@ describe('data backup system', () => {
     const refunds = JSON.parse(readFileSync(join(result.backupDir, 'refunds.json'), 'utf-8'))
     expect(refunds.refunds).toHaveLength(1)
 
-    const inventory = JSON.parse(readFileSync(join(result.backupDir, 'inventory-snapshot.json'), 'utf-8'))
+    const inventory = JSON.parse(
+      readFileSync(join(result.backupDir, 'inventory-snapshot.json'), 'utf-8')
+    )
     expect(inventory.products).toHaveLength(1)
     expect(inventory.totalInventoryValueCost).toBe(500) // 50 cents cost * 10 on-hand
 
-    const metadata = JSON.parse(readFileSync(join(result.backupDir, 'backup-metadata.json'), 'utf-8'))
+    const metadata = JSON.parse(
+      readFileSync(join(result.backupDir, 'backup-metadata.json'), 'utf-8')
+    )
     expect(metadata.dataSnapshot).toEqual({
       salesCount: 1,
       customersCount: 1,
@@ -168,13 +215,23 @@ describe('data backup system', () => {
       loyaltyPointEventsCount: 1,
       productsCount: 1
     })
-    for (const name of ['backup.sqlite', 'sales.json', 'customers.json', 'users.json', 'discounts.json', 'refunds.json', 'inventory-snapshot.json']) {
+    for (const name of [
+      'backup.sqlite',
+      'sales.json',
+      'customers.json',
+      'users.json',
+      'discounts.json',
+      'refunds.json',
+      'inventory-snapshot.json'
+    ]) {
       const recomputed = `sha256:${await sha256File(join(result.backupDir, name))}`
       expect(metadata.checksums[name]).toBe(recomputed)
     }
 
     // Catalogue is excluded from the copy...
-    const copiedDb = new PrismaClient({ datasources: { db: { url: `file:${join(result.backupDir, 'backup.sqlite')}` } } })
+    const copiedDb = new PrismaClient({
+      datasources: { db: { url: `file:${join(result.backupDir, 'backup.sqlite')}` } }
+    })
     try {
       expect(await copiedDb.catalogProduct.count()).toBe(0)
       expect(await copiedDb.catalogImportBatch.count()).toBe(0)
@@ -192,10 +249,93 @@ describe('data backup system', () => {
   it('logs a FAILED BackupLog and rethrows when the drive is unwritable', async () => {
     const user = await db.user.findFirstOrThrow()
     const badDrive = join(driveDir, 'does-not-exist', String.fromCharCode(0)) // invalid path segment
-    await expect(performBackup(db, { drivePath: badDrive, driveName: 'Bad Drive', initiatedByUserId: user.id }, env)).rejects.toThrow()
+    await expect(
+      performBackup(
+        db,
+        { drivePath: badDrive, driveName: 'Bad Drive', initiatedByUserId: user.id },
+        env
+      )
+    ).rejects.toThrow()
 
     const log = await getLastBackupLog(db)
     expect(log?.status).toBe('FAILED')
     expect(log?.errorMessage).toBeTruthy()
+  })
+
+  // A9 — restore must actually work end-to-end against a real backup file,
+  // not just exist as documentation.
+  describe('restore', () => {
+    it('rejects a restore requested by a non-manager', async () => {
+      const user = await db.user.findFirstOrThrow()
+      const backup = await performBackup(
+        db,
+        { drivePath: driveDir, driveName: 'Test Drive', initiatedByUserId: user.id },
+        env
+      )
+      await expect(
+        restoreBackup({ backupDir: backup.backupDir, dbFilePath: env.dbFilePath }, 'CASHIER')
+      ).rejects.toThrow(/Manager/)
+    })
+
+    it('rejects a backup.sqlite that fails checksum verification', async () => {
+      const user = await db.user.findFirstOrThrow()
+      const backup = await performBackup(
+        db,
+        { drivePath: driveDir, driveName: 'Test Drive', initiatedByUserId: user.id },
+        env
+      )
+      // Tamper with the database file after it was checksummed.
+      writeFileSync(join(backup.backupDir, 'backup.sqlite'), Buffer.from('corrupted'))
+      await expect(
+        restoreBackup({ backupDir: backup.backupDir, dbFilePath: env.dbFilePath }, 'MANAGER')
+      ).rejects.toThrow(/checksum verification/)
+    })
+
+    it('lists restorable backups on a drive, newest first', async () => {
+      const user = await db.user.findFirstOrThrow()
+      await performBackup(
+        db,
+        { drivePath: driveDir, driveName: 'Test Drive', initiatedByUserId: user.id },
+        env
+      )
+      const found = listRestorableBackups(driveDir)
+      expect(found.length).toBeGreaterThan(0)
+      expect(found[0].backupDir).toBeTruthy()
+      expect(found[0].dataSnapshot.salesCount).toBe(1)
+    })
+
+    it('stages a verified backup and applyPendingRestoreIfStaged swaps it into place end-to-end', async () => {
+      const user = await db.user.findFirstOrThrow()
+      const backup = await performBackup(
+        db,
+        { drivePath: driveDir, driveName: 'Test Drive', initiatedByUserId: user.id },
+        env
+      )
+
+      const result = await restoreBackup(
+        { backupDir: backup.backupDir, dbFilePath: env.dbFilePath },
+        'MANAGER'
+      )
+      expect(result.restartRequired).toBe(true)
+      expect(existsSync(pendingRestoreMarkerPath(env.dbFilePath))).toBe(true)
+
+      // Simulate the app restarting: the staged file must become the live db,
+      // and a safety copy of what was live before must be kept.
+      const before = await sha256File(env.dbFilePath)
+      const staged = await sha256File(pendingRestoreMarkerPath(env.dbFilePath))
+      const { applied } = applyPendingRestoreIfStaged(env.dbFilePath)
+      expect(applied).toBe(true)
+      expect(existsSync(pendingRestoreMarkerPath(env.dbFilePath))).toBe(false)
+      expect(existsSync(`${env.dbFilePath}.pre-restore-backup`)).toBe(true)
+
+      const after = await sha256File(env.dbFilePath)
+      expect(after).toBe(staged)
+      const preserved = await sha256File(`${env.dbFilePath}.pre-restore-backup`)
+      expect(preserved).toBe(before)
+
+      // A second call with nothing staged is a safe no-op.
+      const second = applyPendingRestoreIfStaged(env.dbFilePath)
+      expect(second.applied).toBe(false)
+    })
   })
 })

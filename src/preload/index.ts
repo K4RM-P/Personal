@@ -27,6 +27,8 @@ import type {
   BackupRunResult,
   BackupLogSummary,
   BackupDestination,
+  RestorableBackup,
+  RestoreBackupResult,
   SalesSummary,
   TopItemRow,
   SlowItemRow,
@@ -73,10 +75,25 @@ const api = {
       ipcRenderer.invoke(IPC.PRODUCT_SEARCH, { query, limit }),
     getByBarcode: (barcode: string): Promise<Product | null> =>
       ipcRenderer.invoke(IPC.PRODUCT_GET_BY_BARCODE, barcode),
-    create: (data: { sku: string; name: string; costCents: number; priceCents?: number; barcode?: string; isPinned?: boolean }): Promise<Product> =>
-      ipcRenderer.invoke(IPC.PRODUCT_CREATE, data),
-    update: (id: number, data: { sku?: string; name?: string; costCents?: number; priceCents?: number; barcode?: string; isPinned?: boolean }): Promise<Product> =>
-      ipcRenderer.invoke(IPC.PRODUCT_UPDATE, { id, data }),
+    create: (data: {
+      sku: string
+      name: string
+      costCents: number
+      priceCents?: number
+      barcode?: string
+      isPinned?: boolean
+    }): Promise<Product> => ipcRenderer.invoke(IPC.PRODUCT_CREATE, data),
+    update: (
+      id: number,
+      data: {
+        sku?: string
+        name?: string
+        costCents?: number
+        priceCents?: number
+        barcode?: string
+        isPinned?: boolean
+      }
+    ): Promise<Product> => ipcRenderer.invoke(IPC.PRODUCT_UPDATE, { id, data }),
     delete: (id: number): Promise<Product> => ipcRenderer.invoke(IPC.PRODUCT_DELETE, id),
     bulkImport: (inputs: BulkImportProductInput[]): Promise<{ count: number }> =>
       ipcRenderer.invoke(IPC.PRODUCT_BULK_IMPORT, inputs)
@@ -103,14 +120,51 @@ const api = {
   customer: {
     search: (query: string): Promise<Customer[]> => ipcRenderer.invoke(IPC.CUSTOMER_SEARCH, query),
     get: (id: number): Promise<Customer> => ipcRenderer.invoke(IPC.CUSTOMER_GET, id),
-    create: (input: { firstName: string; lastName: string; phone: string; address: string; email?: string; loyaltyEnabled?: boolean; notes?: string }) => ipcRenderer.invoke(IPC.CUSTOMER_CREATE, input),
-    update: (id: number, input: { firstName: string; lastName: string; phone: string; address: string; email?: string; loyaltyEnabled?: boolean; notes?: string }) => ipcRenderer.invoke(IPC.CUSTOMER_UPDATE, { id, input }),
-    findDuplicatePhone: (phone: string, excludeId?: number): Promise<Customer | null> => ipcRenderer.invoke(IPC.CUSTOMER_DUPLICATE_PHONE, { phone, excludeId }),
-    addFunds: (customerId: number, amountCents: number, note?: string) => ipcRenderer.invoke(IPC.CUSTOMER_ADD_FUNDS, { customerId, amountCents, note }),
-    adjustCredit: (customerId: number, amountCents: number, note: string, managerGranted: boolean) => ipcRenderer.invoke(IPC.CUSTOMER_ADJUST_CREDIT, { customerId, amountCents, note, managerGranted }),
-    adjustPoints: (customerId: number, points: number, note: string, managerGranted: boolean) => ipcRenderer.invoke(IPC.CUSTOMER_ADJUST_POINTS, { customerId, points, note, managerGranted }),
-    getCreditSettings: (): Promise<{ loyaltyPointsPerDollar: number }> => ipcRenderer.invoke(IPC.CUSTOMER_GET_CREDIT_SETTINGS),
-    saveCreditSettings: (input: { loyaltyPointsPerDollar: number }): Promise<{ loyaltyPointsPerDollar: number }> => ipcRenderer.invoke(IPC.CUSTOMER_SAVE_CREDIT_SETTINGS, input)
+    create: (input: {
+      firstName: string
+      lastName: string
+      phone: string
+      address: string
+      email?: string
+      loyaltyEnabled?: boolean
+      notes?: string
+    }) => ipcRenderer.invoke(IPC.CUSTOMER_CREATE, input),
+    update: (
+      id: number,
+      input: {
+        firstName: string
+        lastName: string
+        phone: string
+        address: string
+        email?: string
+        loyaltyEnabled?: boolean
+        notes?: string
+      }
+    ) => ipcRenderer.invoke(IPC.CUSTOMER_UPDATE, { id, input }),
+    findDuplicatePhone: (phone: string, excludeId?: number): Promise<Customer | null> =>
+      ipcRenderer.invoke(IPC.CUSTOMER_DUPLICATE_PHONE, { phone, excludeId }),
+    addFunds: (customerId: number, amountCents: number, note?: string) =>
+      ipcRenderer.invoke(IPC.CUSTOMER_ADD_FUNDS, { customerId, amountCents, note }),
+    adjustCredit: (
+      customerId: number,
+      amountCents: number,
+      note: string,
+      managerGranted: boolean
+    ) =>
+      ipcRenderer.invoke(IPC.CUSTOMER_ADJUST_CREDIT, {
+        customerId,
+        amountCents,
+        note,
+        managerGranted
+      }),
+    adjustPoints: (customerId: number, points: number, note: string, managerGranted: boolean) =>
+      ipcRenderer.invoke(IPC.CUSTOMER_ADJUST_POINTS, { customerId, points, note, managerGranted }),
+    getCreditSettings: (): Promise<{ loyaltyPointsPerDollar: number }> =>
+      ipcRenderer.invoke(IPC.CUSTOMER_GET_CREDIT_SETTINGS),
+    saveCreditSettings: (input: {
+      loyaltyPointsPerDollar: number
+    }): Promise<{ loyaltyPointsPerDollar: number }> =>
+      ipcRenderer.invoke(IPC.CUSTOMER_SAVE_CREDIT_SETTINGS, input)
   },
   receipt: {
     print: (transaction: TransactionWithItems): Promise<PrintReceiptResult> =>
@@ -120,7 +174,11 @@ const api = {
     listPrinters: (): Promise<SystemPrinterInfo[]> => ipcRenderer.invoke(IPC.RECEIPT_LIST_PRINTERS)
   },
   payment: {
-    charge: (amountCents: number, orderRef: string, options?: ChargeOptions): Promise<ChargeResult> =>
+    charge: (
+      amountCents: number,
+      orderRef: string,
+      options?: ChargeOptions
+    ): Promise<ChargeResult> =>
       ipcRenderer.invoke(IPC.PAYMENT_CHARGE, { amountCents, orderRef, options }),
     refund: (transactionId: string, amountCents?: number): Promise<RefundResult> =>
       ipcRenderer.invoke(IPC.PAYMENT_REFUND, { transactionId, amountCents }),
@@ -138,7 +196,11 @@ const api = {
       ipcRenderer.invoke(IPC.CATALOG_DISCARD_IMPORT, batchId),
     rollback: (): Promise<CatalogCommitResult> => ipcRenderer.invoke(IPC.CATALOG_ROLLBACK),
     getStatus: (): Promise<CatalogStatus> => ipcRenderer.invoke(IPC.CATALOG_GET_STATUS),
-    search: (query: string, province?: string | null, limit?: number): Promise<CatalogSearchRow[]> =>
+    search: (
+      query: string,
+      province?: string | null,
+      limit?: number
+    ): Promise<CatalogSearchRow[]> =>
       ipcRenderer.invoke(IPC.CATALOG_SEARCH, { query, province, limit }),
     scanLookup: (barcode: string): Promise<CatalogScanResult> =>
       ipcRenderer.invoke(IPC.CATALOG_SCAN_LOOKUP, barcode),
@@ -173,7 +235,8 @@ const api = {
     savePrinter: (config: PrinterConfig): Promise<PrinterConfig> =>
       ipcRenderer.invoke(IPC.SETTINGS_SAVE_PRINTER, config),
     getStore: (): Promise<StoreInfo> => ipcRenderer.invoke(IPC.SETTINGS_GET_STORE),
-    saveStore: (info: StoreInfo): Promise<StoreInfo> => ipcRenderer.invoke(IPC.SETTINGS_SAVE_STORE, info),
+    saveStore: (info: StoreInfo): Promise<StoreInfo> =>
+      ipcRenderer.invoke(IPC.SETTINGS_SAVE_STORE, info),
     getPayment: (): Promise<PaymentConfigView> => ipcRenderer.invoke(IPC.SETTINGS_GET_PAYMENT),
     savePayment: (input: SavePaymentConfigInput): Promise<PaymentConfigView> =>
       ipcRenderer.invoke(IPC.SETTINGS_SAVE_PAYMENT, input),
@@ -182,16 +245,27 @@ const api = {
       ipcRenderer.invoke(IPC.SETTINGS_SAVE_CHECKOUT, input)
   },
   compliance: {
-    searchRx: (query: string): Promise<PrescriptionRecord[]> => ipcRenderer.invoke(IPC.COMPLIANCE_SEARCH_RX, query),
+    searchRx: (query: string): Promise<PrescriptionRecord[]> =>
+      ipcRenderer.invoke(IPC.COMPLIANCE_SEARCH_RX, query),
     getAgingRx: (olderThanDays: number): Promise<PrescriptionRecord[]> =>
       ipcRenderer.invoke(IPC.COMPLIANCE_GET_AGING_RX, olderThanDays),
-    logEvent: (kind: string, summary: string, details?: Record<string, unknown>): Promise<ComplianceAuditEntry> =>
+    logEvent: (
+      kind: string,
+      summary: string,
+      details?: Record<string, unknown>
+    ): Promise<ComplianceAuditEntry> =>
       ipcRenderer.invoke(IPC.COMPLIANCE_LOG_EVENT, { kind, summary, details }),
-    getAuditLog: (): Promise<ComplianceAuditEntry[]> => ipcRenderer.invoke(IPC.COMPLIANCE_GET_AUDIT_LOG),
-    exportAuditLog: (): Promise<{ path: string }> => ipcRenderer.invoke(IPC.COMPLIANCE_EXPORT_AUDIT_LOG),
+    getAuditLog: (): Promise<ComplianceAuditEntry[]> =>
+      ipcRenderer.invoke(IPC.COMPLIANCE_GET_AUDIT_LOG),
+    exportAuditLog: (): Promise<{ path: string }> =>
+      ipcRenderer.invoke(IPC.COMPLIANCE_EXPORT_AUDIT_LOG),
     captureSignature: (context: string): Promise<{ captured: boolean; dataUrl?: string }> =>
       ipcRenderer.invoke(IPC.COMPLIANCE_CAPTURE_SIGNATURE, context),
-    pseValidate: (productName: string, quantity: number, days: number): Promise<{ allowed: boolean; reason?: string }> =>
+    pseValidate: (
+      productName: string,
+      quantity: number,
+      days: number
+    ): Promise<{ allowed: boolean; reason?: string }> =>
       ipcRenderer.invoke(IPC.COMPLIANCE_PSE_VALIDATE, { productName, quantity, days }),
     dscsaScan: (barcode: string): Promise<{ ok: boolean; detail?: string }> =>
       ipcRenderer.invoke(IPC.COMPLIANCE_DSCSA_SCAN, barcode),
@@ -199,9 +273,22 @@ const api = {
       ipcRenderer.invoke(IPC.COMPLIANCE_FSA_HSA_CHECK, productName)
   },
   customerLedger: {
-    get: (customerId: number): Promise<CustomerLedgerEntry[]> => ipcRenderer.invoke(IPC.CUSTOMER_LEDGER_GET, customerId),
-    post: (customerId: number, kind: CustomerLedgerEntry['kind'], amountCents: number, reference: string, notes?: string): Promise<CustomerLedgerEntry> =>
-      ipcRenderer.invoke(IPC.CUSTOMER_LEDGER_POST, { customerId, kind, amountCents, reference, notes })
+    get: (customerId: number): Promise<CustomerLedgerEntry[]> =>
+      ipcRenderer.invoke(IPC.CUSTOMER_LEDGER_GET, customerId),
+    post: (
+      customerId: number,
+      kind: CustomerLedgerEntry['kind'],
+      amountCents: number,
+      reference: string,
+      notes?: string
+    ): Promise<CustomerLedgerEntry> =>
+      ipcRenderer.invoke(IPC.CUSTOMER_LEDGER_POST, {
+        customerId,
+        kind,
+        amountCents,
+        reference,
+        notes
+      })
   },
   reports: {
     getDashboard: (): Promise<DashboardData> => ipcRenderer.invoke(IPC.REPORTS_GET_DASHBOARD),
@@ -226,17 +313,29 @@ const api = {
     exportXlsx: (): Promise<{ path: string }> => ipcRenderer.invoke(IPC.REPORTS_EXPORT_XLSX)
   },
   backup: {
-    getExternalDrives: (): Promise<ExternalDrive[]> => ipcRenderer.invoke(IPC.BACKUP_GET_EXTERNAL_DRIVES),
+    getExternalDrives: (): Promise<ExternalDrive[]> =>
+      ipcRenderer.invoke(IPC.BACKUP_GET_EXTERNAL_DRIVES),
     pickFolder: (): Promise<string | null> => ipcRenderer.invoke(IPC.BACKUP_PICK_FOLDER),
-    run: (drivePath: string, driveName: string | undefined, initiatedByUserId: number): Promise<BackupRunResult> =>
+    run: (
+      drivePath: string,
+      driveName: string | undefined,
+      initiatedByUserId: number
+    ): Promise<BackupRunResult> =>
       ipcRenderer.invoke(IPC.BACKUP_RUN, { drivePath, driveName, initiatedByUserId }),
     getLast: (): Promise<BackupLogSummary | null> => ipcRenderer.invoke(IPC.BACKUP_GET_LAST),
     openFolder: (path: string): Promise<void> => ipcRenderer.invoke(IPC.BACKUP_OPEN_FOLDER, path),
     getPromptOnLogout: (): Promise<boolean> => ipcRenderer.invoke(IPC.BACKUP_GET_PROMPT_ON_LOGOUT),
-    savePromptOnLogout: (enabled: boolean): Promise<void> => ipcRenderer.invoke(IPC.BACKUP_SAVE_PROMPT_ON_LOGOUT, enabled),
-    getDrivePath: (): Promise<BackupDestination | null> => ipcRenderer.invoke(IPC.BACKUP_GET_DRIVE_PATH),
+    savePromptOnLogout: (enabled: boolean): Promise<void> =>
+      ipcRenderer.invoke(IPC.BACKUP_SAVE_PROMPT_ON_LOGOUT, enabled),
+    getDrivePath: (): Promise<BackupDestination | null> =>
+      ipcRenderer.invoke(IPC.BACKUP_GET_DRIVE_PATH),
     saveDrivePath: (drivePath: string, driveName: string): Promise<void> =>
-      ipcRenderer.invoke(IPC.BACKUP_SAVE_DRIVE_PATH, { drivePath, driveName })
+      ipcRenderer.invoke(IPC.BACKUP_SAVE_DRIVE_PATH, { drivePath, driveName }),
+    listRestorable: (drivePath: string): Promise<RestorableBackup[]> =>
+      ipcRenderer.invoke(IPC.BACKUP_LIST_RESTORABLE, drivePath),
+    restore: (backupDir: string): Promise<RestoreBackupResult> =>
+      ipcRenderer.invoke(IPC.BACKUP_RESTORE, { backupDir }),
+    relaunch: (): Promise<void> => ipcRenderer.invoke(IPC.BACKUP_RELAUNCH)
   },
   auth: {
     checkFirstBoot: (): Promise<boolean> => ipcRenderer.invoke(IPC.AUTH_CHECK_FIRST_BOOT),
@@ -251,16 +350,27 @@ const api = {
   },
   user: {
     list: (): Promise<AuthUser[] | { error: string }> => ipcRenderer.invoke(IPC.USER_LIST),
-    create: (input: { fullName: string; password: string; role: UserRole }): Promise<AuthUser | { error: string }> =>
-      ipcRenderer.invoke(IPC.USER_CREATE, input),
-    update: (userId: number, role?: UserRole, password?: string): Promise<AuthUser | { error: string }> =>
+    create: (input: {
+      fullName: string
+      password: string
+      role: UserRole
+    }): Promise<AuthUser | { error: string }> => ipcRenderer.invoke(IPC.USER_CREATE, input),
+    update: (
+      userId: number,
+      role?: UserRole,
+      password?: string
+    ): Promise<AuthUser | { error: string }> =>
       ipcRenderer.invoke(IPC.USER_UPDATE, { userId, role, password }),
     delete: (userId: number): Promise<{ ok: true } | { error: string }> =>
       ipcRenderer.invoke(IPC.USER_DELETE, userId)
   },
   refund: {
     searchSales: (query?: string, range?: SaleDateRange): Promise<SaleSearchResult[]> =>
-      ipcRenderer.invoke(IPC.REFUND_SEARCH_SALES, { query, fromDate: range?.fromDate, toDate: range?.toDate }),
+      ipcRenderer.invoke(IPC.REFUND_SEARCH_SALES, {
+        query,
+        fromDate: range?.fromDate,
+        toDate: range?.toDate
+      }),
     getSaleDetails: (transactionId: string): Promise<SaleRefundDetail> =>
       ipcRenderer.invoke(IPC.REFUND_GET_SALE_DETAILS, transactionId),
     process: (payload: ProcessRefundPayload): Promise<ProcessRefundResult> =>

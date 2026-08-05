@@ -11,6 +11,7 @@ import {
 import { FeatureFlagCard } from '../components/FeatureFlagCard'
 import { PaymentSettingsCard } from '../components/PaymentSettingsCard'
 import { BackupModal } from '../components/BackupModal'
+import { RestoreBackupModal } from '../components/RestoreBackupModal'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
 import { Switch } from '../components/ui/Switch'
 import { Alert } from '../components/ui/Alert'
@@ -47,6 +48,7 @@ export function SettingsScreen() {
   const [lastBackup, setLastBackup] = React.useState<BackupLogSummary | null>(null)
   const [promptOnLogout, setPromptOnLogout] = React.useState(true)
   const [showBackupModal, setShowBackupModal] = React.useState(false)
+  const [showRestoreModal, setShowRestoreModal] = React.useState(false)
   const [backupDestination, setBackupDestination] = React.useState<BackupDestination | null>(null)
   const [availableDrives, setAvailableDrives] = React.useState<ExternalDrive[]>([])
   const [savingDestination, setSavingDestination] = React.useState(false)
@@ -69,7 +71,10 @@ export function SettingsScreen() {
     }
   }
 
-  const handleSelectBackupDestination = async (drivePath: string, driveName: string): Promise<void> => {
+  const handleSelectBackupDestination = async (
+    drivePath: string,
+    driveName: string
+  ): Promise<void> => {
     setSavingDestination(true)
     setError(null)
     try {
@@ -159,7 +164,12 @@ export function SettingsScreen() {
     loadHardwareSettings()
     loadBackupSettings()
     loadSystemPrinters()
-    window.api.customer.getCreditSettings().then(setCreditSettings).catch((err) => setError(err instanceof Error ? err.message : 'Failed to load customer settings.'))
+    window.api.customer
+      .getCreditSettings()
+      .then(setCreditSettings)
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : 'Failed to load customer settings.')
+      )
   }, [])
 
   const handleToggle = async (key: string, enabled: boolean) => {
@@ -232,19 +242,25 @@ export function SettingsScreen() {
     try {
       await window.api.customer.saveCreditSettings(creditSettings)
       setSettingsSaved('Customer credit and loyalty settings saved successfully.')
-    } catch (err) { setError(err instanceof Error ? err.message : 'Failed to save customer settings.') }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save customer settings.')
+    }
   }
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)]">Settings</h1>
-        <p className="text-[var(--muted-foreground)]">Configure system preferences, hardware, and feature modules.</p>
+        <p className="text-[var(--muted-foreground)]">
+          Configure system preferences, hardware, and feature modules.
+        </p>
       </div>
 
       {error && (
         <div className="flex items-start gap-3">
-          <Alert variant="error" className="flex-1">{error}</Alert>
+          <Alert variant="error" className="flex-1">
+            {error}
+          </Alert>
           <button
             onClick={() => setError(null)}
             className="min-h-11 shrink-0 rounded-[var(--radius)] border border-[var(--border)] px-3 text-xs font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
@@ -260,7 +276,9 @@ export function SettingsScreen() {
       <Card>
         <CardHeader>
           <CardTitle>Store Information</CardTitle>
-          <CardDescription>Printed on every receipt header and used for the till summary.</CardDescription>
+          <CardDescription>
+            Printed on every receipt header and used for the till summary.
+          </CardDescription>
         </CardHeader>
         <div className="space-y-4 mt-4">
           <div>
@@ -303,7 +321,9 @@ export function SettingsScreen() {
         </CardHeader>
         <div className="space-y-4 mt-4">
           <div>
-            <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Printer Type</label>
+            <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
+              Printer Type
+            </label>
             <select
               value={printerConfig.type}
               onChange={(e) =>
@@ -323,14 +343,14 @@ export function SettingsScreen() {
           {printerConfig.type === 'NETWORK' && (
             <>
               <div>
-                <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Printer IP Address</label>
+                <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
+                  Printer IP Address
+                </label>
                 <input
                   type="text"
                   placeholder="192.168.1.100"
                   value={printerConfig.ipAddress ?? ''}
-                  onChange={(e) =>
-                    setPrinterConfig((c) => ({ ...c, ipAddress: e.target.value }))
-                  }
+                  onChange={(e) => setPrinterConfig((c) => ({ ...c, ipAddress: e.target.value }))}
                   className="input"
                 />
               </div>
@@ -354,7 +374,9 @@ export function SettingsScreen() {
                   {testing ? 'Testing…' : 'Test Network Printer'}
                 </button>
                 {testResult && (
-                  <span className={`text-xs ${testResult.ok ? 'text-[var(--success)]' : 'text-[var(--error)]'}`}>
+                  <span
+                    className={`text-xs ${testResult.ok ? 'text-[var(--success)]' : 'text-[var(--error)]'}`}
+                  >
                     {testResult.message}
                   </span>
                 )}
@@ -365,15 +387,20 @@ export function SettingsScreen() {
           {printerConfig.type === 'SYSTEM' && (
             <>
               <div>
-                <label className="mb-1 block text-xs text-[var(--muted-foreground)]">System Printer</label>
+                <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
+                  System Printer
+                </label>
                 {systemPrinters.length === 0 ? (
                   <p className="text-xs text-[var(--muted-foreground)]">
-                    No printers detected. Make sure a printer is installed on this computer, then rescan.
+                    No printers detected. Make sure a printer is installed on this computer, then
+                    rescan.
                   </p>
                 ) : (
                   <select
                     value={printerConfig.deviceName ?? ''}
-                    onChange={(e) => setPrinterConfig((c) => ({ ...c, deviceName: e.target.value || undefined }))}
+                    onChange={(e) =>
+                      setPrinterConfig((c) => ({ ...c, deviceName: e.target.value || undefined }))
+                    }
                     className="input"
                   >
                     <option value="">Use OS default printer</option>
@@ -407,28 +434,39 @@ export function SettingsScreen() {
       </Card>
 
       <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4">
-        <div className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Payments</div>
+        <div className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+          Payments
+        </div>
         <PaymentSettingsCard />
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Customer Credit & Loyalty</CardTitle>
-          <CardDescription>Tab shortfalls are allowed for an attached customer. Set the loyalty earn rate here.</CardDescription>
+          <CardDescription>
+            Tab shortfalls are allowed for an attached customer. Set the loyalty earn rate here.
+          </CardDescription>
         </CardHeader>
         <div className="space-y-4 mt-4">
           <div>
-            <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Loyalty points earned per dollar spent</label>
+            <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
+              Loyalty points earned per dollar spent
+            </label>
             <input
               type="number"
               min="0"
               step="0.1"
               value={creditSettings.loyaltyPointsPerDollar}
-              onChange={(e) => setCreditSettings((s) => ({ ...s, loyaltyPointsPerDollar: Number(e.target.value) }))}
+              onChange={(e) =>
+                setCreditSettings((s) => ({ ...s, loyaltyPointsPerDollar: Number(e.target.value) }))
+              }
               className="input w-24"
             />
           </div>
-          <button onClick={() => void saveCreditSettings()} className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-medium text-[var(--primary-foreground)]">
+          <button
+            onClick={() => void saveCreditSettings()}
+            className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-medium text-[var(--primary-foreground)]"
+          >
             Save customer settings
           </button>
         </div>
@@ -437,20 +475,33 @@ export function SettingsScreen() {
       <Card>
         <CardHeader>
           <CardTitle>Compliance & Operations</CardTitle>
-          <CardDescription>Rx lookup, aging reports, signature capture, PSE checks, DSCSA scan, and FSA/HSA eligibility are available from the tills.</CardDescription>
+          <CardDescription>
+            Rx lookup, aging reports, signature capture, PSE checks, DSCSA scan, and FSA/HSA
+            eligibility are available from the tills.
+          </CardDescription>
         </CardHeader>
         <div className="space-y-3 mt-4 text-sm text-[var(--foreground)]">
           <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
             <p className="font-semibold text-[var(--foreground)]">Rx lookup / pickup status</p>
-            <p className="text-[var(--muted-foreground)]">Search by patient, Rx number, or drug name from the register to confirm pickup state and outstanding balance.</p>
+            <p className="text-[var(--muted-foreground)]">
+              Search by patient, Rx number, or drug name from the register to confirm pickup state
+              and outstanding balance.
+            </p>
           </div>
           <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
-            <p className="font-semibold text-[var(--foreground)]">Compliance export & audit trail</p>
-            <p className="text-[var(--muted-foreground)]">Every override, PSE event, and ledger adjustment is logged with user/station metadata and exportable for review.</p>
+            <p className="font-semibold text-[var(--foreground)]">
+              Compliance export & audit trail
+            </p>
+            <p className="text-[var(--muted-foreground)]">
+              Every override, PSE event, and ledger adjustment is logged with user/station metadata
+              and exportable for review.
+            </p>
           </div>
           <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
             <p className="font-semibold text-[var(--foreground)]">Backup & restore</p>
-            <p className="text-[var(--muted-foreground)]">Prompted on logout and available on demand — see Data Backup below.</p>
+            <p className="text-[var(--muted-foreground)]">
+              Prompted on logout and available on demand — see Data Backup below.
+            </p>
           </div>
         </div>
       </Card>
@@ -460,8 +511,8 @@ export function SettingsScreen() {
         <CardHeader>
           <CardTitle>Data Backup</CardTitle>
           <CardDescription>
-            Copies sales, customers, users, discounts, refunds, and inventory to an external drive. The McKesson
-            catalogue is never included — it can be re-imported.
+            Copies sales, customers, users, discounts, refunds, and inventory to an external drive.
+            The McKesson catalogue is never included — it can be re-imported.
           </CardDescription>
         </CardHeader>
         <div className="space-y-3 mt-4 text-sm">
@@ -469,14 +520,23 @@ export function SettingsScreen() {
             <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
               <p className="text-[var(--foreground)]">
                 Last backup:{' '}
-                <span className={lastBackup.status === 'SUCCESS' ? 'text-[var(--success)]' : 'text-[var(--error)]'}>
-                  {new Date(lastBackup.timestamp).toLocaleString()} ({lastBackup.status.toLowerCase()})
+                <span
+                  className={
+                    lastBackup.status === 'SUCCESS'
+                      ? 'text-[var(--success)]'
+                      : 'text-[var(--error)]'
+                  }
+                >
+                  {new Date(lastBackup.timestamp).toLocaleString()} (
+                  {lastBackup.status.toLowerCase()})
                 </span>
               </p>
               <p className="text-[var(--muted-foreground)]">
                 Location: {lastBackup.backupPath} · {formatBytes(lastBackup.backupSizeBytes)}
               </p>
-              {lastBackup.errorMessage && <p className="text-[var(--error)]">{lastBackup.errorMessage}</p>}
+              {lastBackup.errorMessage && (
+                <p className="text-[var(--error)]">{lastBackup.errorMessage}</p>
+              )}
             </div>
           ) : (
             <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3 text-[var(--muted-foreground)]">
@@ -486,20 +546,26 @@ export function SettingsScreen() {
 
           <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3 space-y-2">
             <div>
-              <p className="font-semibold text-[var(--foreground)]">Backup destination (USB drive)</p>
+              <p className="font-semibold text-[var(--foreground)]">
+                Backup destination (USB drive)
+              </p>
               <p className="text-[var(--muted-foreground)]">
-                Manual Backup Now writes straight here. When a new backup finishes, the previous one on this drive is
-                deleted automatically.
+                Manual Backup Now writes straight here. When a new backup finishes, the previous one
+                on this drive is deleted automatically.
               </p>
             </div>
 
             {backupDestination ? (
               <p className="text-[var(--foreground)]">
                 Currently: <span className="font-medium">{backupDestination.driveName}</span>{' '}
-                <span className="text-[var(--muted-foreground)]">({backupDestination.drivePath})</span>
+                <span className="text-[var(--muted-foreground)]">
+                  ({backupDestination.drivePath})
+                </span>
               </p>
             ) : (
-              <p className="text-[var(--muted-foreground)]">No destination configured yet — choose one below.</p>
+              <p className="text-[var(--muted-foreground)]">
+                No destination configured yet — choose one below.
+              </p>
             )}
 
             {availableDrives.length > 0 && (
@@ -556,14 +622,25 @@ export function SettingsScreen() {
             >
               Browse Previous Backups
             </button>
+            <button
+              onClick={() => setShowRestoreModal(true)}
+              className="rounded-[var(--radius)] border border-[var(--error)] px-4 py-2 text-sm text-[var(--error)] hover:bg-[var(--error-bg)]"
+            >
+              Restore from Backup…
+            </button>
           </div>
 
           <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
             <div>
               <p className="font-semibold text-[var(--foreground)]">Prompt to back up on logout</p>
-              <p className="text-[var(--muted-foreground)]">Recommended — asks before every logout.</p>
+              <p className="text-[var(--muted-foreground)]">
+                Recommended — asks before every logout.
+              </p>
             </div>
-            <Switch checked={promptOnLogout} onCheckedChange={(v) => void handleTogglePromptOnLogout(v)} />
+            <Switch
+              checked={promptOnLogout}
+              onCheckedChange={(v) => void handleTogglePromptOnLogout(v)}
+            />
           </div>
           <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3 opacity-60">
             <div>
@@ -591,6 +668,8 @@ export function SettingsScreen() {
         />
       )}
 
+      {showRestoreModal && <RestoreBackupModal onClose={() => setShowRestoreModal(false)} />}
+
       {/* Force Reject Testing Utility */}
       <Card className="border-[var(--warning)]/30 bg-[var(--warning-bg)]">
         <div className="flex items-center justify-between">
@@ -609,7 +688,10 @@ export function SettingsScreen() {
       <div className="space-y-4">
         <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4">
           <h2 className="text-lg font-semibold text-[var(--foreground)]">Feature Flags</h2>
-          <p className="mt-1 text-sm text-[var(--muted-foreground)]">Payments, compliance, and optional modules are grouped to keep setup plain-language and predictable.</p>
+          <p className="mt-1 text-sm text-[var(--muted-foreground)]">
+            Payments, compliance, and optional modules are grouped to keep setup plain-language and
+            predictable.
+          </p>
         </div>
         <div className="grid gap-4">
           {flags.map((flag) => (
@@ -623,7 +705,8 @@ export function SettingsScreen() {
           <CardHeader>
             <CardTitle className="text-[var(--primary)]">OTC-Only Mode Preview Active</CardTitle>
             <CardDescription className="text-[var(--muted-foreground)]">
-              This placeholder card is rendered conditionally because the <strong>OTC-Only Mode</strong> feature flag is enabled.
+              This placeholder card is rendered conditionally because the{' '}
+              <strong>OTC-Only Mode</strong> feature flag is enabled.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -639,30 +722,56 @@ export function SettingsScreen() {
             <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
               <div>
                 <p className="font-semibold text-[var(--foreground)]">Reward points</p>
-                <p className="text-[var(--muted-foreground)]">Enable dollar- or product-based loyalty.</p>
+                <p className="text-[var(--muted-foreground)]">
+                  Enable dollar- or product-based loyalty.
+                </p>
               </div>
-              <span className={`text-xs ${rewardFlag?.enabled ? 'text-[var(--success)]' : 'text-[var(--muted-foreground)]'}`}>{rewardFlag?.enabled ? 'On' : 'Off'}</span>
+              <span
+                className={`text-xs ${rewardFlag?.enabled ? 'text-[var(--success)]' : 'text-[var(--muted-foreground)]'}`}
+              >
+                {rewardFlag?.enabled ? 'On' : 'Off'}
+              </span>
             </div>
             <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
               <div>
                 <p className="font-semibold text-[var(--foreground)]">Ontario lottery</p>
-                <p className="text-[var(--muted-foreground)]">Turn on ticket sales and win tracking when installed.</p>
+                <p className="text-[var(--muted-foreground)]">
+                  Turn on ticket sales and win tracking when installed.
+                </p>
               </div>
-              <span className={`text-xs ${lotteryFlag?.enabled ? 'text-[var(--success)]' : 'text-[var(--muted-foreground)]'}`}>{lotteryFlag?.enabled ? 'On' : 'Off'}</span>
+              <span
+                className={`text-xs ${lotteryFlag?.enabled ? 'text-[var(--success)]' : 'text-[var(--muted-foreground)]'}`}
+              >
+                {lotteryFlag?.enabled ? 'On' : 'Off'}
+              </span>
             </div>
             <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
               <div>
                 <p className="font-semibold text-[var(--foreground)]">Charge accounts</p>
-                <p className="text-[var(--muted-foreground)]">Support invoice and statement billing.</p>
+                <p className="text-[var(--muted-foreground)]">
+                  Support invoice and statement billing.
+                </p>
               </div>
-              <span className={`text-xs ${chargeFlag?.enabled ? 'text-[var(--success)]' : 'text-[var(--muted-foreground)]'}`}>{chargeFlag?.enabled ? 'On' : 'Off'}</span>
+              <span
+                className={`text-xs ${chargeFlag?.enabled ? 'text-[var(--success)]' : 'text-[var(--muted-foreground)]'}`}
+              >
+                {chargeFlag?.enabled ? 'On' : 'Off'}
+              </span>
             </div>
             <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
               <div>
-                <p className="font-semibold text-[var(--foreground)]">Customer tab / store credit</p>
-                <p className="text-[var(--muted-foreground)]">Allow short-pay, advance-fill, and credit-ledger flows.</p>
+                <p className="font-semibold text-[var(--foreground)]">
+                  Customer tab / store credit
+                </p>
+                <p className="text-[var(--muted-foreground)]">
+                  Allow short-pay, advance-fill, and credit-ledger flows.
+                </p>
               </div>
-              <span className={`text-xs ${tabFlag?.enabled ? 'text-[var(--success)]' : 'text-[var(--muted-foreground)]'}`}>{tabFlag?.enabled ? 'On' : 'Off'}</span>
+              <span
+                className={`text-xs ${tabFlag?.enabled ? 'text-[var(--success)]' : 'text-[var(--muted-foreground)]'}`}
+              >
+                {tabFlag?.enabled ? 'On' : 'Off'}
+              </span>
             </div>
           </div>
         </Card>
@@ -670,16 +779,24 @@ export function SettingsScreen() {
         <Card>
           <CardHeader>
             <CardTitle>Reporting Snapshot</CardTitle>
-            <CardDescription>A simple owner dashboard and export-ready analytics are now wired to the shared reporting layer.</CardDescription>
+            <CardDescription>
+              A simple owner dashboard and export-ready analytics are now wired to the shared
+              reporting layer.
+            </CardDescription>
           </CardHeader>
           <div className="space-y-3 text-sm text-[var(--foreground)]">
             <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
               <p className="font-semibold text-[var(--foreground)]">Daily sales summary</p>
-              <p className="text-[var(--muted-foreground)]">Track transaction counts, revenue, top movers, and low-stock counts from one dashboard.</p>
+              <p className="text-[var(--muted-foreground)]">
+                Track transaction counts, revenue, top movers, and low-stock counts from one
+                dashboard.
+              </p>
             </div>
             <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
               <p className="font-semibold text-[var(--foreground)]">CSV/XLSX exports</p>
-              <p className="text-[var(--muted-foreground)]">Export report data for accountants without a proprietary format lock-in.</p>
+              <p className="text-[var(--muted-foreground)]">
+                Export report data for accountants without a proprietary format lock-in.
+              </p>
             </div>
           </div>
         </Card>
