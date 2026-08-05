@@ -301,7 +301,8 @@ export function CheckoutScreen(): React.JSX.Element {
     const cardAmount = effectiveTotal
 
     if (!window.api?.payment) {
-      alert('Payment service unavailable')
+      setPaymentState('timeout')
+      setPaymentMessage('Payment service unavailable.')
       return
     }
 
