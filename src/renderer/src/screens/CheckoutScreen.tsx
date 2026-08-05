@@ -764,34 +764,34 @@ export function CheckoutScreen(): React.JSX.Element {
                 <button
                   onClick={() => setPaymentMethod('CASH')}
                   disabled={cart.length === 0}
-                  className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Banknote className="h-5 w-5" />
+                  <Banknote className="h-5 w-5 shrink-0" />
                   CASH
                 </button>
                 <button
                   onClick={() => setPaymentMethod('E_TRANSFER')}
                   disabled={cart.length === 0}
-                  className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Send className="h-5 w-5" />
+                  <Send className="h-5 w-5 shrink-0" />
                   E-TRANSFER
                 </button>
                 <button
                   onClick={() => setPaymentMethod('CARD')}
                   disabled={cart.length === 0}
-                  className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <CreditCard className="h-5 w-5" />
+                  <CreditCard className="h-5 w-5 shrink-0" />
                   CARD (Debit/Credit)
                 </button>
                 <button
                   onClick={() => setPaymentMethod('PHARMACY_CREDIT')}
                   disabled={cart.length === 0 || !attachedCustomer}
                   title={!attachedCustomer ? 'Attach a customer to use Pharmacy Credit' : undefined}
-                  className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <HeartHandshake className="h-5 w-5" />
+                  <HeartHandshake className="h-5 w-5 shrink-0" />
                   PHARMACY CREDIT
                 </button>
                 <button

@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { Banknote, CreditCard, Send, HeartHandshake, ChevronLeft } from 'lucide-react'
 import { Card, CardTitle, CardDescription } from './ui/Card'
 import { Alert } from './ui/Alert'
 import { formatCurrency } from '@shared/formatCurrency'
@@ -181,7 +182,7 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
               Refund Specific Items
             </button>
           </div>
-          <button onClick={() => onClose(false)} className="w-full text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
+          <button onClick={() => onClose(false)} className="min-h-9 w-full rounded-[var(--radius)] text-xs text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]">
             Cancel
           </button>
         </Card>
@@ -237,26 +238,43 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
         <Card className="w-[420px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-4">
           <CardTitle className="text-[var(--foreground)]">Refund Amount: {formatCurrency(amountCents)}</CardTitle>
           <CardDescription>How should this refund be processed?</CardDescription>
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => setStep('CASH')} className="min-h-14 rounded-[var(--radius)] border border-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary)]">
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setStep('CASH')}
+              className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)]"
+            >
+              <Banknote className="h-5 w-5 shrink-0" />
               CASH
             </button>
             <button
               onClick={() => setStep('CARD')}
               disabled={!cardAvailable}
               title={!cardAvailable ? 'This sale has no card charge on file to reverse.' : undefined}
-              className="min-h-14 rounded-[var(--radius)] border border-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary)] disabled:opacity-40"
+              className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-40"
             >
+              <CreditCard className="h-5 w-5 shrink-0" />
               CARD
             </button>
-            <button onClick={() => setStep('E_TRANSFER')} className="min-h-14 rounded-[var(--radius)] border border-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary)]">
+            <button
+              onClick={() => setStep('E_TRANSFER')}
+              className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)]"
+            >
+              <Send className="h-5 w-5 shrink-0" />
               E-TRANSFER
             </button>
-            <button onClick={() => setStep('TAB_CREDIT')} className="min-h-14 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]">
+            <button
+              onClick={() => setStep('TAB_CREDIT')}
+              className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
+            >
+              <HeartHandshake className="h-5 w-5 shrink-0" />
               DEPOSIT TO TAB
             </button>
           </div>
-          <button onClick={() => setStep(selectedItemIds.size > 0 ? 'items' : 'scope')} className="w-full text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
+          <button
+            onClick={() => setStep(selectedItemIds.size > 0 ? 'items' : 'scope')}
+            className="flex min-h-9 w-full items-center justify-center gap-1 rounded-[var(--radius)] text-xs text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
             Back
           </button>
         </Card>
