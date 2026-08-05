@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Card, CardTitle, CardDescription } from './ui/Card'
+import { Alert } from './ui/Alert'
 import type { BackupRunResult, ExternalDrive } from '@shared/types'
 
 function formatBytes(bytes: number): string {
@@ -83,7 +84,7 @@ export function BackupModal({ userId, standalone = false, presetDrive, onClose }
         {step === 'scanning' && (
           <>
             <CardTitle className="text-[var(--foreground)]">Backing Up Data…</CardTitle>
-            <CardDescription>Scanning for external drives…</CardDescription>
+            <Alert variant="pending">Step 1 of 2 — Scanning for external drives…</Alert>
           </>
         )}
 
@@ -101,26 +102,35 @@ export function BackupModal({ userId, standalone = false, presetDrive, onClose }
             )}
 
             <div className="space-y-2">
-              {drives.map((drive) => (
-                <label
-                  key={drive.path}
-                  className="flex cursor-pointer items-center gap-3 rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]"
-                >
-                  <input
-                    type="radio"
-                    name="backup-drive"
-                    checked={selected?.path === drive.path}
-                    onChange={() => setSelected({ path: drive.path, name: drive.name })}
-                  />
-                  <span className="flex-1">{drive.name}</span>
-                  <span className="text-xs text-[var(--muted-foreground)]">
-                    {formatBytes(drive.freeBytes)} free of {formatBytes(drive.totalBytes)}
-                  </span>
-                </label>
-              ))}
+              {drives.map((drive) => {
+                const freePercent = drive.totalBytes > 0 ? Math.round((drive.freeBytes / drive.totalBytes) * 100) : 0
+                return (
+                  <label
+                    key={drive.path}
+                    className="flex min-h-11 cursor-pointer flex-col gap-2 rounded-[var(--radius)] border border-[var(--border)] px-3 py-3 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="radio"
+                        name="backup-drive"
+                        checked={selected?.path === drive.path}
+                        onChange={() => setSelected({ path: drive.path, name: drive.name })}
+                        className="h-4 w-4 shrink-0"
+                      />
+                      <span className="flex-1 font-medium">{drive.name}</span>
+                      <span className="text-xs text-[var(--muted-foreground)]">
+                        {formatBytes(drive.freeBytes)} free of {formatBytes(drive.totalBytes)}
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--border)]" role="progressbar" aria-valuenow={freePercent} aria-valuemin={0} aria-valuemax={100} aria-label={`${drive.name} free space`}>
+                      <div className="h-full rounded-full bg-[var(--primary)] transition-[width] duration-150" style={{ width: `${Math.min(100, Math.max(0, freePercent))}%` }} />
+                    </div>
+                  </label>
+                )
+              })}
               {selected && !drives.some((d) => d.path === selected.path) && (
-                <label className="flex items-center gap-3 rounded-[var(--radius)] border border-[var(--primary)] px-3 py-2 text-sm text-[var(--foreground)]">
-                  <input type="radio" checked readOnly />
+                <label className="flex min-h-11 items-center gap-3 rounded-[var(--radius)] border border-[var(--primary)] px-3 py-3 text-sm text-[var(--foreground)]">
+                  <input type="radio" checked readOnly className="h-4 w-4 shrink-0" />
                   <span className="flex-1">{selected.path}</span>
                   <span className="text-xs text-[var(--muted-foreground)]">Custom location</span>
                 </label>
@@ -129,12 +139,12 @@ export function BackupModal({ userId, standalone = false, presetDrive, onClose }
 
             <button
               onClick={() => void browse()}
-              className="w-full rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]"
+              className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]"
             >
               Browse…
             </button>
 
-            <div className="grid grid-cols-2 gap-2 pt-2">
+            <div className="grid grid-cols-2 gap-3 pt-2">
               <button
                 onClick={onClose}
                 className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)]"
@@ -155,21 +165,21 @@ export function BackupModal({ userId, standalone = false, presetDrive, onClose }
         {step === 'running' && (
           <>
             <CardTitle className="text-[var(--foreground)]">Backing Up Data…</CardTitle>
-            <CardDescription>
-              Copying sales, customers, users, discounts, refunds, and inventory to {selected?.name}. This may take a
-              moment.
-            </CardDescription>
+            <Alert variant="pending">
+              Step 2 of 2 — Copying sales, customers, users, discounts, refunds, and inventory to {selected?.name}. This
+              may take a moment.
+            </Alert>
           </>
         )}
 
         {step === 'success' && result && (
           <>
             <CardTitle className="text-[var(--foreground)]">Backup Complete</CardTitle>
-            <CardDescription>✓ Data backed up successfully</CardDescription>
+            <Alert variant="success">Data backed up successfully.</Alert>
             <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-xs text-[var(--foreground)]">
               {result.backupDir}
             </div>
-            <div className="max-h-48 space-y-1 overflow-y-auto text-sm text-[var(--foreground)]">
+            <div className="max-h-48 space-y-1.5 overflow-y-auto text-sm text-[var(--foreground)]">
               {result.files.map((file) => (
                 <div key={file.name} className="flex justify-between">
                   <span>• {file.name}</span>
@@ -189,13 +199,11 @@ export function BackupModal({ userId, standalone = false, presetDrive, onClose }
         {step === 'error' && (
           <>
             <CardTitle className="text-[var(--foreground)]">Backup Failed</CardTitle>
-            <div className="rounded-[var(--radius)] border border-[var(--error)]/30 bg-[var(--error-bg)] px-3 py-2 text-sm text-[var(--error)]">
-              Error: {error}
-            </div>
-            <div className="grid grid-cols-3 gap-2">
+            <Alert variant="error">{error}</Alert>
+            <div className="grid grid-cols-3 gap-3">
               <button
                 onClick={() => void runBackup()}
-                className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]"
+                className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
               >
                 Retry
               </button>
@@ -206,11 +214,11 @@ export function BackupModal({ userId, standalone = false, presetDrive, onClose }
                 }}
                 className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]"
               >
-                Choose Different Drive
+                Different Drive
               </button>
               <button
                 onClick={onClose}
-                className="min-h-11 rounded-[var(--radius)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)]"
+                className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)]"
               >
                 Skip Backup
               </button>

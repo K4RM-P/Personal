@@ -27,10 +27,10 @@ export function LogoutConfirmModal({ onCancel }: LogoutConfirmModalProps): React
           sales, customers, transactions, and other important data. The McKesson catalogue is not included (it can be
           re-imported).
         </CardDescription>
-        <div className="grid grid-cols-3 gap-2 pt-2">
+        <div className="grid grid-cols-3 gap-3 pt-2">
           <button
             onClick={onCancel}
-            className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)]"
+            className="min-h-11 rounded-[var(--radius)] px-3 text-sm text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
           >
             Cancel
           </button>

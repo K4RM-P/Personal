@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Card, CardTitle, CardDescription } from './ui/Card'
+import { Alert } from './ui/Alert'
 import type { AuthUser } from '@shared/types'
 
 interface ManagerAuthModalProps {
@@ -48,35 +49,31 @@ export function ManagerAuthModal({ description, onCancel, onSuccess }: ManagerAu
           {description && <CardDescription>{description}</CardDescription>}
         </div>
 
-        {error && (
-          <div className="rounded-[var(--radius)] border border-[var(--error)]/30 bg-[var(--error-bg)] px-3 py-2 text-xs text-[var(--error)]">
-            {error}
-          </div>
-        )}
+        {error && <Alert variant="error">{error}</Alert>}
 
         <div>
-          <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Full Name</label>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Full Name</label>
           <input
             type="text"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') void submit() }}
-            className="w-full rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
+            className="input"
             autoFocus
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Password</label>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Password</label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') void submit() }}
-            className="w-full rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
+            className="input"
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-3 pt-1">
           <button
             onClick={onCancel}
             disabled={submitting}
