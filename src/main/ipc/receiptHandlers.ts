@@ -2,8 +2,27 @@ import { ipcMain } from 'electron'
 import { PrismaClient } from '@prisma/client'
 import { IPC } from '../../shared/channels'
 import { printReceipt, testNetworkPrinter, listSystemPrinters } from '../receipt/receiptPrinter'
-import { getPrinterConfig, getStoreInfo, savePrinterConfig, saveStoreInfo, getAllowCreditCardSurcharge, getCardSurchargePercent, getAllowShortPayToTab, saveAllowCreditCardSurcharge, saveCardSurchargePercent, saveAllowShortPayToTab } from '../db/queries/settingsQueries'
-import type { PrinterConfig, StoreInfo, TransactionWithItems, CheckoutSettings } from '../../shared/types'
+import {
+  getPrinterConfig,
+  getStoreInfo,
+  savePrinterConfig,
+  saveStoreInfo,
+  getAllowCreditCardSurcharge,
+  getCardSurchargePercent,
+  getAllowShortPayToTab,
+  saveAllowCreditCardSurcharge,
+  saveCardSurchargePercent,
+  saveAllowShortPayToTab,
+  getIdleTimeoutMinutes,
+  saveIdleTimeoutMinutes
+} from '../db/queries/settingsQueries'
+import { requireManager } from '../auth/session'
+import type {
+  PrinterConfig,
+  StoreInfo,
+  TransactionWithItems,
+  CheckoutSettings
+} from '../../shared/types'
 
 export function registerReceiptHandlers(db: PrismaClient): void {
   ipcMain.handle(IPC.RECEIPT_PRINT, async (_e, transaction: TransactionWithItems) => {
@@ -11,14 +30,19 @@ export function registerReceiptHandlers(db: PrismaClient): void {
     return printReceipt({ transaction, printerConfig, storeInfo })
   })
 
-  ipcMain.handle(IPC.RECEIPT_TEST_NETWORK, async (_e, { ipAddress, port }: { ipAddress: string; port?: number }) => {
-    return testNetworkPrinter(ipAddress, port ?? 9100)
-  })
+  ipcMain.handle(
+    IPC.RECEIPT_TEST_NETWORK,
+    async (_e, { ipAddress, port }: { ipAddress: string; port?: number }) => {
+      return testNetworkPrinter(ipAddress, port ?? 9100)
+    }
+  )
 
   ipcMain.handle(IPC.RECEIPT_LIST_PRINTERS, () => listSystemPrinters())
 
   ipcMain.handle(IPC.SETTINGS_GET_PRINTER, () => getPrinterConfig(db))
-  ipcMain.handle(IPC.SETTINGS_SAVE_PRINTER, (_e, config: PrinterConfig) => savePrinterConfig(db, config))
+  ipcMain.handle(IPC.SETTINGS_SAVE_PRINTER, (_e, config: PrinterConfig) =>
+    savePrinterConfig(db, config)
+  )
 
   ipcMain.handle(IPC.SETTINGS_GET_STORE, () => getStoreInfo(db))
   ipcMain.handle(IPC.SETTINGS_SAVE_STORE, (_e, info: StoreInfo) => saveStoreInfo(db, info))
@@ -29,7 +53,11 @@ export function registerReceiptHandlers(db: PrismaClient): void {
       getCardSurchargePercent(db),
       getAllowShortPayToTab(db)
     ])
-    return { allowCreditCardSurcharge: allowSurcharge, cardSurchargePercent: surchargePercent, allowShortPayToTab: allowShortPay }
+    return {
+      allowCreditCardSurcharge: allowSurcharge,
+      cardSurchargePercent: surchargePercent,
+      allowShortPayToTab: allowShortPay
+    }
   })
 
   ipcMain.handle(IPC.SETTINGS_SAVE_CHECKOUT, async (_e, input: CheckoutSettings) => {
@@ -39,5 +67,12 @@ export function registerReceiptHandlers(db: PrismaClient): void {
       saveAllowShortPayToTab(db, input.allowShortPayToTab)
     ])
     return input
+  })
+
+  ipcMain.handle(IPC.SETTINGS_GET_IDLE_TIMEOUT, () => getIdleTimeoutMinutes(db))
+  ipcMain.handle(IPC.SETTINGS_SAVE_IDLE_TIMEOUT, async (_e, minutes: number) => {
+    requireManager()
+    await saveIdleTimeoutMinutes(db, minutes)
+    return minutes
   })
 }

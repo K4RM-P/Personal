@@ -24,7 +24,10 @@ const DEFAULTS = {
   'customer.allowShortPayToTab': 'false',
   'backup.promptOnLogout': 'true',
   'backup.drivePath': '',
-  'backup.driveName': ''
+  'backup.driveName': '',
+  // A15 — idle auto-logout. A checkout terminal left signed in as a manager,
+  // unattended, can process refunds or adjust customer balances.
+  'session.idleTimeoutMinutes': '20'
 } as const
 
 async function getSetting(db: PrismaClient, key: string): Promise<string> {
@@ -70,7 +73,10 @@ export async function getPrinterConfig(db: PrismaClient): Promise<PrinterConfig>
   }
 }
 
-export async function savePrinterConfig(db: PrismaClient, config: PrinterConfig): Promise<PrinterConfig> {
+export async function savePrinterConfig(
+  db: PrismaClient,
+  config: PrinterConfig
+): Promise<PrinterConfig> {
   await setSetting(db, 'printer.type', config.type)
   await setSetting(db, 'printer.networkIp', config.ipAddress ?? '')
   await setSetting(db, 'printer.networkPort', String(config.port ?? 9100))
@@ -116,7 +122,10 @@ export async function getAllowShortPayToTab(db: PrismaClient): Promise<boolean> 
   return (await getSetting(db, 'customer.allowShortPayToTab')) === 'true'
 }
 
-export async function saveAllowCreditCardSurcharge(db: PrismaClient, enabled: boolean): Promise<void> {
+export async function saveAllowCreditCardSurcharge(
+  db: PrismaClient,
+  enabled: boolean
+): Promise<void> {
   await setSetting(db, 'payment.allowCreditCardSurcharge', String(enabled))
 }
 
@@ -137,14 +146,34 @@ export async function saveBackupPromptOnLogout(db: PrismaClient, enabled: boolea
 }
 
 /** The manager-configured USB drive backups are written to automatically. Null when not yet set. */
-export async function getBackupDestination(db: PrismaClient): Promise<{ drivePath: string; driveName: string } | null> {
+export async function getBackupDestination(
+  db: PrismaClient
+): Promise<{ drivePath: string; driveName: string } | null> {
   const drivePath = await getSetting(db, 'backup.drivePath')
   if (!drivePath) return null
   const driveName = await getSetting(db, 'backup.driveName')
   return { drivePath, driveName: driveName || drivePath }
 }
 
-export async function saveBackupDestination(db: PrismaClient, drivePath: string, driveName: string): Promise<void> {
+export async function saveBackupDestination(
+  db: PrismaClient,
+  drivePath: string,
+  driveName: string
+): Promise<void> {
   await setSetting(db, 'backup.drivePath', drivePath)
   await setSetting(db, 'backup.driveName', driveName)
+}
+
+/** Minutes of inactivity before the session is force-logged-out. Manager-configurable, default 20. */
+export async function getIdleTimeoutMinutes(db: PrismaClient): Promise<number> {
+  const raw = await getSetting(db, 'session.idleTimeoutMinutes')
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : 20
+}
+
+export async function saveIdleTimeoutMinutes(db: PrismaClient, minutes: number): Promise<void> {
+  if (!Number.isFinite(minutes) || minutes < 1 || minutes > 240) {
+    throw new Error('Idle timeout must be between 1 and 240 minutes.')
+  }
+  await setSetting(db, 'session.idleTimeoutMinutes', String(Math.round(minutes)))
 }

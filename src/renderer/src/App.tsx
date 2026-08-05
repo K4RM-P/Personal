@@ -3,6 +3,7 @@ import { AppShell, NavTab } from './components/AppShell'
 import { CurrentUserProvider, useCurrentUser } from './context/CurrentUserContext'
 import { LoginScreen } from './screens/LoginScreen'
 import { SetupWizard } from './screens/SetupWizard'
+import { useIdleLogout } from './hooks/useIdleLogout'
 
 // Screens are code-split so the initial render only parses/mounts the active
 // tab. The other screens load on first navigation, cutting startup cost.
@@ -41,10 +42,22 @@ function PermissionDenied(): React.JSX.Element {
 }
 
 function AuthedApp(): React.JSX.Element {
-  const { user } = useCurrentUser()
+  const { user, logout } = useCurrentUser()
   const isManager = user?.role === 'MANAGER'
   // A POS opens to the register, not to settings.
   const [activeTab, setActiveTab] = React.useState<NavTab>('checkout')
+
+  const [idleTimeoutMinutes, setIdleTimeoutMinutes] = React.useState<number | null>(null)
+  React.useEffect(() => {
+    window.api.settings
+      .getIdleTimeoutMinutes()
+      .then(setIdleTimeoutMinutes)
+      .catch(() => setIdleTimeoutMinutes(20))
+  }, [])
+  const handleIdle = React.useCallback((): void => {
+    void logout()
+  }, [logout])
+  useIdleLogout(idleTimeoutMinutes, handleIdle)
 
   const canAccess = (tab: NavTab): boolean => (MANAGER_ONLY.includes(tab) ? isManager : true)
 

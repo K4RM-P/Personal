@@ -76,6 +76,8 @@ export const IPC = {
   SETTINGS_SAVE_PAYMENT: 'settings:savePayment',
   SETTINGS_GET_CHECKOUT: 'settings:getCheckout',
   SETTINGS_SAVE_CHECKOUT: 'settings:saveCheckout',
+  SETTINGS_GET_IDLE_TIMEOUT: 'settings:getIdleTimeout',
+  SETTINGS_SAVE_IDLE_TIMEOUT: 'settings:saveIdleTimeout',
 
   // Auth & user management channels
   AUTH_LOGIN: 'auth:login',
