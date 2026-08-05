@@ -86,16 +86,24 @@ export type TransactionWithItems = DBTransaction & {
 
 // ---------------------------------------------------------------- Refunds
 
-/** A row in the "Refund Past Sales" search results list. */
+/** A row in the "Refund Past Sales" / "Past Sales" search results list. */
 export interface SaleSearchResult {
   id: string
   receiptNumber: string
   createdAt: string
   customerName: string | null
+  cashierName: string | null
+  itemCount: number
   totalCents: number
   tenderType: string
   status: string
   refundedCents: number
+}
+
+/** Optional inclusive date-range bound for sale search/history queries. */
+export interface SaleDateRange {
+  fromDate?: string
+  toDate?: string
 }
 
 /** Full sale detail loaded when a manager drills into a specific sale to refund it. */

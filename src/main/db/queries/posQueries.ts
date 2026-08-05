@@ -404,25 +404,6 @@ export async function createTransaction(
   })
 }
 
-export async function getAllTransactions(
-  db: PrismaClient,
-  limit = 25
-): Promise<TransactionWithItems[]> {
-  return db.transaction.findMany({
-    orderBy: { createdAt: 'desc' },
-    take: limit,
-    include: {
-      items: {
-        include: {
-          product: true
-        }
-      },
-      customer: true,
-      user: { select: { id: true, fullName: true, role: true } }
-    }
-  })
-}
-
 export async function voidTransaction(
   db: PrismaClient,
   id: string,

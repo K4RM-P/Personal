@@ -4,23 +4,38 @@ import { getActiveProvider } from '../../payment/paymentService'
 import { customerLedgerInternals } from './customerQueries'
 
 /**
- * Sales list for the "Refund Past Sales" screen — no date range, searchable by
- * receipt number (the human-facing "Sale #"). Capped so the manager isn't
- * shipped the entire sales history over IPC on every keystroke.
+ * Sales list backing both the "Refund Past Sales" flow and the Past Sales tab
+ * — searchable by receipt number (the human-facing "Sale #") and optionally
+ * bounded to a date range (managers pick one; cashiers are pinned to the last
+ * 24 hours by the caller). Capped so nobody is shipped the entire sales
+ * history over IPC on every keystroke.
  */
 export async function searchSalesForRefund(
   db: PrismaClient,
   query?: string,
-  limit = 100
+  options?: { fromDate?: Date; toDate?: Date; limit?: number }
 ): Promise<SaleSearchResult[]> {
   const q = query?.trim()
+  const textFilter = q ? { OR: [{ receiptNumber: { contains: q } }, { id: { contains: q } }] } : undefined
+  const dateFilter =
+    options?.fromDate || options?.toDate
+      ? {
+          createdAt: {
+            ...(options.fromDate ? { gte: options.fromDate } : {}),
+            ...(options.toDate ? { lte: options.toDate } : {})
+          }
+        }
+      : undefined
+
   const transactions = await db.transaction.findMany({
-    where: q ? { OR: [{ receiptNumber: { contains: q } }, { id: { contains: q } }] } : undefined,
+    where: textFilter && dateFilter ? { AND: [textFilter, dateFilter] } : (textFilter ?? dateFilter),
     orderBy: { createdAt: 'desc' },
-    take: limit,
+    take: options?.limit ?? 300,
     include: {
       customer: { select: { firstName: true, lastName: true } },
-      refunds: { select: { amountCents: true } }
+      user: { select: { fullName: true } },
+      refunds: { select: { amountCents: true } },
+      _count: { select: { items: true } }
     }
   })
   return transactions.map((tx) => ({
@@ -28,6 +43,8 @@ export async function searchSalesForRefund(
     receiptNumber: tx.receiptNumber,
     createdAt: tx.createdAt.toISOString(),
     customerName: tx.customer ? `${tx.customer.firstName} ${tx.customer.lastName}` : null,
+    cashierName: tx.user?.fullName ?? null,
+    itemCount: tx._count.items,
     totalCents: tx.totalCents,
     tenderType: tx.tenderType,
     status: tx.status,

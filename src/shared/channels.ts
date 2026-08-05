@@ -21,7 +21,6 @@ export const IPC = {
 
   // Transaction & Checkout Channels (Stage 1)
   TRANSACTION_CREATE: 'transaction:create',
-  TRANSACTION_GET_ALL: 'transaction:getAll',
   TRANSACTION_PARK: 'transaction:park',
   TRANSACTION_VOID: 'transaction:void',
   TRANSACTION_REFUND_TAB: 'transaction:refundTab',

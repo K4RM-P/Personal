@@ -1,12 +1,17 @@
 import { ipcMain } from 'electron'
 import { PrismaClient } from '@prisma/client'
 import { IPC } from '../../shared/channels'
-import type { ProcessRefundPayload, ProcessRefundResult, SaleRefundDetail, SaleSearchResult } from '../../shared/types'
+import type { ProcessRefundPayload, ProcessRefundResult, SaleDateRange, SaleRefundDetail, SaleSearchResult } from '../../shared/types'
 import { getSaleDetailsForRefund, processRefund, searchSalesForRefund } from '../db/queries/refundQueries'
 
 export function registerRefundHandlers(db: PrismaClient): void {
-  ipcMain.handle(IPC.REFUND_SEARCH_SALES, (_e, query?: string): Promise<SaleSearchResult[]> =>
-    searchSalesForRefund(db, query)
+  ipcMain.handle(
+    IPC.REFUND_SEARCH_SALES,
+    (_e, args: { query?: string } & SaleDateRange): Promise<SaleSearchResult[]> =>
+      searchSalesForRefund(db, args?.query, {
+        fromDate: args?.fromDate ? new Date(args.fromDate) : undefined,
+        toDate: args?.toDate ? new Date(args.toDate) : undefined
+      })
   )
 
   ipcMain.handle(IPC.REFUND_GET_SALE_DETAILS, (_e, transactionId: string): Promise<SaleRefundDetail> =>

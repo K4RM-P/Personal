@@ -44,6 +44,7 @@ import type {
   VerifyManagerResult,
   SaleSearchResult,
   SaleRefundDetail,
+  SaleDateRange,
   ProcessRefundPayload,
   ProcessRefundResult
 } from '../shared/types'
@@ -96,7 +97,6 @@ const api = {
   transaction: {
     create: (payload: CreateTransactionPayload): Promise<TransactionWithItems> =>
       ipcRenderer.invoke(IPC.TRANSACTION_CREATE, payload),
-    getAll: (): Promise<TransactionWithItems[]> => ipcRenderer.invoke(IPC.TRANSACTION_GET_ALL),
     void: (id: string, reason: string): Promise<TransactionWithItems> =>
       ipcRenderer.invoke(IPC.TRANSACTION_VOID, { id, reason })
   },
@@ -259,8 +259,8 @@ const api = {
       ipcRenderer.invoke(IPC.USER_DELETE, userId)
   },
   refund: {
-    searchSales: (query?: string): Promise<SaleSearchResult[]> =>
-      ipcRenderer.invoke(IPC.REFUND_SEARCH_SALES, query),
+    searchSales: (query?: string, range?: SaleDateRange): Promise<SaleSearchResult[]> =>
+      ipcRenderer.invoke(IPC.REFUND_SEARCH_SALES, { query, fromDate: range?.fromDate, toDate: range?.toDate }),
     getSaleDetails: (transactionId: string): Promise<SaleRefundDetail> =>
       ipcRenderer.invoke(IPC.REFUND_GET_SALE_DETAILS, transactionId),
     process: (payload: ProcessRefundPayload): Promise<ProcessRefundResult> =>
