@@ -41,6 +41,7 @@ export const IPC = {
   // Receipt Printing Channels (Stage 4)
   RECEIPT_PRINT: 'receipt:print',
   RECEIPT_TEST_NETWORK: 'receipt:testNetwork',
+  RECEIPT_LIST_PRINTERS: 'receipt:listPrinters',
 
   // Payment Channels (Stage 5)
   PAYMENT_CHARGE: 'payment:charge',

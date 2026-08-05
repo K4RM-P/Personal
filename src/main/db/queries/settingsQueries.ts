@@ -8,6 +8,7 @@ const DEFAULTS = {
   'printer.type': 'PDF',
   'printer.networkIp': '',
   'printer.networkPort': '9100',
+  'printer.deviceName': '',
   // Payment (Stage 5): default to Manual/External terminal until setup is run.
   'payment.provider': 'manual',
   'payment.environment': 'sandbox',
@@ -59,11 +60,13 @@ export async function getPrinterConfig(db: PrismaClient): Promise<PrinterConfig>
   const ipAddress = await getSetting(db, 'printer.networkIp')
   const portStr = await getSetting(db, 'printer.networkPort')
   const port = parseInt(portStr, 10) || 9100
+  const deviceName = await getSetting(db, 'printer.deviceName')
 
   return {
     type: type === 'NETWORK' || type === 'SYSTEM' ? type : 'PDF',
     ipAddress: ipAddress || undefined,
-    port
+    port,
+    deviceName: deviceName || undefined
   }
 }
 
@@ -71,6 +74,7 @@ export async function savePrinterConfig(db: PrismaClient, config: PrinterConfig)
   await setSetting(db, 'printer.type', config.type)
   await setSetting(db, 'printer.networkIp', config.ipAddress ?? '')
   await setSetting(db, 'printer.networkPort', String(config.port ?? 9100))
+  await setSetting(db, 'printer.deviceName', config.deviceName ?? '')
   return getPrinterConfig(db)
 }
 

@@ -4,7 +4,7 @@ import * as net from 'net'
 import { writeFile } from 'fs/promises'
 import { join } from 'path'
 import { formatCurrency } from '../../shared/formatCurrency'
-import { PrintReceiptOptions, PrintReceiptResult } from '../../shared/types'
+import { PrintReceiptOptions, PrintReceiptResult, SystemPrinterInfo } from '../../shared/types'
 import { buildReceiptHtml, DEFAULT_STORE_INFO } from './receiptTemplate'
 
 /**
@@ -132,12 +132,29 @@ export async function printToPdf(html: string, receiptNumber: string): Promise<{
 }
 
 /**
- * Sends receipt HTML to the OS default / configured printer (USB / Windows print queue).
+ * Lists installed OS printers so Settings can offer a picker instead of relying on the
+ * system default.
  */
-export async function printToSystemPrinter(html: string): Promise<void> {
+export async function listSystemPrinters(): Promise<SystemPrinterInfo[]> {
+  const win = await loadHtmlInHiddenWindow('<html><body></body></html>')
+  try {
+    const printers = await win.webContents.getPrintersAsync()
+    return printers.map((p) => ({ name: p.name, displayName: p.displayName }))
+  } finally {
+    win.close()
+  }
+}
+
+/**
+ * Sends receipt HTML to the configured OS printer (USB / Windows print queue). Always
+ * silent — printing must never pop the native OS print dialog. When `deviceName` is set
+ * (from Settings), it targets that specific printer; otherwise it falls back to the OS
+ * default printer, still silently.
+ */
+export async function printToSystemPrinter(html: string, deviceName?: string): Promise<void> {
   const win = await loadHtmlInHiddenWindow(html)
   return new Promise((resolve, reject) => {
-    win.webContents.print({ silent: false }, (success, failureReason) => {
+    win.webContents.print({ silent: true, ...(deviceName ? { deviceName } : {}) }, (success, failureReason) => {
       win.close()
       if (success) resolve()
       else reject(new Error(failureReason || 'System print failed'))
@@ -173,8 +190,11 @@ export async function printReceipt(options: PrintReceiptOptions): Promise<PrintR
 
   if (config?.type === 'SYSTEM') {
     try {
-      await printToSystemPrinter(html)
-      return { success: true, message: 'Receipt sent to system printer.' }
+      await printToSystemPrinter(html, config.deviceName)
+      return {
+        success: true,
+        message: config.deviceName ? `Receipt printed to ${config.deviceName}.` : 'Receipt sent to system printer.'
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       console.warn('System print failed, falling back to PDF:', msg)

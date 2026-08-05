@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
 import { PrismaClient } from '@prisma/client'
 import { IPC } from '../../shared/channels'
-import { printReceipt, testNetworkPrinter } from '../receipt/receiptPrinter'
+import { printReceipt, testNetworkPrinter, listSystemPrinters } from '../receipt/receiptPrinter'
 import { getPrinterConfig, getStoreInfo, savePrinterConfig, saveStoreInfo, getAllowCreditCardSurcharge, getCardSurchargePercent, getAllowShortPayToTab, saveAllowCreditCardSurcharge, saveCardSurchargePercent, saveAllowShortPayToTab } from '../db/queries/settingsQueries'
 import type { PrinterConfig, StoreInfo, TransactionWithItems, CheckoutSettings } from '../../shared/types'
 
@@ -14,6 +14,8 @@ export function registerReceiptHandlers(db: PrismaClient): void {
   ipcMain.handle(IPC.RECEIPT_TEST_NETWORK, async (_e, { ipAddress, port }: { ipAddress: string; port?: number }) => {
     return testNetworkPrinter(ipAddress, port ?? 9100)
   })
+
+  ipcMain.handle(IPC.RECEIPT_LIST_PRINTERS, () => listSystemPrinters())
 
   ipcMain.handle(IPC.SETTINGS_GET_PRINTER, () => getPrinterConfig(db))
   ipcMain.handle(IPC.SETTINGS_SAVE_PRINTER, (_e, config: PrinterConfig) => savePrinterConfig(db, config))

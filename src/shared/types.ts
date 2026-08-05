@@ -132,6 +132,14 @@ export interface PrinterConfig {
   type: PrinterType
   ipAddress?: string
   port?: number
+  /** OS printer device name for SYSTEM type — printing targets this printer silently, no OS print dialog. */
+  deviceName?: string
+}
+
+/** An installed OS printer, as reported by Electron's printer enumeration. */
+export interface SystemPrinterInfo {
+  name: string
+  displayName: string
 }
 
 export interface BarcodeScanResult {

@@ -1,5 +1,13 @@
 import * as React from 'react'
-import { BackupDestination, BackupLogSummary, ExternalDrive, FeatureFlag, PrinterConfig, StoreInfo } from '@shared/types'
+import {
+  BackupDestination,
+  BackupLogSummary,
+  ExternalDrive,
+  FeatureFlag,
+  PrinterConfig,
+  StoreInfo,
+  SystemPrinterInfo
+} from '@shared/types'
 import { FeatureFlagCard } from '../components/FeatureFlagCard'
 import { PaymentSettingsCard } from '../components/PaymentSettingsCard'
 import { BackupModal } from '../components/BackupModal'
@@ -33,6 +41,7 @@ export function SettingsScreen() {
   const [settingsSaved, setSettingsSaved] = React.useState<string | null>(null)
   const [testResult, setTestResult] = React.useState<{ ok: boolean; message: string } | null>(null)
   const [testing, setTesting] = React.useState(false)
+  const [systemPrinters, setSystemPrinters] = React.useState<SystemPrinterInfo[]>([])
   const [creditSettings, setCreditSettings] = React.useState({ loyaltyPointsPerDollar: 1 })
   const [lastBackup, setLastBackup] = React.useState<BackupLogSummary | null>(null)
   const [promptOnLogout, setPromptOnLogout] = React.useState(true)
@@ -136,10 +145,19 @@ export function SettingsScreen() {
     }
   }
 
+  const loadSystemPrinters = async (): Promise<void> => {
+    try {
+      setSystemPrinters(await window.api.receipt.listPrinters())
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to list system printers.')
+    }
+  }
+
   React.useEffect(() => {
     loadFlags()
     loadHardwareSettings()
     loadBackupSettings()
+    loadSystemPrinters()
     window.api.customer.getCreditSettings().then(setCreditSettings).catch((err) => setError(err instanceof Error ? err.message : 'Failed to load customer settings.'))
   }, [])
 
@@ -344,6 +362,41 @@ export function SettingsScreen() {
                   </span>
                 )}
               </div>
+            </>
+          )}
+
+          {printerConfig.type === 'SYSTEM' && (
+            <>
+              <div>
+                <label className="mb-1 block text-xs text-[var(--muted-foreground)]">System Printer</label>
+                {systemPrinters.length === 0 ? (
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    No printers detected. Make sure a printer is installed on this computer, then rescan.
+                  </p>
+                ) : (
+                  <select
+                    value={printerConfig.deviceName ?? ''}
+                    onChange={(e) => setPrinterConfig((c) => ({ ...c, deviceName: e.target.value || undefined }))}
+                    className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
+                  >
+                    <option value="">Use OS default printer</option>
+                    {systemPrinters.map((p) => (
+                      <option key={p.name} value={p.name}>
+                        {p.displayName}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+                  Receipts print straight to this printer — no print dialog will appear.
+                </p>
+              </div>
+              <button
+                onClick={() => void loadSystemPrinters()}
+                className="w-fit rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-4 py-2 text-sm text-[var(--foreground)]"
+              >
+                Rescan Printers
+              </button>
             </>
           )}
         </div>

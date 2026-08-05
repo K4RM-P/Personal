@@ -11,6 +11,7 @@ import type {
   BarcodeScanResult,
   PrintReceiptResult,
   PrinterConfig,
+  SystemPrinterInfo,
   StoreInfo,
   ChargeOptions,
   ChargeResult,
@@ -115,7 +116,8 @@ const api = {
     print: (transaction: TransactionWithItems): Promise<PrintReceiptResult> =>
       ipcRenderer.invoke(IPC.RECEIPT_PRINT, transaction),
     testNetwork: (ipAddress: string, port?: number): Promise<{ ok: boolean; message: string }> =>
-      ipcRenderer.invoke(IPC.RECEIPT_TEST_NETWORK, { ipAddress, port })
+      ipcRenderer.invoke(IPC.RECEIPT_TEST_NETWORK, { ipAddress, port }),
+    listPrinters: (): Promise<SystemPrinterInfo[]> => ipcRenderer.invoke(IPC.RECEIPT_LIST_PRINTERS)
   },
   payment: {
     charge: (amountCents: number, orderRef: string, options?: ChargeOptions): Promise<ChargeResult> =>
