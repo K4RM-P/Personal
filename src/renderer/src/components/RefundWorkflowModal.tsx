@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Card, CardTitle, CardDescription } from './ui/Card'
+import { Alert } from './ui/Alert'
 import { formatCurrency } from '@shared/formatCurrency'
 import type { AuthUser, Customer, RefundType, SaleRefundDetail } from '@shared/types'
 
@@ -133,7 +134,7 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
     return (
       <Overlay>
         <Card className="w-[420px] border-[var(--error)] bg-[var(--card)] p-6 space-y-4">
-          <div className="text-sm text-[var(--error)]">{loadError}</div>
+          <Alert variant="error">{loadError}</Alert>
           <button onClick={() => onClose(false)} className="w-full min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)]">
             Close
           </button>
@@ -196,9 +197,9 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
           <CardTitle className="text-[var(--foreground)]">Select items to refund</CardTitle>
           <div className="max-h-[300px] space-y-2 overflow-y-auto">
             {sale.items.map((item) => (
-              <label key={item.id} className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] p-2.5 text-sm">
-                <span className="flex items-center gap-2">
-                  <input type="checkbox" checked={selectedItemIds.has(item.id)} onChange={() => toggleItem(item.id)} />
+              <label key={item.id} className="flex min-h-11 items-center justify-between rounded-[var(--radius)] border border-[var(--border)] p-3 text-sm">
+                <span className="flex items-center gap-2.5">
+                  <input type="checkbox" checked={selectedItemIds.has(item.id)} onChange={() => toggleItem(item.id)} className="h-4 w-4 shrink-0" />
                   {item.product.name} (qty {item.quantity}) @ {formatCurrency(item.unitPriceCents)} ea
                 </span>
                 <span className="font-semibold text-[var(--foreground)]">{formatCurrency(item.totalCents)}</span>
@@ -269,9 +270,7 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
       <Overlay>
         <Card className="w-[420px] border-[var(--success)] bg-[var(--card)] p-6 space-y-4">
           <CardTitle className="text-[var(--foreground)]">Refund complete</CardTitle>
-          <div className="rounded-[var(--radius)] border border-[var(--success)]/30 bg-[var(--success-bg)] px-3 py-2 text-sm text-[var(--success)]">
-            {successMessage}
-          </div>
+          <Alert variant="success">{successMessage}</Alert>
           <button onClick={() => onClose(true)} className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]">
             Back to sales list
           </button>
@@ -281,9 +280,7 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
   }
 
   // ---------------------------------------------------------------- Type-specific confirmation forms
-  const errorBanner = error && (
-    <div className="rounded-[var(--radius)] border border-[var(--error)]/30 bg-[var(--error-bg)] px-3 py-2 text-xs text-[var(--error)]">{error}</div>
-  )
+  const errorBanner = error && <Alert variant="error">{error}</Alert>
   const reasonField = (
     <div>
       <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Refund reason (optional)</label>
@@ -391,9 +388,7 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
 
         {!hasCustomer && customerLinkMode === null && (
           <>
-            <div className="rounded-[var(--radius)] border border-[var(--warning)]/30 bg-[var(--warning-bg)] px-3 py-2 text-xs text-[var(--foreground)]">
-              This sale is not linked to a customer. Create or link one to deposit the refund.
-            </div>
+            <Alert variant="warning">This sale is not linked to a customer. Create or link one to deposit the refund.</Alert>
             <div className="grid grid-cols-2 gap-2">
               <button onClick={() => setCustomerLinkMode('create')} className="min-h-11 rounded-[var(--radius)] border border-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary)]">
                 Create New Customer

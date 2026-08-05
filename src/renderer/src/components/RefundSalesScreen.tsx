@@ -1,5 +1,7 @@
 import * as React from 'react'
+import { Receipt } from 'lucide-react'
 import { Card, CardTitle, CardDescription } from './ui/Card'
+import { EmptyState } from './ui/EmptyState'
 import { formatCurrency } from '@shared/formatCurrency'
 import type { AuthUser, SaleSearchResult } from '@shared/types'
 import { RefundWorkflowModal } from './RefundWorkflowModal'
@@ -46,7 +48,7 @@ export function RefundSalesScreen({ manager, onExit }: RefundSalesScreenProps): 
           </div>
           <button
             onClick={onExit}
-            className="min-h-10 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-4 text-sm font-semibold text-[var(--foreground)]"
+            className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-4 text-sm font-semibold text-[var(--foreground)]"
           >
             Exit Refunds
           </button>
@@ -58,7 +60,7 @@ export function RefundSalesScreen({ manager, onExit }: RefundSalesScreenProps): 
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by Sale # (receipt number)…"
-            className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-4 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
+            className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-4 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
             autoFocus
           />
         </Card>
@@ -68,14 +70,16 @@ export function RefundSalesScreen({ manager, onExit }: RefundSalesScreenProps): 
           <CardDescription>{loading ? 'Searching…' : `${sales.length} sale${sales.length === 1 ? '' : 's'}`}</CardDescription>
           <div className="mt-3 space-y-2">
             {sales.length === 0 && !loading && (
-              <div className="rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-6 text-center text-sm text-[var(--muted-foreground)]">
-                No sales found.
-              </div>
+              <EmptyState
+                icon={Receipt}
+                title={query.trim() ? `No sales found for "${query}"` : 'No sales yet'}
+                description={query.trim() ? 'Check the receipt number and try again.' : 'Completed sales will appear here.'}
+              />
             )}
             {sales.map((sale) => {
               const isRefundable = sale.status !== 'VOIDED' && sale.refundedCents < sale.totalCents
               return (
-                <div key={sale.id} className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3 text-sm">
+                <div key={sale.id} className="flex min-h-11 items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3 text-sm">
                   <div>
                     <div className="font-bold text-[var(--foreground)]">{sale.receiptNumber}</div>
                     <div className="text-xs text-[var(--muted-foreground)]">
