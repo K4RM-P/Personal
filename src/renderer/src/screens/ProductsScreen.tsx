@@ -1,5 +1,8 @@
 import * as React from 'react'
+import { PackageSearch } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
+import { Alert } from '../components/ui/Alert'
+import { EmptyState } from '../components/ui/EmptyState'
 import { PricingTier, BulkImportProductInput } from '@shared/types'
 import { formatCurrency } from '@shared/formatCurrency'
 import { calculateRetailPriceCents, TierChangePreviewItem } from '@shared/pricingEngine'
@@ -40,6 +43,7 @@ export function ProductsScreen(): React.JSX.Element {
   const [barcode, setBarcode] = React.useState('')
   const [isPinned, setIsPinned] = React.useState(false)
   const [editingProductId, setEditingProductId] = React.useState<number | null>(null)
+  const [formMessage, setFormMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   // Tier Edit & Preview State
   const [editableTiers, setEditableTiers] = React.useState<PricingTier[]>([])
@@ -50,6 +54,8 @@ export function ProductsScreen(): React.JSX.Element {
   // Bulk Import CSV State
   const [csvText, setCsvText] = React.useState('')
   const [importCount, setImportCount] = React.useState<number | null>(null)
+  const [importError, setImportError] = React.useState<string | null>(null)
+  const [tierMessage, setTierMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const importPreview = React.useMemo(() => parseImportPreviewCsv(csvText), [csvText])
 
   const loadData = async (): Promise<void> => {
@@ -112,8 +118,9 @@ export function ProductsScreen(): React.JSX.Element {
 
   const handleSaveProduct = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
+    setFormMessage(null)
     if (!sku || !name || !costDollars) {
-      alert('Please provide SKU, Name, and Cost Price')
+      setFormMessage({ type: 'error', text: 'Please provide SKU, Name, and Cost Price.' })
       return
     }
 
@@ -135,10 +142,11 @@ export function ProductsScreen(): React.JSX.Element {
         }
         resetForm()
         loadData()
+        setFormMessage({ type: 'success', text: 'Product saved.' })
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to save product'
-      alert(message)
+      setFormMessage({ type: 'error', text: message })
     }
   }
 
@@ -150,6 +158,7 @@ export function ProductsScreen(): React.JSX.Element {
     setPriceDollars('')
     setBarcode('')
     setIsPinned(false)
+    setFormMessage(null)
   }
 
   // Tier Table Handlers
@@ -175,20 +184,22 @@ export function ProductsScreen(): React.JSX.Element {
     try {
       if (window.api?.pricingTier) {
         await window.api.pricingTier.saveAll(editableTiers)
-        alert('Pricing Tiers saved successfully! Live retail prices updated across catalog.')
+        setTierMessage({ type: 'success', text: 'Pricing tiers saved — live retail prices updated across the catalog.' })
         loadData()
         setPreviewImpact([])
         setPreviewAffectedCount(0)
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to save tiers'
-      alert(message)
+      setTierMessage({ type: 'error', text: message })
     }
   }
 
   // Bulk Import Handler
   const handleBulkImport = async (): Promise<void> => {
     if (!csvText.trim()) return
+    setImportError(null)
+    setImportCount(null)
     const inputs: BulkImportProductInput[] = importPreview.map((row) => ({
       sku: row.sku,
       name: row.name,
@@ -197,7 +208,7 @@ export function ProductsScreen(): React.JSX.Element {
     }))
 
     if (inputs.length === 0) {
-      alert('Invalid CSV format. Format: SKU,Name,CostInDollars,Barcode(optional)')
+      setImportError('Invalid CSV format. Expected: SKU,Name,CostInDollars,Barcode(optional)')
       return
     }
 
@@ -210,7 +221,7 @@ export function ProductsScreen(): React.JSX.Element {
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Bulk import failed'
-      alert(message)
+      setImportError(message)
     }
   }
 
@@ -269,6 +280,7 @@ export function ProductsScreen(): React.JSX.Element {
               <h3 className="mb-4 font-semibold text-[var(--foreground)]">
                 {editingProductId ? 'Edit Product' : 'Add New Product'}
               </h3>
+              {formMessage && <Alert variant={formMessage.type} className="mb-3">{formMessage.text}</Alert>}
               <form onSubmit={handleSaveProduct} className="space-y-3 text-xs">
                 <div>
                   <label className="mb-1 block text-[var(--muted-foreground)]">SKU Code*</label>
@@ -395,13 +407,16 @@ export function ProductsScreen(): React.JSX.Element {
                 />
                 <div className="max-h-[600px] overflow-y-auto pr-1">
                   {catalogLoading ? (
-                    <div className="rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-6 text-center text-sm text-[var(--muted-foreground)]">
-                      Searching catalogue...
+                    <div className="flex items-center justify-center gap-2 rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-6 text-sm text-[var(--muted-foreground)]">
+                      <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[var(--muted-foreground)] border-t-transparent" aria-hidden="true" />
+                      Searching catalogue…
                     </div>
                   ) : displayCatalog.length === 0 ? (
-                    <div className="rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-6 text-center text-sm text-[var(--muted-foreground)]">
-                      {catalogSearch ? 'No catalogue items match your search.' : 'No catalogue items yet. Upload a McKesson WEBCAT file to populate the catalogue.'}
-                    </div>
+                    <EmptyState
+                      icon={PackageSearch}
+                      title={catalogSearch ? 'No catalogue items match your search' : 'No catalogue items yet'}
+                      description={catalogSearch ? 'Try a different code, description, or UPC.' : 'Upload a McKesson WEBCAT file to populate the catalogue.'}
+                    />
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs">
@@ -477,6 +492,7 @@ export function ProductsScreen(): React.JSX.Element {
                   </div>
                 </div>
               ))}
+              {tierMessage && <Alert variant={tierMessage.type}>{tierMessage.text}</Alert>}
               <div className="pt-2 flex justify-end">
                 <button
                   onClick={handleSaveTiers}
@@ -560,11 +576,8 @@ export function ProductsScreen(): React.JSX.Element {
               </div>
             )}
 
-            {importCount !== null && (
-              <div className="rounded-[var(--radius)] border border-[var(--success)]/30 bg-[var(--success-bg)] p-3 text-xs text-[var(--success)]">
-                Successfully imported/upserted {importCount} products into database.
-              </div>
-            )}
+            {importError && <Alert variant="error">{importError}</Alert>}
+            {importCount !== null && <Alert variant="success">Successfully imported/upserted {importCount} products.</Alert>}
 
             <button
               onClick={handleBulkImport}
