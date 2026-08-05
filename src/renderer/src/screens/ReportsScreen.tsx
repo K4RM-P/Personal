@@ -1,5 +1,8 @@
 import * as React from 'react'
+import { FileBarChart2, PackageSearch } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
+import { Alert } from '../components/ui/Alert'
+import { EmptyState } from '../components/ui/EmptyState'
 import { formatCurrency } from '@shared/formatCurrency'
 import type {
   DashboardData,
@@ -50,14 +53,14 @@ function DateRangePicker({
   presets?: { label: string; from: string; to: string }[]
 }): React.JSX.Element {
   return (
-    <div className="flex items-center gap-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-3">
+    <div className="flex flex-wrap items-center gap-4 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4">
       <div className="flex items-center gap-2 text-sm">
         <label className="text-[var(--muted-foreground)]">From:</label>
         <input
           type="date"
           value={fromDate}
           onChange={(e) => onChange(e.target.value, toDate)}
-          className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-sm"
+          className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 text-sm"
         />
       </div>
       <div className="flex items-center gap-2 text-sm">
@@ -66,18 +69,20 @@ function DateRangePicker({
           type="date"
           value={toDate}
           onChange={(e) => onChange(fromDate, e.target.value)}
-          className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-sm"
+          className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 text-sm"
         />
       </div>
-      {presets?.map((p) => (
-        <button
-          key={p.label}
-          onClick={() => onChange(p.from, p.to)}
-          className="rounded-[var(--radius)] border border-[var(--border)] px-2.5 py-1.5 text-xs font-medium text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
-        >
-          {p.label}
-        </button>
-      ))}
+      <div className="flex flex-wrap items-center gap-2">
+        {presets?.map((p) => (
+          <button
+            key={p.label}
+            onClick={() => onChange(p.from, p.to)}
+            className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-4 text-xs font-medium text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -142,9 +147,9 @@ function DashboardPage(): React.JSX.Element {
     return () => { active = false }
   }, [])
 
-  if (loading) return <div className="p-8 text-center text-[var(--muted-foreground)]">Loading dashboard…</div>
-  if (error) return <div className="p-8 text-center text-[var(--error)]">Error: {error}</div>
-  if (!data) return <div className="p-8 text-center text-[var(--muted-foreground)]">No data yet.</div>
+  if (loading) return <Alert variant="pending">Loading dashboard…</Alert>
+  if (error) return <Alert variant="error">Failed to load dashboard: {error}</Alert>
+  if (!data) return <EmptyState icon={FileBarChart2} title="No data yet" description="Dashboard figures appear once sales start coming in." />
 
   const renderSalesCard = (title: string, sales: SalesSummary, topItems: TopItemRow[]) => (
     <Card>
@@ -203,18 +208,18 @@ function DashboardPage(): React.JSX.Element {
   )
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Dashboard</h1>
         <p className="text-sm text-[var(--muted-foreground)]">Today and this month at a glance.</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {renderSalesCard('Today', data.today.sales, data.today.topItems)}
         {renderSalesCard('This Month', data.thisMonth.sales, data.thisMonth.topItems)}
       </div>
 
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Alerts</CardTitle>
@@ -275,10 +280,12 @@ function SalesReportsPage(): React.JSX.Element {
   const [topItems, setTopItems] = React.useState<TopItemRow[]>([])
   const [slowItems, setSlowItems] = React.useState<SlowItemRow[]>([])
   const [loading, setLoading] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
   const [subTab, setSubTab] = React.useState<'daily' | 'tender' | 'top' | 'slow'>('daily')
 
   const loadData = React.useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const [daily, tender, top, slow] = await Promise.all([
         window.api.reports.getDailySales(fromDate, toDate),
@@ -292,6 +299,7 @@ function SalesReportsPage(): React.JSX.Element {
       setSlowItems(slow)
     } catch (err: any) {
       console.error(err)
+      setError(err instanceof Error ? err.message : 'Failed to load sales reports.')
     } finally {
       setLoading(false)
     }
@@ -306,7 +314,7 @@ function SalesReportsPage(): React.JSX.Element {
   ]
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Sales Reports</h1>
@@ -328,7 +336,7 @@ function SalesReportsPage(): React.JSX.Element {
             })()
             downloadCsv(`sales-${subTab}`, csvHeaders, csvRows)
           }}
-          className="rounded-[var(--radius)] bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-[var(--primary-foreground)]"
+          className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)]"
         >
           Export CSV
         </button>
@@ -346,7 +354,7 @@ function SalesReportsPage(): React.JSX.Element {
           <button
             key={tab}
             onClick={() => setSubTab(tab)}
-            className={`rounded-[var(--radius)] px-3 py-1.5 text-xs font-semibold ${
+            className={`min-h-11 rounded-[var(--radius)] px-4 text-xs font-semibold ${
               subTab === tab ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
             }`}
           >
@@ -355,7 +363,8 @@ function SalesReportsPage(): React.JSX.Element {
         ))}
       </div>
 
-      {loading && <div className="p-4 text-center text-sm text-[var(--muted-foreground)]">Loading…</div>}
+      {loading && <Alert variant="pending">Loading…</Alert>}
+      {!loading && error && <Alert variant="error">{error}</Alert>}
 
       {!loading && subTab === 'daily' && (
         <Card>
@@ -378,16 +387,16 @@ function SalesReportsPage(): React.JSX.Element {
               <tbody>
                 {dailySales.map((row) => (
                   <tr key={row.date} className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
-                    <td className="py-2 pr-3 font-medium">{row.date}</td>
-                    <td className="py-2 pr-3">{row.transactionCount}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{formatCurrency(row.grossCents)}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums text-[var(--error)]">{row.returnsCents !== 0 ? formatCurrency(row.returnsCents) : '—'}</td>
-                    <td className="py-2 pr-3 text-right font-semibold tabular-nums">{formatCurrency(row.netCents)}</td>
-                    <td className="py-2 text-right tabular-nums">{formatPercent(row.marginPercent)}</td>
+                    <td className="py-3 pr-3 font-medium">{row.date}</td>
+                    <td className="py-3 pr-3">{row.transactionCount}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(row.grossCents)}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums text-[var(--error)]">{row.returnsCents !== 0 ? formatCurrency(row.returnsCents) : '—'}</td>
+                    <td className="py-3 pr-3 text-right font-semibold tabular-nums">{formatCurrency(row.netCents)}</td>
+                    <td className="py-3 text-right tabular-nums">{formatPercent(row.marginPercent)}</td>
                   </tr>
                 ))}
                 {dailySales.length === 0 && (
-                  <tr><td colSpan={6} className="py-4 text-center text-[var(--muted-foreground)]">No sales in this period.</td></tr>
+                  <tr><td colSpan={6} className="py-6 text-center text-[var(--muted-foreground)]">No sales in this period.</td></tr>
                 )}
               </tbody>
             </table>
@@ -415,9 +424,9 @@ function SalesReportsPage(): React.JSX.Element {
                   .filter((r) => r.amountCents !== 0 || r.tender === 'Cash')
                   .map((row) => (
                     <tr key={row.tender} className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
-                      <td className="py-2 pr-3 font-medium">{row.tender}</td>
-                      <td className="py-2 pr-3 text-right tabular-nums">{formatCurrency(row.amountCents)}</td>
-                      <td className="py-2 text-right tabular-nums">{formatPercent(row.percent)}</td>
+                      <td className="py-3 pr-3 font-medium">{row.tender}</td>
+                      <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(row.amountCents)}</td>
+                      <td className="py-3 text-right tabular-nums">{formatPercent(row.percent)}</td>
                     </tr>
                   ))}
               </tbody>
@@ -446,15 +455,15 @@ function SalesReportsPage(): React.JSX.Element {
               <tbody>
                 {topItems.map((item) => (
                   <tr key={item.productId} className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
-                    <td className="py-2 pr-3 font-medium">{item.name}</td>
-                    <td className="py-2 pr-3 text-[var(--muted-foreground)]">{item.category ?? '—'}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{item.quantity}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{formatCurrency(item.revenueCents)}</td>
-                    <td className="py-2 text-right tabular-nums">{formatPercent(item.marginPercent)}</td>
+                    <td className="py-3 pr-3 font-medium">{item.name}</td>
+                    <td className="py-3 pr-3 text-[var(--muted-foreground)]">{item.category ?? '—'}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{item.quantity}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(item.revenueCents)}</td>
+                    <td className="py-3 text-right tabular-nums">{formatPercent(item.marginPercent)}</td>
                   </tr>
                 ))}
                 {topItems.length === 0 && (
-                  <tr><td colSpan={5} className="py-4 text-center text-[var(--muted-foreground)]">No sales in this period.</td></tr>
+                  <tr><td colSpan={5} className="py-6 text-center text-[var(--muted-foreground)]">No sales in this period.</td></tr>
                 )}
               </tbody>
             </table>
@@ -481,14 +490,14 @@ function SalesReportsPage(): React.JSX.Element {
               <tbody>
                 {slowItems.slice(0, 50).map((item) => (
                   <tr key={item.productId} className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
-                    <td className="py-2 pr-3 font-medium">{item.name}</td>
-                    <td className="py-2 pr-3 text-[var(--muted-foreground)]">{item.category ?? '—'}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{item.quantitySold}</td>
-                    <td className="py-2 text-right tabular-nums">{item.currentOnHand}</td>
+                    <td className="py-3 pr-3 font-medium">{item.name}</td>
+                    <td className="py-3 pr-3 text-[var(--muted-foreground)]">{item.category ?? '—'}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{item.quantitySold}</td>
+                    <td className="py-3 text-right tabular-nums">{item.currentOnHand}</td>
                   </tr>
                 ))}
                 {slowItems.length === 0 && (
-                  <tr><td colSpan={4} className="py-4 text-center text-[var(--muted-foreground)]">All items have sold in this period.</td></tr>
+                  <tr><td colSpan={4} className="py-6 text-center text-[var(--muted-foreground)]">All items have sold in this period.</td></tr>
                 )}
               </tbody>
             </table>
@@ -506,20 +515,22 @@ function SalesReportsPage(): React.JSX.Element {
 function InventoryReportsPage(): React.JSX.Element {
   const [valuation, setValuation] = React.useState<InventoryValuation | null>(null)
   const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     let active = true
     setLoading(true)
+    setError(null)
     window.api.reports
       .getInventoryValuation()
       .then((v) => { if (active) setValuation(v) })
-      .catch(() => {})
+      .catch((err: Error) => { if (active) setError(err.message || 'Failed to load inventory valuation.') })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [])
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Inventory Reports</h1>
@@ -533,14 +544,18 @@ function InventoryReportsPage(): React.JSX.Element {
               rows.push(['TOTAL', String(valuation.totalItemCount), String(valuation.totalCostValueCents), String(valuation.totalRetailValueCents), formatPercent(valuation.totalVariancePercent)])
               downloadCsv('inventory-valuation', headers, rows)
             }}
-            className="rounded-[var(--radius)] bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-[var(--primary-foreground)]"
+            className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)]"
           >
             Export CSV
           </button>
         )}
       </div>
 
-      {loading && <div className="p-4 text-center text-sm text-[var(--muted-foreground)]">Loading…</div>}
+      {loading && <Alert variant="pending">Loading…</Alert>}
+      {!loading && error && <Alert variant="error">{error}</Alert>}
+      {!loading && !error && !valuation && (
+        <EmptyState icon={PackageSearch} title="No inventory data yet" description="Valuation appears once products have cost and quantity data." />
+      )}
 
       {!loading && valuation && (
         <Card>
@@ -562,21 +577,21 @@ function InventoryReportsPage(): React.JSX.Element {
               <tbody>
                 {valuation.rows.map((row) => (
                   <tr key={row.category} className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
-                    <td className="py-2 pr-3 font-medium">{row.category}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{row.itemCount}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{formatCurrency(row.costValueCents)}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{formatCurrency(row.retailValueCents)}</td>
-                    <td className="py-2 text-right tabular-nums">{formatPercent(row.variancePercent)}</td>
+                    <td className="py-3 pr-3 font-medium">{row.category}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{row.itemCount}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(row.costValueCents)}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(row.retailValueCents)}</td>
+                    <td className="py-3 text-right tabular-nums">{formatPercent(row.variancePercent)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-[var(--border)] font-semibold">
-                  <td className="py-2 pr-3">TOTAL</td>
-                  <td className="py-2 pr-3 text-right tabular-nums">{valuation.totalItemCount}</td>
-                  <td className="py-2 pr-3 text-right tabular-nums">{formatCurrency(valuation.totalCostValueCents)}</td>
-                  <td className="py-2 pr-3 text-right tabular-nums">{formatCurrency(valuation.totalRetailValueCents)}</td>
-                  <td className="py-2 text-right tabular-nums">{formatPercent(valuation.totalVariancePercent)}</td>
+                  <td className="py-3 pr-3">TOTAL</td>
+                  <td className="py-3 pr-3 text-right tabular-nums">{valuation.totalItemCount}</td>
+                  <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(valuation.totalCostValueCents)}</td>
+                  <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(valuation.totalRetailValueCents)}</td>
+                  <td className="py-3 text-right tabular-nums">{formatPercent(valuation.totalVariancePercent)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -596,14 +611,17 @@ function CashierReportsPage(): React.JSX.Element {
   const [toDate, setToDate] = React.useState(todayStr)
   const [cashiers, setCashiers] = React.useState<CashierTotalRow[]>([])
   const [loading, setLoading] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
 
   const loadData = React.useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const data = await window.api.reports.getCashierTotals(fromDate, toDate)
       setCashiers(data)
     } catch (err: any) {
       console.error(err)
+      setError(err instanceof Error ? err.message : 'Failed to load cashier reports.')
     } finally {
       setLoading(false)
     }
@@ -612,7 +630,7 @@ function CashierReportsPage(): React.JSX.Element {
   React.useEffect(() => { void loadData() }, [loadData])
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Cashier Reports</h1>
@@ -624,7 +642,7 @@ function CashierReportsPage(): React.JSX.Element {
             const rows = cashiers.map((r) => [r.cashierName, String(r.transactionCount), String(r.totalSalesCents), String(r.avgTransactionCents), String(r.discountsCents), String(r.voidsCount), String(r.voidsCents)])
             downloadCsv('cashier-totals', headers, rows)
           }}
-          className="rounded-[var(--radius)] bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-[var(--primary-foreground)]"
+          className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)]"
         >
           Export CSV
         </button>
@@ -640,7 +658,8 @@ function CashierReportsPage(): React.JSX.Element {
         ]}
       />
 
-      {loading && <div className="p-4 text-center text-sm text-[var(--muted-foreground)]">Loading…</div>}
+      {loading && <Alert variant="pending">Loading…</Alert>}
+      {!loading && error && <Alert variant="error">{error}</Alert>}
 
       {!loading && (
         <Card>
@@ -664,29 +683,29 @@ function CashierReportsPage(): React.JSX.Element {
               <tbody>
                 {cashiers.map((r) => (
                   <tr key={r.userId ?? 'unassigned'} className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
-                    <td className="py-2 pr-3 font-medium">{r.cashierName}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{r.transactionCount}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums font-semibold">{formatCurrency(r.totalSalesCents)}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{formatCurrency(r.avgTransactionCents)}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{formatCurrency(r.discountsCents)}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{r.voidsCount}</td>
-                    <td className="py-2 text-right tabular-nums">{formatCurrency(r.voidsCents)}</td>
+                    <td className="py-3 pr-3 font-medium">{r.cashierName}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{r.transactionCount}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums font-semibold">{formatCurrency(r.totalSalesCents)}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(r.avgTransactionCents)}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(r.discountsCents)}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{r.voidsCount}</td>
+                    <td className="py-3 text-right tabular-nums">{formatCurrency(r.voidsCents)}</td>
                   </tr>
                 ))}
                 {cashiers.length === 0 && (
-                  <tr><td colSpan={7} className="py-4 text-center text-[var(--muted-foreground)]">No data in this period.</td></tr>
+                  <tr><td colSpan={7} className="py-6 text-center text-[var(--muted-foreground)]">No data in this period.</td></tr>
                 )}
               </tbody>
               {cashiers.length > 0 && (
                 <tfoot>
                   <tr className="border-t-2 border-[var(--border)] font-semibold">
-                    <td className="py-2 pr-3">TOTAL</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{cashiers.reduce((s, r) => s + r.transactionCount, 0)}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{formatCurrency(cashiers.reduce((s, r) => s + r.totalSalesCents, 0))}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">—</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{formatCurrency(cashiers.reduce((s, r) => s + r.discountsCents, 0))}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{cashiers.reduce((s, r) => s + r.voidsCount, 0)}</td>
-                    <td className="py-2 text-right tabular-nums">{formatCurrency(cashiers.reduce((s, r) => s + r.voidsCents, 0))}</td>
+                    <td className="py-3 pr-3">TOTAL</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{cashiers.reduce((s, r) => s + r.transactionCount, 0)}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(cashiers.reduce((s, r) => s + r.totalSalesCents, 0))}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">—</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(cashiers.reduce((s, r) => s + r.discountsCents, 0))}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{cashiers.reduce((s, r) => s + r.voidsCount, 0)}</td>
+                    <td className="py-3 text-right tabular-nums">{formatCurrency(cashiers.reduce((s, r) => s + r.voidsCents, 0))}</td>
                   </tr>
                 </tfoot>
               )}
@@ -713,7 +732,7 @@ export function ReportsScreen(): React.JSX.Element {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`rounded-[var(--radius)] px-4 py-2 text-sm font-semibold ${
+            className={`min-h-11 rounded-[var(--radius)] px-4 text-sm font-semibold ${
               activeTab === tab ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
             }`}
           >
