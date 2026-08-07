@@ -4,6 +4,14 @@ import { hashPassword, verifyPassword } from '../../auth/password'
 
 const ROLES: UserRole[] = ['MANAGER', 'CASHIER']
 
+// SQLite has no case-insensitive Prisma query mode, so uniqueness/login lookups
+// by fullName are done by scanning and comparing lowercased names in JS.
+async function findUserByFullNameCI(db: PrismaClient, fullName: string) {
+  const target = fullName.toLowerCase()
+  const rows = await db.user.findMany()
+  return rows.find((row) => row.fullName.toLowerCase() === target) ?? null
+}
+
 function toAuthUser(row: {
   id: number
   fullName: string
@@ -45,7 +53,7 @@ export async function createUser(
   // The very first user must be a manager — you cannot create a cashier-only system.
   const role: UserRole = (await countUsers(db)) === 0 ? 'MANAGER' : input.role
 
-  const existing = await db.user.findUnique({ where: { fullName } })
+  const existing = await findUserByFullNameCI(db, fullName)
   if (existing) throw new Error(`A user named "${fullName}" already exists.`)
 
   const passwordHash = await hashPassword(input.password)
@@ -104,7 +112,7 @@ export async function verifyLogin(
   fullName: string,
   password: string
 ): Promise<AuthUser | null> {
-  const row = await db.user.findUnique({ where: { fullName: fullName.trim() } })
+  const row = await findUserByFullNameCI(db, fullName.trim())
   if (!row) return null
   const ok = await verifyPassword(password, row.passwordHash)
   if (!ok) return null

@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"/Users/karmpatel/Desktop/POS System\" && if [ -n \"$(git status --porcelain)\" ]; then git add -A && git commit -m \"auto-commit\" && git push origin main; fi",
+            "timeout": 60,
+            "statusMessage": "Auto-committing and pushing to main..."
+          }
+        ]
+      }
+    ]
+  }
+}
