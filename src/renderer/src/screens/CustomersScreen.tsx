@@ -57,6 +57,10 @@ export function CustomersScreen(): React.JSX.Element {
   const refresh = React.useCallback(
     async (id?: number) => {
       if (id) setSelected(await window.api.customer.get(id))
+      if (!query.trim()) {
+        setResults([])
+        return
+      }
       const rows = await window.api.customer.search(query)
       setResults(rows)
     },
@@ -64,11 +68,15 @@ export function CustomersScreen(): React.JSX.Element {
   )
 
   React.useEffect(() => {
+    if (!query.trim()) {
+      setResults([])
+      return
+    }
     const timer = window.setTimeout(() => {
       void refresh()
     }, 200)
     return () => window.clearTimeout(timer)
-  }, [refresh])
+  }, [refresh, query])
 
   React.useEffect(() => {
     void window.api.featureFlag
@@ -231,7 +239,7 @@ export function CustomersScreen(): React.JSX.Element {
             {!results.length && (
               <EmptyState
                 icon={UsersIcon}
-                title={query.trim() ? `No matches for "${query}"` : 'No customers yet'}
+                title={query.trim() ? `No matches for "${query}"` : 'Search to find a customer'}
                 description="Create one without leaving this screen."
                 action={
                   <button
