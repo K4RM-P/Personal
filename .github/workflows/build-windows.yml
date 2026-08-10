@@ -32,19 +32,24 @@ jobs:
           npm pkg set version=$v
           echo "version=$v" >> "$GITHUB_OUTPUT"
 
-      - name: Build and publish Windows installer
-        run: npm run build && npx electron-builder --win --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Windows installer
+        run: npm run build && npx electron-builder --win --publish never
 
-      # electron-builder always creates GitHub releases as drafts (a direct
-      # non-draft create via releaseType: release hits a known electron-builder
-      # bug - electron-userland/electron-builder#2393 - "Published releases
-      # must have a valid tag"). Un-draft it here instead so /releases/latest
-      # and electron-updater (which ignores drafts) both see the new build.
-      - name: Publish the release (un-draft)
+      # electron-builder's own GitHub publisher is unreliable here: GitHub's
+      # "get release by tag" API can't see draft releases, so when
+      # electron-builder uploads the installer and then the .blockmap as two
+      # separate calls, the second one can't find the release it just made
+      # and creates a duplicate draft instead - splitting assets across two
+      # releases with the same tag. Publishing ourselves in one `gh` call
+      # guarantees a single release with every file attached.
+      - name: Publish release
         shell: bash
-        run: gh release edit "v${{ steps.version.outputs.version }}" --draft=false --latest
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" \
+            dist/*.exe dist/*.blockmap dist/latest.yml \
+            --title "v${{ steps.version.outputs.version }}" \
+            --notes "Automated Windows build" \
+            --latest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
