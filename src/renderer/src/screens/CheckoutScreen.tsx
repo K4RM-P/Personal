@@ -8,7 +8,7 @@ import { RefundsScreen } from './RefundsScreen'
 import { formatCurrency } from '@shared/formatCurrency'
 import type { Product, Customer, TransactionWithItems, ChargeResult } from '@shared/types'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
-import { Lock, RotateCcw, ShoppingCart, ArrowUpRight, ArrowDownRight, Banknote, Send, CreditCard, HeartHandshake, ChevronLeft, Pill, PackagePlus } from 'lucide-react'
+import { Lock, RotateCcw, ShoppingCart, ArrowUpRight, ArrowDownRight, Banknote, Send, CreditCard, HeartHandshake, ChevronLeft, Pill, PackagePlus, Percent } from 'lucide-react'
 
 type ScanFeedback = { type: 'success' | 'error'; message: string } | null
 type PaymentMethod = 'CASH' | 'E_TRANSFER' | 'CARD' | 'PHARMACY_CREDIT' | null
@@ -731,29 +731,35 @@ export function CheckoutScreen(): React.JSX.Element {
             <span>Total due</span>
             <span className="text-[var(--primary)]">{formatCurrency(effectiveTotal)}</span>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="flex items-stretch gap-2">
             <button
               onClick={() => setShowBillDiscountModal(true)}
               disabled={cart.length === 0}
-              className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-xs font-medium text-[var(--foreground)] disabled:opacity-50"
+              title={effectiveBillDiscountCents > 0 ? 'Edit whole-bill discount' : 'Whole Bill Discount'}
+              aria-label={effectiveBillDiscountCents > 0 ? 'Edit whole-bill discount' : 'Whole Bill Discount'}
+              className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-[var(--radius)] border text-[10px] font-semibold disabled:opacity-50 ${effectiveBillDiscountCents > 0 ? 'border-[var(--success)] bg-[var(--success-bg)] text-[var(--success)]' : 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]'}`}
             >
-              {effectiveBillDiscountCents > 0 ? 'Edit whole-bill discount' : 'Whole Bill Discount'}
+              <Percent className="h-4 w-4" />
+              Disc.
             </button>
             <button
               onClick={handleToggleWholeCartHst}
               disabled={cart.length === 0}
-              className={`min-h-11 rounded-[var(--radius)] border px-3 text-xs font-medium disabled:opacity-50 ${allHstOn ? 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]' : 'border-[var(--warning)] bg-[var(--warning-bg)] text-[var(--warning)]'}`}
+              title={allHstOn ? 'Remove HST from Whole Cart' : 'Charge HST on Whole Cart'}
+              aria-label={allHstOn ? 'Remove HST from Whole Cart' : 'Charge HST on Whole Cart'}
+              className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-[var(--radius)] border text-[10px] font-semibold disabled:opacity-50 ${allHstOn ? 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]' : 'border-[var(--warning)] bg-[var(--warning-bg)] text-[var(--warning)]'}`}
             >
-              {allHstOn ? 'Remove HST from Whole Cart' : 'Charge HST on Whole Cart'}
+              <span className="text-xs font-bold">HST</span>
+              {allHstOn ? 'On' : 'Off'}
+            </button>
+            <button
+              onClick={() => setShowPayModal(true)}
+              disabled={cart.length === 0}
+              className="min-h-14 flex-1 rounded-[var(--radius)] bg-[var(--primary)] text-lg font-bold tracking-wide text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              PAY
             </button>
           </div>
-          <button
-            onClick={() => setShowPayModal(true)}
-            disabled={cart.length === 0}
-            className="min-h-14 w-full rounded-[var(--radius)] bg-[var(--primary)] text-lg font-bold tracking-wide text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            PAY
-          </button>
         </div>
       </Card>
 
