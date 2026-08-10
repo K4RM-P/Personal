@@ -3,14 +3,25 @@ productName: scaffold-tmp
 directories:
   buildResources: build
 files:
-  - '!**/.vscode/*'
-  - '!src/*'
-  - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
-  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
-  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - filter:
+      - '**/*'
+      - '!**/.vscode/*'
+      - '!src/*'
+      - '!electron.vite.config.{js,ts,mjs,cjs}'
+      - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+      - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+      - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+      - '!.claude/**/*'
+      - '!.kilo/**/*'
+  # electron-builder's dependency walker doesn't discover node_modules/.prisma
+  # (Prisma's generated client — required dynamically, not a declared dependency),
+  # so it has to be copied in as an explicit extra file set.
+  - from: node_modules/.prisma
+    to: node_modules/.prisma
 asarUnpack:
   - resources/**
+  - node_modules/.prisma/**/*
+  - node_modules/@prisma/client/**/*
 win:
   executableName: scaffold-tmp
 nsis:
