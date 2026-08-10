@@ -800,8 +800,7 @@ export function CheckoutScreen(): React.JSX.Element {
                 </button>
                 <button
                   onClick={() => setPaymentMethod('PHARMACY_CREDIT')}
-                  disabled={cart.length === 0 || !attachedCustomer}
-                  title={!attachedCustomer ? 'Attach a customer to use Pharmacy Credit' : undefined}
+                  disabled={cart.length === 0}
                   className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <HeartHandshake className="h-5 w-5 shrink-0" />
