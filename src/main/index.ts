@@ -3,6 +3,7 @@ import { join } from 'path'
 import { existsSync } from 'fs'
 import http from 'http'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
 import { getDb, closeDb } from './db/prisma'
 import { registerAllHandlers } from './ipc'
@@ -117,6 +118,17 @@ app.whenReady().then(() => {
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+
+  // Checks GitHub Releases for a newer build and installs it automatically, so the
+  // POS device never needs a manual browser re-download after the first install.
+  if (!is.dev) {
+    autoUpdater.on('error', (err) => {
+      log('ERROR', { message: err.message, source: 'autoUpdater' })
+    })
+    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+      log('ERROR', { message: err instanceof Error ? err.message : String(err), source: 'autoUpdater' })
+    })
+  }
 })
 
 app.on('window-all-closed', () => {

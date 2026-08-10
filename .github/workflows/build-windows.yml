@@ -24,21 +24,17 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
-      - name: Build Windows installer
-        run: npm run build:win
+      - name: Bump build version
+        shell: bash
+        run: npm pkg set version=1.0.${{ github.run_number }}
+
+      - name: Build and publish Windows installer
+        run: npm run build && npx electron-builder --win --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer
           path: dist/*-setup.exe
-
-      - name: Attach to GitHub Release
-        if: github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: build-${{ github.run_number }}
-          name: Build ${{ github.run_number }}
-          files: dist/*-setup.exe
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
