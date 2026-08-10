@@ -8,7 +8,7 @@ import { RefundsScreen } from './RefundsScreen'
 import { formatCurrency } from '@shared/formatCurrency'
 import type { Product, Customer, TransactionWithItems, ChargeResult } from '@shared/types'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
-import { Lock, RotateCcw, ShoppingCart, SearchX, ScanLine, ArrowUpRight, ArrowDownRight, Banknote, Send, CreditCard, HeartHandshake, ChevronLeft } from 'lucide-react'
+import { Lock, RotateCcw, ShoppingCart, ArrowUpRight, ArrowDownRight, Banknote, Send, CreditCard, HeartHandshake, ChevronLeft, Pill, PackagePlus } from 'lucide-react'
 
 type ScanFeedback = { type: 'success' | 'error'; message: string } | null
 type PaymentMethod = 'CASH' | 'E_TRANSFER' | 'CARD' | 'PHARMACY_CREDIT' | null
@@ -124,6 +124,32 @@ export function CheckoutScreen(): React.JSX.Element {
     }, 150)
     return () => clearTimeout(timer)
   }, [searchQuery])
+
+  const addProductToCart = (product: Product): void => {
+    setCart((prev) => {
+      const existing = prev.find((item) => item.product.id === product.id)
+      if (existing) {
+        return prev.map((item) =>
+          item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+        )
+      }
+      return [...prev, { product, quantity: 1, unitPriceCents: product.priceCents }]
+    })
+    setScanFeedback({ type: 'success', message: `Added ${product.name}` })
+    setSearchQuery('')
+    setProducts([])
+  }
+
+  // A search that resolves to exactly one product is treated the same as a
+  // barcode scan — add it straight to the cart instead of making the cashier
+  // tap it, so the results panel only ever appears when there's an actual
+  // choice to make.
+  React.useEffect(() => {
+    if (products.length === 1) {
+      addProductToCart(products[0])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products])
 
   // Live, debounced customer search — fires as the cashier types (no Enter required)
   React.useEffect(() => {
@@ -524,79 +550,64 @@ export function CheckoutScreen(): React.JSX.Element {
       {/* Scan feedback */}
       {scanFeedback && <Alert variant={scanFeedback.type}>{scanFeedback.message}</Alert>}
 
-      {/* Product search — full width, top of screen */}
-      <Card>
-        <div className="mb-3 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setCustomProductMode('RX')}
-                className="min-h-10 rounded-[var(--radius)] border border-[var(--warning)] bg-[var(--warning-bg)] px-3 text-sm font-semibold text-[var(--warning)]"
-              >
-                RX Item
-              </button>
-              <button
-                type="button"
-                onClick={() => setCustomProductMode('NONRX')}
-                className="min-h-10 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm font-semibold text-[var(--foreground)]"
-              >
-                Non-RX Item
-              </button>
-            </div>
-
-            <div className="mb-3">
-              <input
-                type="text"
-                placeholder="Search products by SKU, name, or barcode"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-4 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
-              />
-            </div>
-
-            {filteredProducts.length === 0 ? (
-              <EmptyState
-                icon={searchQuery.trim() ? SearchX : ScanLine}
-                title={searchQuery.trim() ? `No results for "${searchQuery}"` : 'Search to load items'}
-                description={
-                  searchQuery.trim()
-                    ? 'Try checking the spelling, or scan the barcode directly.'
-                    : 'Type a name, SKU, or barcode, or scan an item.'
-                }
-              />
-            ) : (
-              <div className="grid max-h-[420px] grid-cols-2 gap-2 overflow-y-auto pr-1">
+      {/* Product search — compact single row. A single match auto-adds to the
+          cart (same as a barcode scan); multiple matches drop into a small
+          overlay dropdown that never pushes page content down or scrolls
+          the page itself — only the dropdown's own list scrolls if it's
+          taller than ~4 rows. */}
+      <Card className="relative overflow-visible">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              placeholder="Search products by SKU, name, or barcode"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-4 text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
+            />
+            {searchQuery.trim() !== '' && filteredProducts.length > 0 && (
+              <div className="absolute z-20 mt-1 max-h-[190px] w-full overflow-y-auto rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">
                 {filteredProducts.map((product) => (
                   <button
                     key={product.id}
-                    onClick={() => {
-                      setCart((prev) => {
-                        const existing = prev.find((item) => item.product.id === product.id)
-                        if (existing) {
-                          return prev.map((item) =>
-                            item.product.id === product.id
-                              ? { ...item, quantity: item.quantity + 1 }
-                              : item
-                          )
-                        }
-                        return [...prev, { product, quantity: 1, unitPriceCents: product.priceCents }]
-                      })
-                      setScanFeedback({ type: 'success', message: `Added ${product.name}` })
-                    }}
-                    className="flex flex-col justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3 text-left"
+                    onClick={() => addProductToCart(product)}
+                    className="flex min-h-11 w-full items-center justify-between gap-3 border-b border-[var(--border)] px-3 text-left text-sm last:border-0 hover:bg-[var(--muted)]"
                   >
-                    <div>
-                      <div className="font-semibold text-[var(--foreground)]">{product.name}</div>
-                      <div className="text-xs text-[var(--muted-foreground)]">SKU: {product.sku}</div>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between">
-                      <span className="text-xs text-[var(--muted-foreground)]">Cost: {formatCurrency(product.costCents)}</span>
-                      <span className="font-semibold text-[var(--primary)]">{formatCurrency(product.priceCents)}</span>
-                    </div>
+                    <span className="min-w-0 flex-1 truncate">
+                      <span className="font-medium text-[var(--foreground)]">{product.name}</span>
+                      <span className="ml-2 text-xs text-[var(--muted-foreground)]">{product.sku}</span>
+                    </span>
+                    <span className="shrink-0 font-semibold text-[var(--primary)]">{formatCurrency(product.priceCents)}</span>
                   </button>
                 ))}
               </div>
             )}
-          </Card>
+            {searchQuery.trim() !== '' && filteredProducts.length === 0 && (
+              <div className="absolute z-20 mt-1 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white p-3 text-center text-xs text-[var(--muted-foreground)] shadow-sm">
+                No results for &quot;{searchQuery}&quot;
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            title="Add RX Item"
+            aria-label="Add RX Item"
+            onClick={() => setCustomProductMode('RX')}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] border border-[var(--warning)] bg-[var(--warning-bg)] text-[var(--warning)]"
+          >
+            <Pill className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            title="Add Non-RX Item"
+            aria-label="Add Non-RX Item"
+            onClick={() => setCustomProductMode('NONRX')}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]"
+          >
+            <PackagePlus className="h-5 w-5" />
+          </button>
+        </div>
+      </Card>
 
       {/* Parked Sales */}
       {parkedCarts.length > 0 && (
