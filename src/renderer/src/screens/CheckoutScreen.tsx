@@ -3,6 +3,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/C
 import { Alert } from '../components/ui/Alert'
 import { EmptyState } from '../components/ui/EmptyState'
 import { DiscountModal } from '../components/DiscountModal'
+import { CustomProductModal } from '../components/CustomProductModal'
 import { RefundsScreen } from './RefundsScreen'
 import { formatCurrency } from '@shared/formatCurrency'
 import type { Product, Customer, TransactionWithItems, ChargeResult } from '@shared/types'
@@ -12,7 +13,7 @@ import { Lock, RotateCcw, ShoppingCart, SearchX, ScanLine, ArrowUpRight, ArrowDo
 type ScanFeedback = { type: 'success' | 'error'; message: string } | null
 type PaymentMethod = 'CASH' | 'E_TRANSFER' | 'CARD' | 'PHARMACY_CREDIT' | null
 type CardType = 'DEBIT' | 'CREDIT' | null
-type CartItem = { product: Product; quantity: number; unitPriceCents: number; discountCents?: number; discountReason?: string; hstApplied?: boolean }
+type CartItem = { product: Product; quantity: number; unitPriceCents: number; discountCents?: number; discountReason?: string; hstApplied?: boolean; hstLocked?: boolean }
 
 export function CheckoutScreen(): React.JSX.Element {
   const [products, setProducts] = React.useState<Product[]>([])
@@ -40,6 +41,8 @@ export function CheckoutScreen(): React.JSX.Element {
   const [manualPrompt, setManualPrompt] = React.useState<{ amountCents: number; orderRef: string } | null>(null)
   const [manualRef, setManualRef] = React.useState('')
   const [showRefunds, setShowRefunds] = React.useState(false)
+  const [customProductMode, setCustomProductMode] = React.useState<'RX' | 'NONRX' | null>(null)
+  const [customProductError, setCustomProductError] = React.useState<string | null>(null)
 
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod>(null)
   const [cardType, setCardType] = React.useState<CardType>(null)
@@ -175,7 +178,9 @@ export function CheckoutScreen(): React.JSX.Element {
   const handleToggleItemHst = (productId: number): void => {
     setCart((prev) =>
       prev.map((item) =>
-        item.product.id === productId ? { ...item, hstApplied: item.hstApplied === false } : item
+        item.product.id === productId && !item.hstLocked
+          ? { ...item, hstApplied: item.hstApplied === false }
+          : item
       )
     )
   }
@@ -183,8 +188,39 @@ export function CheckoutScreen(): React.JSX.Element {
   const handleToggleWholeCartHst = (): void => {
     setCart((prev) => {
       const nextValue = !allHstOn
-      return prev.map((item) => ({ ...item, hstApplied: nextValue }))
+      return prev.map((item) => (item.hstLocked ? item : { ...item, hstApplied: nextValue }))
     })
+  }
+
+  const handleAddCustomProduct = async (mode: 'RX' | 'NONRX', data: { name: string; priceCents: number }): Promise<void> => {
+    setCustomProductError(null)
+    try {
+      if (!window.api?.product) {
+        setCustomProductError('API not available')
+        return
+      }
+      const sku = `${mode}-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+      const product = await window.api.product.create({
+        sku,
+        name: data.name,
+        costCents: data.priceCents,
+        priceCents: data.priceCents,
+        isPinned: true
+      })
+      setCart((prev) => [
+        ...prev,
+        {
+          product,
+          quantity: 1,
+          unitPriceCents: data.priceCents,
+          hstApplied: mode === 'RX' ? false : true,
+          hstLocked: mode === 'RX'
+        }
+      ])
+      setCustomProductMode(null)
+    } catch (err) {
+      setCustomProductError(err instanceof Error ? err.message : 'Failed to add item')
+    }
   }
 
   const handleQuantityChange = (productId: number, delta: number): void => {
@@ -557,6 +593,23 @@ export function CheckoutScreen(): React.JSX.Element {
           </Card>
 
           <Card>
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setCustomProductMode('RX')}
+                className="min-h-10 rounded-[var(--radius)] border border-[var(--warning)] bg-[var(--warning-bg)] px-3 text-sm font-semibold text-[var(--warning)]"
+              >
+                RX Item
+              </button>
+              <button
+                type="button"
+                onClick={() => setCustomProductMode('NONRX')}
+                className="min-h-10 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm font-semibold text-[var(--foreground)]"
+              >
+                Non-RX Item
+              </button>
+            </div>
+
             <div className="mb-3">
               <input
                 type="text"
@@ -672,12 +725,13 @@ export function CheckoutScreen(): React.JSX.Element {
                           {lineDiscountCents > 0 ? 'Edit' : 'Discount'}
                         </button>
                         <label
-                          className={`flex min-h-7 items-center gap-1 rounded-[var(--radius)] border px-1.5 text-[10px] font-semibold ${itemHstOn ? 'border-[var(--border)] text-[var(--foreground)]' : 'border-[var(--warning)] text-[var(--warning)]'}`}
-                          title="Charge HST on this item"
+                          className={`flex min-h-7 items-center gap-1 rounded-[var(--radius)] border px-1.5 text-[10px] font-semibold ${itemHstOn ? 'border-[var(--border)] text-[var(--foreground)]' : 'border-[var(--warning)] text-[var(--warning)]'} ${item.hstLocked ? 'opacity-60' : ''}`}
+                          title={item.hstLocked ? 'RX items cannot be charged HST' : 'Charge HST on this item'}
                         >
                           <input
                             type="checkbox"
                             checked={itemHstOn}
+                            disabled={item.hstLocked}
                             onChange={() => handleToggleItemHst(item.product.id)}
                             className="h-3 w-3"
                           />
@@ -1142,6 +1196,19 @@ export function CheckoutScreen(): React.JSX.Element {
       )}
 
       {showRefunds && <RefundsScreen onClose={() => setShowRefunds(false)} />}
+
+      {customProductMode && (
+        <CustomProductModal
+          mode={customProductMode}
+          onApply={(data) => void handleAddCustomProduct(customProductMode, data)}
+          onCancel={() => { setCustomProductMode(null); setCustomProductError(null) }}
+        />
+      )}
+      {customProductError && (
+        <div className="fixed inset-x-0 bottom-4 z-[60] flex justify-center">
+          <Alert variant="error">{customProductError}</Alert>
+        </div>
+      )}
 
     </div>
   )
