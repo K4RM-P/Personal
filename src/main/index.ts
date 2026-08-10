@@ -6,10 +6,19 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
 import { getDb, closeDb } from './db/prisma'
+import { runPendingMigrations } from './db/migrate'
 import { registerAllHandlers } from './ipc'
 import { applyPendingRestoreIfStaged } from './backup/backupService'
 import { resolveDbFilePath } from './backup/dbPath'
 import { initLogger, log } from './logging/logger'
+
+// .env (dev-only, gitignored) is the only thing that sets DATABASE_URL, and it's
+// intentionally excluded from the packaged app. Without this fallback, Prisma has
+// no database to connect to at all in a production install. userData survives
+// every reinstall/update, unlike the app's own install directory.
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = `file:${join(app.getPath('userData'), 'pharmapos.db')}`
+}
 
 /**
  * Checks that the electron-vite dev server is actually reachable before pointing the
@@ -88,7 +97,7 @@ function createWindow(): void {
   void loadRenderer(mainWindow)
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.pharmacy.pos')
 
   app.on('browser-window-created', (_, window) => {
@@ -101,6 +110,9 @@ app.whenReady().then(() => {
   if (restore.applied) log('RESTORE_STAGED', { dbFilePath: resolveDbFilePath() })
 
   const db = getDb()
+  if (!is.dev) {
+    await runPendingMigrations(db)
+  }
   registerAllHandlers(db)
 
   process.on('uncaughtException', (error) => {
