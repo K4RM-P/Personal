@@ -55,25 +55,63 @@ function timestampForDirName(date: Date): string {
   return date.toISOString().replace(/[:.]/g, '-').replace('T', '_').replace('Z', '')
 }
 
+const RETENTION_DAYS = 30
+
 /**
- * Only the most recent backup is kept on the destination drive — deletes every other
- * `PHARMACY_POS_BACKUP_*` directory there. Best-effort: a prune failure doesn't fail
- * the backup that just succeeded.
+ * Deletes only `PHARMACY_POS_BACKUP_*` folders on this drive whose own timestamp
+ * (parsed from the folder name) is more than RETENTION_DAYS old — never based on
+ * how many other backups exist. Each expired folder's matching `BackupLog` row
+ * (matched by `backupPath`) is kept but marked `EXPIRED_AND_DELETED`, never removed.
+ * Best-effort: a cleanup failure doesn't fail the backup that just succeeded, and a
+ * folder that can't be positively confirmed as 30+ days old is left alone.
  */
-function pruneOldBackups(drivePath: string, keepDir: string): void {
+async function cleanupExpiredBackups(db: PrismaClient, drivePath: string): Promise<void> {
+  let entries: Dirent[]
   try {
-    for (const entry of readdirSync(drivePath, { withFileTypes: true })) {
-      const entryPath = join(drivePath, entry.name)
-      if (
-        entry.isDirectory() &&
-        entry.name.startsWith('PHARMACY_POS_BACKUP_') &&
-        entryPath !== keepDir
-      ) {
-        rmSync(entryPath, { recursive: true, force: true })
+    entries = readdirSync(drivePath, { withFileTypes: true })
+  } catch {
+    // drive not currently reachable — never assume anything is safe to delete
+    return
+  }
+
+  const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000
+
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !entry.name.startsWith('PHARMACY_POS_BACKUP_')) continue
+    const entryPath = join(drivePath, entry.name)
+
+    const metadataPath = join(entryPath, 'backup-metadata.json')
+    let timestamp: number | null = null
+    try {
+      const metadata = JSON.parse(readFileSync(metadataPath, 'utf-8')) as { timestamp?: string }
+      if (metadata.timestamp) timestamp = Date.parse(metadata.timestamp)
+    } catch {
+      // metadata missing/unreadable — fall back to folder mtime below
+    }
+    if (timestamp === null || Number.isNaN(timestamp)) {
+      try {
+        timestamp = statSync(entryPath).birthtimeMs || statSync(entryPath).mtimeMs
+      } catch {
+        continue // can't positively confirm age — leave it alone
       }
     }
-  } catch {
-    // best-effort — failing to prune old backups doesn't invalidate the new one
+
+    if (timestamp >= cutoff) continue // not yet 30 days old
+
+    try {
+      rmSync(entryPath, { recursive: true, force: true })
+    } catch {
+      continue // couldn't delete — don't mark the log row as deleted
+    }
+
+    try {
+      await db.backupLog.updateMany({
+        where: { backupPath: entryPath },
+        data: { status: 'EXPIRED_AND_DELETED' }
+      })
+    } catch {
+      // best-effort — the folder is already gone; the log row can be reconciled later
+    }
   }
 }
 
@@ -227,8 +265,9 @@ export async function performBackup(
       status: 'SUCCESS'
     })
 
-    // 5. Retention: this drive should only ever hold the backup that just completed.
-    pruneOldBackups(drivePath, backupDir)
+    // 5. Retention: sweep this drive for backups whose own timestamp is 30+ days old.
+    //    Never deletes anything just because a newer backup was made.
+    await cleanupExpiredBackups(db, drivePath)
 
     return { backupDir, files, createdAt: startedAt.toISOString() }
   } catch (error) {

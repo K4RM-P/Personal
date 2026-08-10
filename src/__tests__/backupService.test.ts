@@ -246,6 +246,117 @@ describe('data backup system', () => {
     expect(log?.backupPath).toBe(result.backupDir)
   })
 
+  describe('retention (30-day age-based cleanup)', () => {
+    it('does not delete a backup just because a newer one was created moments later', async () => {
+      const user = await db.user.findFirstOrThrow()
+      const dir = mkdtempSync(join(tmpdir(), 'backup-retention-'))
+      try {
+        const first = await performBackup(
+          db,
+          { drivePath: dir, driveName: 'Retention Drive', initiatedByUserId: user.id },
+          env
+        )
+        const second = await performBackup(
+          db,
+          { drivePath: dir, driveName: 'Retention Drive', initiatedByUserId: user.id },
+          env
+        )
+        expect(existsSync(first.backupDir)).toBe(true)
+        expect(existsSync(second.backupDir)).toBe(true)
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    })
+
+    it('does not delete a 29-day-old backup, but deletes a 31-day-old one and marks its log EXPIRED_AND_DELETED', async () => {
+      const user = await db.user.findFirstOrThrow()
+      const dir = mkdtempSync(join(tmpdir(), 'backup-retention-age-'))
+      try {
+        const fresh = await performBackup(
+          db,
+          { drivePath: dir, driveName: 'Retention Drive', initiatedByUserId: user.id },
+          env
+        )
+        const day29 = await performBackup(
+          db,
+          { drivePath: dir, driveName: 'Retention Drive', initiatedByUserId: user.id },
+          env
+        )
+        const day31 = await performBackup(
+          db,
+          { drivePath: dir, driveName: 'Retention Drive', initiatedByUserId: user.id },
+          env
+        )
+
+        // Backdate metadata timestamps to simulate age, since these were just created.
+        const backdate = (backupDir: string, daysAgo: number): void => {
+          const metadataPath = join(backupDir, 'backup-metadata.json')
+          const metadata = JSON.parse(readFileSync(metadataPath, 'utf-8'))
+          metadata.timestamp = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString()
+          writeFileSync(metadataPath, JSON.stringify(metadata, null, 2))
+        }
+        backdate(day29.backupDir, 29)
+        backdate(day31.backupDir, 31)
+
+        const day31Log = await db.backupLog.findFirst({ where: { backupPath: day31.backupDir } })
+
+        // Triggering cleanup: run one more backup, whose post-success sweep evaluates all folders.
+        const trigger = await performBackup(
+          db,
+          { drivePath: dir, driveName: 'Retention Drive', initiatedByUserId: user.id },
+          env
+        )
+
+        expect(existsSync(fresh.backupDir)).toBe(true)
+        expect(existsSync(day29.backupDir)).toBe(true)
+        expect(existsSync(day31.backupDir)).toBe(false)
+        expect(existsSync(trigger.backupDir)).toBe(true)
+
+        const updatedLog = await db.backupLog.findUnique({ where: { id: day31Log!.id } })
+        expect(updatedLog).not.toBeNull()
+        expect(updatedLog?.status).toBe('EXPIRED_AND_DELETED')
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    })
+
+    it('retention at one drive does not affect backups at another drive', async () => {
+      const user = await db.user.findFirstOrThrow()
+      const driveA = mkdtempSync(join(tmpdir(), 'backup-retention-a-'))
+      const driveB = mkdtempSync(join(tmpdir(), 'backup-retention-b-'))
+      try {
+        const oldOnA = await performBackup(
+          db,
+          { drivePath: driveA, driveName: 'Drive A', initiatedByUserId: user.id },
+          env
+        )
+        const metadataPath = join(oldOnA.backupDir, 'backup-metadata.json')
+        const metadata = JSON.parse(readFileSync(metadataPath, 'utf-8'))
+        metadata.timestamp = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString()
+        writeFileSync(metadataPath, JSON.stringify(metadata, null, 2))
+
+        const onB = await performBackup(
+          db,
+          { drivePath: driveB, driveName: 'Drive B', initiatedByUserId: user.id },
+          env
+        )
+        // Trigger cleanup on drive A independently.
+        const triggerA = await performBackup(
+          db,
+          { drivePath: driveA, driveName: 'Drive A', initiatedByUserId: user.id },
+          env
+        )
+
+        expect(existsSync(oldOnA.backupDir)).toBe(false) // expired, drive A
+        expect(existsSync(triggerA.backupDir)).toBe(true)
+        expect(existsSync(onB.backupDir)).toBe(true) // untouched, drive B
+      } finally {
+        rmSync(driveA, { recursive: true, force: true })
+        rmSync(driveB, { recursive: true, force: true })
+      }
+    })
+  })
+
   it('logs a FAILED BackupLog and rethrows when the drive is unwritable', async () => {
     const user = await db.user.findFirstOrThrow()
     const badDrive = join(driveDir, 'does-not-exist', String.fromCharCode(0)) // invalid path segment

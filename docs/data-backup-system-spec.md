@@ -902,6 +902,25 @@ Recent backups:
 
 **Backup History:** table showing last 10 backups with status, location, size.
 
+### 8.1 Retention policy
+
+Backups are retained for **30 days from their own timestamp**, independent of how many other
+backups exist at that destination. A backup folder is **never** deleted just because a newer
+backup was created — only once it is more than 30 days old.
+
+- After each successful backup, the workflow sweeps the destination for
+  `PHARMACY_POS_BACKUP_*` folders whose `backup-metadata.json` timestamp (or, if unreadable, the
+  folder's own filesystem timestamp) is older than 30 days, and deletes those folders.
+- Retention is scoped **per destination** — an external drive's backups age out on their own
+  30-day clock, and a cloud destination's backups age out on their own clock; deleting an expired
+  backup at one destination never affects another destination.
+- Deleting a folder never deletes its `BackupLog` row. The row's `status` is instead set to
+  `EXPIRED_AND_DELETED`, preserving the audit trail (a backup existed on this date, here's its
+  metadata) even after the disk space is reclaimed.
+- The sweep only ever deletes a folder it can positively confirm is 30+ days old at a destination
+  it can currently see. If a destination is unreachable (drive unmounted, swapped, etc.), nothing
+  at that destination is touched or assumed deleted.
+
 ---
 
 ## 9. Implementation Order

@@ -258,7 +258,7 @@ export interface BackupLogSummary {
   driveName: string
   drivePath: string
   backupSizeBytes: number
-  status: 'SUCCESS' | 'FAILED' | 'PARTIAL'
+  status: 'SUCCESS' | 'FAILED' | 'PARTIAL' | 'EXPIRED_AND_DELETED'
   errorMessage: string | null
 }
 

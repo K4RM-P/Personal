@@ -402,6 +402,7 @@ enum BackupStatus {
   SUCCESS
   FAILED
   PARTIAL
+  EXPIRED_AND_DELETED
 }
 
 /// Manual inventory corrections (physical count, damage, expiry, stocking).
