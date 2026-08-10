@@ -41,6 +41,7 @@ export function CheckoutScreen(): React.JSX.Element {
   const [manualPrompt, setManualPrompt] = React.useState<{ amountCents: number; orderRef: string } | null>(null)
   const [manualRef, setManualRef] = React.useState('')
   const [showRefunds, setShowRefunds] = React.useState(false)
+  const [showPayModal, setShowPayModal] = React.useState(false)
   const [customProductMode, setCustomProductMode] = React.useState<'RX' | 'NONRX' | null>(null)
   const [customProductError, setCustomProductError] = React.useState<string | null>(null)
 
@@ -287,6 +288,7 @@ export function CheckoutScreen(): React.JSX.Element {
       setETransferConfirmed(false)
       setBillDiscountCents(0)
       setBillDiscountReason(undefined)
+      setShowPayModal(false)
       setScanFeedback({ type: 'success', message: `Sale complete — ${transaction.receiptNumber}` })
     } catch (err) {
       setScanFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Transaction failed' })
@@ -522,78 +524,9 @@ export function CheckoutScreen(): React.JSX.Element {
       {/* Scan feedback */}
       {scanFeedback && <Alert variant={scanFeedback.type}>{scanFeedback.message}</Alert>}
 
-      <div className="grid grid-cols-12 gap-4">
-        {/* Left: Customer attachment + Product search + selectable items */}
-        <div className="col-span-7 space-y-4">
-          {/* Customer attachment bar */}
-          <Card>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="min-w-[260px] flex-1">
-                <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Customer (optional)</label>
-                {attachedCustomer ? (
-                  <div className="flex min-h-11 items-center justify-between rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--muted)] px-3 text-sm">
-                    <span className="font-semibold">
-                      {attachedCustomer.firstName} {attachedCustomer.lastName} · {attachedCustomer.phone}
-                    </span>
-                    <button onClick={() => { setAttachedCustomer(null); setTenderedDollars('') }} className="text-[var(--primary)]">
-                      Remove
-                    </button>
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <input
-                      ref={searchRef}
-                      value={customerSearchQuery}
-                      onChange={(e) => setCustomerSearchQuery(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') void handleCustomerSearch() }}
-                      placeholder="Attach customer — search name or phone, then Enter"
-                      className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm"
-                    />
-                    {customerSearchResults.length > 0 && (
-                      <div className="absolute z-20 mt-1 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">
-                        {customerSearchResults.map((customer) => (
-                          <button
-                            key={customer.id}
-                            onClick={() => void attachCustomer(customer)}
-                            className="block min-h-11 w-full border-b border-[var(--border)] px-3 text-left text-sm last:border-0"
-                          >
-                            <b>{customer.firstName} {customer.lastName}</b> · {customer.phone}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {/* No results → offer to add a new customer */}
-                    {customerSearchQuery.trim() !== '' && customerSearchResults.length === 0 && (
-                      <div className="absolute z-20 mt-1 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white p-3 text-center text-sm shadow-sm">
-                        <div className="mb-2 text-[var(--muted-foreground)]">Customer not found</div>
-                        <button
-                          onClick={() => {
-                            setNewCustomer((prev) => ({ ...prev, lastName: customerSearchQuery.trim() }))
-                            setShowAddCustomer(true)
-                          }}
-                          className="min-h-11 w-full rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
-                        >
-                          + Add new customer
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-              {attachedCustomer && (
-                <div className="rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm">
-                  <div className="text-xs text-[var(--muted-foreground)]">Pharmacy Credit balance</div>
-                  <div className={`flex items-center gap-1.5 font-semibold ${customerBalance >= 0 ? 'text-[var(--success)]' : 'text-[var(--owed)]'}`}>
-                    {customerBalance >= 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
-                    <span>{customerBalance >= 0 ? 'Credit available' : 'Customer owes'}: {formatCurrency(Math.abs(customerBalance))}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Card>
-
-          <Card>
-            <div className="mb-3 grid grid-cols-2 gap-2">
+      {/* Product search — full width, top of screen */}
+      <Card>
+        <div className="mb-3 grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setCustomProductMode('RX')}
@@ -665,149 +598,158 @@ export function CheckoutScreen(): React.JSX.Element {
             )}
           </Card>
 
-          {/* Parked Sales */}
-          {parkedCarts.length > 0 && (
-            <Card className="border-[var(--warning)]/30 bg-[var(--warning-bg)]">
-              <h3 className="mb-2 text-sm font-semibold text-[var(--warning)]">Parked Sales ({parkedCarts.length})</h3>
-              <div className="space-y-2">
-                {parkedCarts.map((parked) => (
-                  <div key={parked.id} className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-white p-2 text-xs">
-                    <span className="font-medium text-[var(--foreground)]">{parked.name}</span>
-                    <button
-                      onClick={() => handleResumeParkedSale(parked.id)}
-                      className="rounded-[var(--radius)] bg-[var(--warning)] px-2 py-1 font-medium text-[var(--primary-foreground)]"
-                    >
-                      Resume Sale
-                    </button>
-                  </div>
-                ))}
+      {/* Parked Sales */}
+      {parkedCarts.length > 0 && (
+        <Card className="border-[var(--warning)]/30 bg-[var(--warning-bg)]">
+          <h3 className="mb-2 text-sm font-semibold text-[var(--warning)]">Parked Sales ({parkedCarts.length})</h3>
+          <div className="space-y-2">
+            {parkedCarts.map((parked) => (
+              <div key={parked.id} className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-white p-2 text-xs">
+                <span className="font-medium text-[var(--foreground)]">{parked.name}</span>
+                <button
+                  onClick={() => handleResumeParkedSale(parked.id)}
+                  className="rounded-[var(--radius)] bg-[var(--warning)] px-2 py-1 font-medium text-[var(--primary-foreground)]"
+                >
+                  Resume Sale
+                </button>
               </div>
-            </Card>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Cart — full width */}
+      <Card>
+        <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
+          <h3 className="font-semibold text-[var(--foreground)]">Current Cart</h3>
+          <span className="text-xs text-[var(--muted-foreground)]">{cart.length} line items</span>
+        </div>
+
+        <div className="mt-3 max-h-[320px] space-y-2 overflow-y-auto pr-1">
+          {cart.length === 0 ? (
+            <EmptyState icon={ShoppingCart} title="Cart is empty" description="Search or scan to add items." className="p-4" />
+          ) : (
+            cart.map((item) => {
+              const lineRawCents = item.unitPriceCents * item.quantity
+              const lineDiscountCents = item.discountCents ?? 0
+              const lineTotalCents = lineRawCents - lineDiscountCents
+              const itemHstOn = item.hstApplied !== false
+              return (
+                <div key={item.product.id} className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3 text-sm">
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-[var(--foreground)]" title={item.product.name}>{item.product.name}</div>
+                    <div className="text-xs text-[var(--muted-foreground)]">
+                      {formatCurrency(item.unitPriceCents)} × {item.quantity}
+                      {lineDiscountCents > 0 && <span className="text-[var(--success)]"> · discount {formatCurrency(lineDiscountCents)}</span>}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                    <div className="flex min-h-11 items-center rounded-[var(--radius)] border border-[var(--border)]">
+                      <button onClick={() => handleQuantityChange(item.product.id, -1)} className="min-w-11 px-2 py-2 text-[var(--foreground)]">−</button>
+                      <span className="px-2 text-[var(--foreground)]">{item.quantity}</span>
+                      <button onClick={() => handleQuantityChange(item.product.id, 1)} className="min-w-11 px-2 py-2 text-[var(--foreground)]">+</button>
+                    </div>
+                    <button
+                      onClick={() => setDiscountItemTarget(item.product.id)}
+                      className={`min-h-11 rounded-[var(--radius)] border px-2.5 text-xs font-semibold ${lineDiscountCents > 0 ? 'border-[var(--success)] text-[var(--success)]' : 'border-[var(--border)] text-[var(--muted-foreground)]'}`}
+                    >
+                      {lineDiscountCents > 0 ? 'Edit' : 'Discount'}
+                    </button>
+                    <label
+                      className={`flex min-h-11 items-center gap-1.5 rounded-[var(--radius)] border px-2.5 text-xs font-semibold ${itemHstOn ? 'border-[var(--border)] text-[var(--foreground)]' : 'border-[var(--warning)] text-[var(--warning)]'} ${item.hstLocked ? 'opacity-60' : ''}`}
+                      title={item.hstLocked ? 'RX items cannot be charged HST' : 'Charge HST on this item'}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={itemHstOn}
+                        disabled={item.hstLocked}
+                        onChange={() => handleToggleItemHst(item.product.id)}
+                        className="h-3.5 w-3.5"
+                      />
+                      HST
+                    </label>
+                    <div className="w-20 text-right">
+                      {lineDiscountCents > 0 && (
+                        <div className="text-[10px] text-[var(--muted-foreground)] line-through">{formatCurrency(lineRawCents)}</div>
+                      )}
+                      <span className="font-semibold text-[var(--foreground)]">{formatCurrency(lineTotalCents)}</span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })
           )}
         </div>
 
-        {/* Right: Cart + Payment */}
-        <div className="col-span-5 space-y-4">
-          <Card>
-            <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
-              <h3 className="font-semibold text-[var(--foreground)]">Current Cart</h3>
-              <span className="text-xs text-[var(--muted-foreground)]">{cart.length} line items</span>
+        <div className="mt-3 space-y-2 border-t border-[var(--border)] pt-3">
+          <div className="flex justify-between text-sm text-[var(--muted-foreground)]">
+            <span>Subtotal</span>
+            <span>{formatCurrency(subtotalCents)}</span>
+          </div>
+          {itemDiscountTotalCents > 0 && (
+            <div className="flex justify-between text-sm text-[var(--success)]">
+              <span>Item discounts</span>
+              <span>-{formatCurrency(itemDiscountTotalCents)}</span>
             </div>
-
-            <div className="mt-3 max-h-[180px] space-y-2 overflow-y-auto pr-1">
-              {cart.length === 0 ? (
-                <EmptyState icon={ShoppingCart} title="Cart is empty" description="Search or scan to add items." className="p-4" />
-              ) : (
-                cart.map((item) => {
-                  const lineRawCents = item.unitPriceCents * item.quantity
-                  const lineDiscountCents = item.discountCents ?? 0
-                  const lineTotalCents = lineRawCents - lineDiscountCents
-                  const itemHstOn = item.hstApplied !== false
-                  return (
-                    <div key={item.product.id} className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-2.5 text-xs">
-                      <div className="flex-1 pr-2">
-                        <div className="font-medium text-[var(--foreground)]">{item.product.name}</div>
-                        <div className="text-[var(--muted-foreground)]">
-                          {formatCurrency(item.unitPriceCents)} × {item.quantity}
-                          {lineDiscountCents > 0 && <span className="text-[var(--success)]"> · discount {formatCurrency(lineDiscountCents)}</span>}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center rounded-[var(--radius)] border border-[var(--border)]">
-                          <button onClick={() => handleQuantityChange(item.product.id, -1)} className="px-2 py-1 text-[var(--foreground)]">−</button>
-                          <span className="px-2 text-[var(--foreground)]">{item.quantity}</span>
-                          <button onClick={() => handleQuantityChange(item.product.id, 1)} className="px-2 py-1 text-[var(--foreground)]">+</button>
-                        </div>
-                        <button
-                          onClick={() => setDiscountItemTarget(item.product.id)}
-                          className={`min-h-7 rounded-[var(--radius)] border px-1.5 text-[10px] font-semibold ${lineDiscountCents > 0 ? 'border-[var(--success)] text-[var(--success)]' : 'border-[var(--border)] text-[var(--muted-foreground)]'}`}
-                        >
-                          {lineDiscountCents > 0 ? 'Edit' : 'Discount'}
-                        </button>
-                        <label
-                          className={`flex min-h-7 items-center gap-1 rounded-[var(--radius)] border px-1.5 text-[10px] font-semibold ${itemHstOn ? 'border-[var(--border)] text-[var(--foreground)]' : 'border-[var(--warning)] text-[var(--warning)]'} ${item.hstLocked ? 'opacity-60' : ''}`}
-                          title={item.hstLocked ? 'RX items cannot be charged HST' : 'Charge HST on this item'}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={itemHstOn}
-                            disabled={item.hstLocked}
-                            onChange={() => handleToggleItemHst(item.product.id)}
-                            className="h-3 w-3"
-                          />
-                          HST
-                        </label>
-                        <div className="w-14 text-right">
-                          {lineDiscountCents > 0 && (
-                            <div className="text-[10px] text-[var(--muted-foreground)] line-through">{formatCurrency(lineRawCents)}</div>
-                          )}
-                          <span className="font-semibold text-[var(--foreground)]">{formatCurrency(lineTotalCents)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })
-              )}
+          )}
+          {effectiveBillDiscountCents > 0 && (
+            <div className="flex items-center justify-between text-sm text-[var(--success)]">
+              <span>Bill discount</span>
+              <span className="flex items-center gap-2">
+                -{formatCurrency(effectiveBillDiscountCents)}
+                <button
+                  onClick={() => { setBillDiscountCents(0); setBillDiscountReason(undefined) }}
+                  className="text-[10px] text-[var(--muted-foreground)] underline"
+                >
+                  remove
+                </button>
+              </span>
             </div>
-
-            <div className="mt-3 space-y-2 border-t border-[var(--border)] pt-3">
-              <div className="flex justify-between text-sm text-[var(--muted-foreground)]">
-                <span>Subtotal</span>
-                <span>{formatCurrency(subtotalCents)}</span>
-              </div>
-              {itemDiscountTotalCents > 0 && (
-                <div className="flex justify-between text-sm text-[var(--success)]">
-                  <span>Item discounts</span>
-                  <span>-{formatCurrency(itemDiscountTotalCents)}</span>
-                </div>
-              )}
-              {effectiveBillDiscountCents > 0 && (
-                <div className="flex items-center justify-between text-sm text-[var(--success)]">
-                  <span>Bill discount</span>
-                  <span className="flex items-center gap-2">
-                    -{formatCurrency(effectiveBillDiscountCents)}
-                    <button
-                      onClick={() => { setBillDiscountCents(0); setBillDiscountReason(undefined) }}
-                      className="text-[10px] text-[var(--muted-foreground)] underline"
-                    >
-                      remove
-                    </button>
-                  </span>
-                </div>
-              )}
-              <div className="flex items-center justify-between text-sm text-[var(--muted-foreground)]">
-                <span>HST ({taxRatePercent}%)</span>
-                <span>{formatCurrency(taxCents)}</span>
-              </div>
-              {surchargeCents > 0 && (
-                <div className="flex items-center justify-between text-sm text-[var(--warning)]">
-                  <span>Credit card fee ({checkoutSettings.cardSurchargePercent}%)</span>
-                  <span>{formatCurrency(surchargeCents)}</span>
-                </div>
-              )}
-              <div className="flex justify-between border-t border-[var(--border)] pt-2 text-base font-semibold text-[var(--foreground)]">
-                <span>Total due</span>
-                <span className="text-[var(--primary)]">{formatCurrency(effectiveTotal)}</span>
-              </div>
-              <button
-                onClick={() => setShowBillDiscountModal(true)}
-                disabled={cart.length === 0}
-                className="w-full min-h-9 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-xs font-medium text-[var(--foreground)] disabled:opacity-50"
-              >
-                {effectiveBillDiscountCents > 0 ? 'Edit whole-bill discount' : 'Whole Bill Discount'}
-              </button>
-              <button
-                onClick={handleToggleWholeCartHst}
-                disabled={cart.length === 0}
-                className={`w-full min-h-9 rounded-[var(--radius)] border px-3 text-xs font-medium disabled:opacity-50 ${allHstOn ? 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]' : 'border-[var(--warning)] bg-[var(--warning-bg)] text-[var(--warning)]'}`}
-              >
-                {allHstOn ? 'Remove HST from Whole Cart' : 'Charge HST on Whole Cart'}
-              </button>
+          )}
+          <div className="flex items-center justify-between text-sm text-[var(--muted-foreground)]">
+            <span>HST ({taxRatePercent}%)</span>
+            <span>{formatCurrency(taxCents)}</span>
+          </div>
+          {surchargeCents > 0 && (
+            <div className="flex items-center justify-between text-sm text-[var(--warning)]">
+              <span>Credit card fee ({checkoutSettings.cardSurchargePercent}%)</span>
+              <span>{formatCurrency(surchargeCents)}</span>
             </div>
-          </Card>
+          )}
+          <div className="flex justify-between border-t border-[var(--border)] pt-2 text-base font-semibold text-[var(--foreground)]">
+            <span>Total due</span>
+            <span className="text-[var(--primary)]">{formatCurrency(effectiveTotal)}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setShowBillDiscountModal(true)}
+              disabled={cart.length === 0}
+              className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-xs font-medium text-[var(--foreground)] disabled:opacity-50"
+            >
+              {effectiveBillDiscountCents > 0 ? 'Edit whole-bill discount' : 'Whole Bill Discount'}
+            </button>
+            <button
+              onClick={handleToggleWholeCartHst}
+              disabled={cart.length === 0}
+              className={`min-h-11 rounded-[var(--radius)] border px-3 text-xs font-medium disabled:opacity-50 ${allHstOn ? 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]' : 'border-[var(--warning)] bg-[var(--warning-bg)] text-[var(--warning)]'}`}
+            >
+              {allHstOn ? 'Remove HST from Whole Cart' : 'Charge HST on Whole Cart'}
+            </button>
+          </div>
+          <button
+            onClick={() => setShowPayModal(true)}
+            disabled={cart.length === 0}
+            className="min-h-14 w-full rounded-[var(--radius)] bg-[var(--primary)] text-lg font-bold tracking-wide text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            PAY
+          </button>
+        </div>
+      </Card>
 
-          {/* Payment method selection */}
-          <Card>
+      {/* PAY popup — not dismissable by outside click; explicit Cancel only before a method is picked */}
+      {showPayModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <Card className="max-h-[90vh] w-[480px] max-w-full overflow-y-auto bg-[var(--card)]">
             <CardHeader>
               <CardTitle>How will they pay?</CardTitle>
               <CardDescription>Choose a payment method to continue.</CardDescription>
@@ -855,6 +797,12 @@ export function CheckoutScreen(): React.JSX.Element {
                 >
                   <Lock className="h-3.5 w-3.5" />
                   Hold / Park sale
+                </button>
+                <button
+                  onClick={() => setShowPayModal(false)}
+                  className="col-span-2 min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--card)]"
+                >
+                  Cancel
                 </button>
               </div>
             ) : (
@@ -994,11 +942,61 @@ export function CheckoutScreen(): React.JSX.Element {
                 {paymentMethod === 'PHARMACY_CREDIT' && (
                   <div className="space-y-3">
                     {!attachedCustomer ? (
-                      <div className="rounded-[var(--radius)] border border-[var(--warning)]/30 bg-[var(--warning-bg)] p-3 text-xs text-[var(--foreground)]">
-                        Attach a customer to pay with Pharmacy Credit.
+                      <div>
+                        <label className="mb-1 block font-semibold text-[var(--foreground)]">Attach a customer for Pharmacy Credit</label>
+                        <div className="relative">
+                          <input
+                            ref={searchRef}
+                            value={customerSearchQuery}
+                            onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') void handleCustomerSearch() }}
+                            placeholder="Search name or phone, then Enter"
+                            className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm"
+                          />
+                          {customerSearchResults.length > 0 && (
+                            <div className="relative z-20 mt-1 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">
+                              {customerSearchResults.map((customer) => (
+                                <button
+                                  key={customer.id}
+                                  onClick={() => void attachCustomer(customer)}
+                                  className="block min-h-11 w-full border-b border-[var(--border)] px-3 text-left text-sm last:border-0"
+                                >
+                                  <b>{customer.firstName} {customer.lastName}</b> · {customer.phone}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {/* No results → offer to add a new customer */}
+                          {customerSearchQuery.trim() !== '' && customerSearchResults.length === 0 && (
+                            <div className="relative z-20 mt-1 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white p-3 text-center text-sm shadow-sm">
+                              <div className="mb-2 text-[var(--muted-foreground)]">Customer not found</div>
+                              <button
+                                onClick={() => {
+                                  setNewCustomer((prev) => ({ ...prev, lastName: customerSearchQuery.trim() }))
+                                  setShowAddCustomer(true)
+                                }}
+                                className="min-h-11 w-full rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
+                              >
+                                + Add new customer
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <>
+                        <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--muted)] px-3 py-2 text-sm">
+                          <span className="font-semibold">
+                            {attachedCustomer.firstName} {attachedCustomer.lastName} · {attachedCustomer.phone}
+                          </span>
+                          <button onClick={() => { setAttachedCustomer(null); setTenderedDollars('') }} className="text-[var(--primary)]">
+                            Remove
+                          </button>
+                        </div>
+                        <div className={`flex items-center gap-1.5 text-xs font-semibold ${customerBalance >= 0 ? 'text-[var(--success)]' : 'text-[var(--owed)]'}`}>
+                          {customerBalance >= 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+                          <span>{customerBalance >= 0 ? 'Credit available' : 'Customer owes'}: {formatCurrency(Math.abs(customerBalance))}</span>
+                        </div>
                         <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3 text-sm">
                           Available: {formatCurrency(customerBalance)} | Applying: {formatCurrency(effectiveTotal)}
                         </div>
@@ -1044,7 +1042,7 @@ export function CheckoutScreen(): React.JSX.Element {
             )}
           </Card>
         </div>
-      </div>
+      )}
 
       {/* Add-customer modal */}
       {showAddCustomer && (
