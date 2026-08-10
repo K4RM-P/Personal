@@ -988,7 +988,6 @@ export function CheckoutScreen(): React.JSX.Element {
                               <div className="mb-2 text-[var(--muted-foreground)]">Customer not found</div>
                               <button
                                 onClick={() => {
-                                  setNewCustomer((prev) => ({ ...prev, lastName: customerSearchQuery.trim() }))
                                   setShowAddCustomer(true)
                                 }}
                                 className="min-h-11 w-full rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
