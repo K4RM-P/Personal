@@ -8,12 +8,13 @@ import { RefundsScreen } from './RefundsScreen'
 import { formatCurrency } from '@shared/formatCurrency'
 import type { Product, Customer, TransactionWithItems, ChargeResult } from '@shared/types'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
-import { Lock, RotateCcw, ShoppingCart, ArrowUpRight, ArrowDownRight, Banknote, Send, CreditCard, HeartHandshake, ChevronLeft, Pill, PackagePlus, Percent } from 'lucide-react'
+import { Lock, RotateCcw, ShoppingCart, ArrowUpRight, ArrowDownRight, Banknote, Send, CreditCard, HeartHandshake, ChevronLeft, Pill, PackagePlus, Percent, Trash2 } from 'lucide-react'
 
 type ScanFeedback = { type: 'success' | 'error'; message: string } | null
 type PaymentMethod = 'CASH' | 'E_TRANSFER' | 'CARD' | 'PHARMACY_CREDIT' | null
 type CardType = 'DEBIT' | 'CREDIT' | null
 type CartItem = { product: Product; quantity: number; unitPriceCents: number; discountCents?: number; discountReason?: string; hstApplied?: boolean; hstLocked?: boolean }
+type ParkedCart = { id: string; name: string; items: CartItem[]; customer?: { id: number; firstName: string; lastName: string } | null }
 
 export function CheckoutScreen(): React.JSX.Element {
   const [products, setProducts] = React.useState<Product[]>([])
@@ -35,7 +36,10 @@ export function CheckoutScreen(): React.JSX.Element {
   const [printStatus, setPrintStatus] = React.useState<string | null>(null)
   const [receiptPdfUrl, setReceiptPdfUrl] = React.useState<string | null>(null)
   const [receiptError, setReceiptError] = React.useState(false)
-  const [parkedCarts, setParkedCarts] = React.useState<{ id: string; name: string; items: CartItem[] }[]>([])
+  const [parkedCarts, setParkedCarts] = React.useState<ParkedCart[]>([])
+  const [showParkModal, setShowParkModal] = React.useState(false)
+  const [parkCustomerQuery, setParkCustomerQuery] = React.useState('')
+  const [parkCustomerResults, setParkCustomerResults] = React.useState<Customer[]>([])
   const [paymentState, setPaymentState] = React.useState<'idle' | 'awaiting' | 'processing' | 'approved' | 'declined' | 'timeout'>('idle')
   const [paymentMessage, setPaymentMessage] = React.useState<string | null>(null)
   const [manualPrompt, setManualPrompt] = React.useState<{ amountCents: number; orderRef: string } | null>(null)
@@ -167,6 +171,26 @@ export function CheckoutScreen(): React.JSX.Element {
     }, 200)
     return () => clearTimeout(timer)
   }, [customerSearchQuery, attachedCustomer])
+
+  // Debounced customer search for the optional "attach customer" step when
+  // parking a sale — kept separate from the Pharmacy Credit search state
+  // above since the two flows can't run into each other but shouldn't share
+  // state either.
+  React.useEffect(() => {
+    if (!window.api?.customer || !showParkModal) return
+    const q = parkCustomerQuery.trim()
+    if (!q) {
+      setParkCustomerResults([])
+      return
+    }
+    const timer = setTimeout(() => {
+      window.api.customer
+        .search(q)
+        .then(setParkCustomerResults)
+        .catch(() => setParkCustomerResults([]))
+    }, 200)
+    return () => clearTimeout(timer)
+  }, [parkCustomerQuery, showParkModal])
 
   const handleBarcode = React.useCallback(
     async (barcode: string): Promise<void> => {
@@ -422,10 +446,27 @@ export function CheckoutScreen(): React.JSX.Element {
 
   const handleParkSale = (): void => {
     if (cart.length === 0) return
+    setParkCustomerQuery('')
+    setParkCustomerResults([])
+    setShowParkModal(true)
+  }
+
+  const confirmParkSale = (customer?: Customer): void => {
     const parkId = `PARK-${Date.now()}`
     const name = `Parked Cart ${parkedCarts.length + 1} (${cart.length} items)`
-    setParkedCarts((prev) => [...prev, { id: parkId, name, items: [...cart] }])
+    setParkedCarts((prev) => [
+      ...prev,
+      {
+        id: parkId,
+        name,
+        items: [...cart],
+        customer: customer ? { id: customer.id, firstName: customer.firstName, lastName: customer.lastName } : null
+      }
+    ])
     setCart([])
+    setShowParkModal(false)
+    setParkCustomerQuery('')
+    setParkCustomerResults([])
   }
 
   const handleResumeParkedSale = (parkId: string): void => {
@@ -434,6 +475,11 @@ export function CheckoutScreen(): React.JSX.Element {
       setCart(parked.items)
       setParkedCarts((prev) => prev.filter((p) => p.id !== parkId))
     }
+  }
+
+  const handleDeleteParkedSale = (parkId: string): void => {
+    if (!window.confirm('Delete this parked sale? Its items will be lost.')) return
+    setParkedCarts((prev) => prev.filter((p) => p.id !== parkId))
   }
 
   const handleCustomerSearch = async (): Promise<void> => {
@@ -616,13 +662,27 @@ export function CheckoutScreen(): React.JSX.Element {
           <div className="space-y-2">
             {parkedCarts.map((parked) => (
               <div key={parked.id} className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-white p-2 text-xs">
-                <span className="font-medium text-[var(--foreground)]">{parked.name}</span>
-                <button
-                  onClick={() => handleResumeParkedSale(parked.id)}
-                  className="rounded-[var(--radius)] bg-[var(--warning)] px-2 py-1 font-medium text-[var(--primary-foreground)]"
-                >
-                  Resume Sale
-                </button>
+                <div>
+                  <span className="font-medium text-[var(--foreground)]">{parked.name}</span>
+                  {parked.customer && (
+                    <div className="text-[var(--muted-foreground)]">{parked.customer.firstName} {parked.customer.lastName}</div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleResumeParkedSale(parked.id)}
+                    className="min-h-8 rounded-[var(--radius)] bg-[var(--warning)] px-2 py-1 font-medium text-[var(--primary-foreground)]"
+                  >
+                    Resume Sale
+                  </button>
+                  <button
+                    onClick={() => handleDeleteParkedSale(parked.id)}
+                    aria-label="Delete parked sale"
+                    className="flex min-h-8 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] px-2 py-1 font-medium text-[var(--error)] hover:bg-[var(--error-bg)]"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -1055,6 +1115,59 @@ export function CheckoutScreen(): React.JSX.Element {
                 )}
               </div>
             )}
+          </Card>
+        </div>
+      )}
+
+      {/* Park-sale modal — optional customer attach before parking */}
+      {showParkModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <Card className="w-[420px] max-w-full bg-[var(--card)] p-6 space-y-3">
+            <div>
+              <CardTitle className="text-[var(--foreground)]">Attach a customer? (optional)</CardTitle>
+              <CardDescription className="text-[var(--muted-foreground)]">
+                Search to link this parked sale to a customer, or skip.
+              </CardDescription>
+            </div>
+            <div className="relative">
+              <input
+                value={parkCustomerQuery}
+                onChange={(e) => setParkCustomerQuery(e.target.value)}
+                placeholder="Search name or phone"
+                autoFocus
+                className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm"
+              />
+              {parkCustomerResults.length > 0 && (
+                <div className="mt-1 max-h-[180px] overflow-y-auto rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">
+                  {parkCustomerResults.map((customer) => (
+                    <button
+                      key={customer.id}
+                      onClick={() => confirmParkSale(customer)}
+                      className="block min-h-11 w-full border-b border-[var(--border)] px-3 text-left text-sm last:border-0 hover:bg-[var(--muted)]"
+                    >
+                      <b>{customer.firstName} {customer.lastName}</b> · {customer.phone}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {parkCustomerQuery.trim() !== '' && parkCustomerResults.length === 0 && (
+                <div className="mt-1 text-xs text-[var(--muted-foreground)]">No matching customers.</div>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                onClick={() => { setShowParkModal(false); setParkCustomerQuery(''); setParkCustomerResults([]) }}
+                className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => confirmParkSale()}
+                className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
+              >
+                Skip &amp; Park
+              </button>
+            </div>
           </Card>
         </div>
       )}
