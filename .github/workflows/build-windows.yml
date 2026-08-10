@@ -25,11 +25,26 @@ jobs:
         run: npx prisma generate
 
       - name: Bump build version
+        id: version
         shell: bash
-        run: npm pkg set version=1.0.${{ github.run_number }}
+        run: |
+          v="1.0.${{ github.run_number }}"
+          npm pkg set version=$v
+          echo "version=$v" >> "$GITHUB_OUTPUT"
 
       - name: Build and publish Windows installer
         run: npm run build && npx electron-builder --win --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # electron-builder always creates GitHub releases as drafts (a direct
+      # non-draft create via releaseType: release hits a known electron-builder
+      # bug - electron-userland/electron-builder#2393 - "Published releases
+      # must have a valid tag"). Un-draft it here instead so /releases/latest
+      # and electron-updater (which ignores drafts) both see the new build.
+      - name: Publish the release (un-draft)
+        shell: bash
+        run: gh release edit "v${{ steps.version.outputs.version }}" --draft=false --latest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

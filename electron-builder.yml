@@ -53,4 +53,3 @@ publish:
   provider: github
   owner: K4RM-P
   repo: Personal
-  releaseType: release
