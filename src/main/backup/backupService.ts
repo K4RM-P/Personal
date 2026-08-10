@@ -295,35 +295,51 @@ export function pendingRestoreMarkerPath(dbFilePath: string): string {
   return `${dbFilePath}.pending-restore`
 }
 
+/** Reads and validates a single candidate backup folder; null if it isn't a real backup. */
+function readRestorableBackup(backupDir: string): RestorableBackup | null {
+  const metadataPath = join(backupDir, 'backup-metadata.json')
+  if (!existsSync(metadataPath) || !existsSync(join(backupDir, 'backup.sqlite'))) return null
+  try {
+    const metadata = JSON.parse(readFileSync(metadataPath, 'utf-8'))
+    return {
+      backupDir,
+      timestamp: metadata.timestamp,
+      posVersion: metadata.posVersion,
+      dataSnapshot: metadata.dataSnapshot ?? {}
+    }
+  } catch {
+    // unreadable/corrupt metadata — not a valid backup
+    return null
+  }
+}
+
 /**
  * Scans a drive for `PHARMACY_POS_BACKUP_*` folders that have a readable,
  * checksummed `backup-metadata.json` — i.e. backups actually restorable, not
  * a folder that merely looks like one.
+ *
+ * `drivePath` itself is also checked directly: a user browsing with the native
+ * folder picker will often navigate *into* a `PHARMACY_POS_BACKUP_*` folder and
+ * select that folder itself rather than its parent — that selection is just as
+ * valid as picking the parent, so it must resolve to that one backup instead of
+ * reporting "no backups found" because it has no matching subfolders.
  */
 export function listRestorableBackups(drivePath: string): RestorableBackup[] {
   const results: RestorableBackup[] = []
+
+  const selfBackup = readRestorableBackup(drivePath)
+  if (selfBackup) results.push(selfBackup)
+
   let entries: Dirent[]
   try {
     entries = readdirSync(drivePath, { withFileTypes: true })
   } catch {
-    return []
+    return results
   }
   for (const entry of entries) {
     if (!entry.isDirectory() || !entry.name.startsWith('PHARMACY_POS_BACKUP_')) continue
-    const backupDir = join(drivePath, entry.name)
-    const metadataPath = join(backupDir, 'backup-metadata.json')
-    if (!existsSync(metadataPath) || !existsSync(join(backupDir, 'backup.sqlite'))) continue
-    try {
-      const metadata = JSON.parse(readFileSync(metadataPath, 'utf-8'))
-      results.push({
-        backupDir,
-        timestamp: metadata.timestamp,
-        posVersion: metadata.posVersion,
-        dataSnapshot: metadata.dataSnapshot ?? {}
-      })
-    } catch {
-      // unreadable/corrupt metadata — skip it rather than offer a broken restore
-    }
+    const backup = readRestorableBackup(join(drivePath, entry.name))
+    if (backup) results.push(backup)
   }
   return results.sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1))
 }

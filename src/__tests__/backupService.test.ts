@@ -415,6 +415,25 @@ describe('data backup system', () => {
       expect(found[0].dataSnapshot.salesCount).toBe(1)
     })
 
+    it('finds a backup when the user browses directly into the PHARMACY_POS_BACKUP_* folder itself', async () => {
+      const user = await db.user.findFirstOrThrow()
+      const dir = mkdtempSync(join(tmpdir(), 'backup-selfpick-'))
+      try {
+        const backup = await performBackup(
+          db,
+          { drivePath: dir, driveName: 'Self-pick Drive', initiatedByUserId: user.id },
+          env
+        )
+        // Simulate picking the backup folder itself, not its parent.
+        const found = listRestorableBackups(backup.backupDir)
+        expect(found).toHaveLength(1)
+        expect(found[0].backupDir).toBe(backup.backupDir)
+        expect(found[0].dataSnapshot.salesCount).toBe(1)
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    })
+
     it('stages a verified backup and applyPendingRestoreIfStaged swaps it into place end-to-end', async () => {
       const user = await db.user.findFirstOrThrow()
       const backup = await performBackup(
