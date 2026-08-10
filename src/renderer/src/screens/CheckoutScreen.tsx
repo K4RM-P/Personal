@@ -90,7 +90,6 @@ export function CheckoutScreen(): React.JSX.Element {
   const taxableAfterBillDiscountCents =
     subtotalCents > 0 ? taxableSubtotalCents - (effectiveBillDiscountCents * taxableSubtotalCents) / subtotalCents : 0
   const taxCents = Math.round((taxableAfterBillDiscountCents * taxRatePercent) / 100)
-  const allHstOn = cart.length > 0 && cart.every((item) => item.hstApplied !== false)
   const surchargeCents = cardType === 'CREDIT' && applySurcharge
     ? Math.floor(preTaxCents * checkoutSettings.cardSurchargePercent / 100)
     : 0
@@ -236,13 +235,6 @@ export function CheckoutScreen(): React.JSX.Element {
     )
   }
 
-  const handleToggleWholeCartHst = (): void => {
-    setCart((prev) => {
-      const nextValue = !allHstOn
-      return prev.map((item) => (item.hstLocked ? item : { ...item, hstApplied: nextValue }))
-    })
-  }
-
   const handleAddCustomProduct = async (mode: 'RX' | 'NONRX', data: { name: string; priceCents: number }): Promise<void> => {
     setCustomProductError(null)
     try {
@@ -339,7 +331,6 @@ export function CheckoutScreen(): React.JSX.Element {
       setBillDiscountCents(0)
       setBillDiscountReason(undefined)
       setShowPayModal(false)
-      setScanFeedback({ type: 'success', message: `Sale complete — ${transaction.receiptNumber}` })
     } catch (err) {
       setScanFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Transaction failed' })
     } finally {
@@ -797,25 +788,15 @@ export function CheckoutScreen(): React.JSX.Element {
               disabled={cart.length === 0}
               title={effectiveBillDiscountCents > 0 ? 'Edit whole-bill discount' : 'Whole Bill Discount'}
               aria-label={effectiveBillDiscountCents > 0 ? 'Edit whole-bill discount' : 'Whole Bill Discount'}
-              className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-[var(--radius)] border text-[10px] font-semibold disabled:opacity-50 ${effectiveBillDiscountCents > 0 ? 'border-[var(--success)] bg-[var(--success-bg)] text-[var(--success)]' : 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]'}`}
+              className={`flex h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-[var(--radius)] border text-[10px] font-semibold disabled:opacity-50 ${effectiveBillDiscountCents > 0 ? 'border-[var(--success)] bg-[var(--success-bg)] text-[var(--success)]' : 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]'}`}
             >
               <Percent className="h-4 w-4" />
               Disc.
             </button>
             <button
-              onClick={handleToggleWholeCartHst}
-              disabled={cart.length === 0}
-              title={allHstOn ? 'Remove HST from Whole Cart' : 'Charge HST on Whole Cart'}
-              aria-label={allHstOn ? 'Remove HST from Whole Cart' : 'Charge HST on Whole Cart'}
-              className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-[var(--radius)] border text-[10px] font-semibold disabled:opacity-50 ${allHstOn ? 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]' : 'border-[var(--warning)] bg-[var(--warning-bg)] text-[var(--warning)]'}`}
-            >
-              <span className="text-xs font-bold">HST</span>
-              {allHstOn ? 'On' : 'Off'}
-            </button>
-            <button
               onClick={() => setShowPayModal(true)}
               disabled={cart.length === 0}
-              className="min-h-14 flex-1 rounded-[var(--radius)] bg-[var(--primary)] text-lg font-bold tracking-wide text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-14 flex-1 rounded-[var(--radius)] bg-[var(--primary)] text-lg font-bold tracking-wide text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               PAY
             </button>
