@@ -78,6 +78,7 @@ export function IdleScreen({
           fontWeight: 700,
           lineHeight: 1.15,
           maxWidth: '100%',
+          wordBreak: 'break-word',
           animation: 'cd-fade-in 400ms ease'
         }}
       >
