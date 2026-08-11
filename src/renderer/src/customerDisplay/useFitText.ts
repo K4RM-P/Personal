@@ -16,30 +16,41 @@ export interface FitOptions {
 export interface FitMeasurement {
   /** Rendered height in px of the text wrapped to the container width. */
   heightPx: number
+  /**
+   * Widest line's content width in px, when the caller can report it (real DOM
+   * measurement via scrollWidth). A word wider than the container shows up
+   * here even though word-breaking is disabled, so it can be rejected instead
+   * of silently accepted at a size that would clip or force a mid-word split.
+   */
+  widthPx?: number
 }
 
 /**
  * Pure core of the measure-and-shrink algorithm (spec §2.4): start at the max
- * size and step down until the text fits both the available height and the
- * line cap. Deliberately not a per-character-count lookup table — the caller
- * supplies a real measurement function, so sizing is always computed for the
- * actual text at the actual container size.
+ * size and step down until the text fits the available height, the line cap,
+ * and (when reported) the container width without any word overflowing it.
+ * Deliberately not a per-character-count lookup table — the caller supplies a
+ * real measurement function, so sizing is always computed for the actual text
+ * at the actual container size.
  */
 export function computeFitFontSize(
   measure: (fontSizePx: number) => FitMeasurement,
   availableHeightPx: number,
-  opts?: FitOptions
+  opts?: FitOptions & { availableWidthPx?: number }
 ): number {
   const maxPx = opts?.maxPx ?? FIT_MAX_PX
   const minPx = opts?.minPx ?? FIT_MIN_PX
   const maxLines = opts?.maxLines ?? 2
   const stepPx = opts?.stepPx ?? FIT_STEP_PX
+  const availableWidthPx = opts?.availableWidthPx
 
   let size = maxPx
   while (size > minPx) {
-    const { heightPx } = measure(size)
+    const { heightPx, widthPx } = measure(size)
     const lines = Math.max(1, Math.round(heightPx / (size * FIT_LINE_HEIGHT)))
-    if (heightPx <= availableHeightPx && lines <= maxLines) break
+    const fitsWidth =
+      widthPx === undefined || availableWidthPx === undefined || widthPx <= availableWidthPx
+    if (heightPx <= availableHeightPx && lines <= maxLines && fitsWidth) break
     size -= stepPx
   }
   return Math.max(minPx, Math.min(maxPx, size))
@@ -80,8 +91,12 @@ export function useFitText(
       measurer.style.left = '-99999px'
       measurer.style.top = '0'
       measurer.style.visibility = 'hidden'
+      // Word-breaking deliberately disabled: an unbroken word that doesn't fit
+      // is reported via widthPx (below) and rejected by computeFitFontSize, so
+      // the algorithm shrinks the font instead of ever splitting a word.
       measurer.style.whiteSpace = 'normal'
-      measurer.style.overflowWrap = 'break-word'
+      measurer.style.overflowWrap = 'normal'
+      measurer.style.wordBreak = 'normal'
       measurer.style.fontWeight = '700'
       measurer.style.lineHeight = String(FIT_LINE_HEIGHT)
       measurer.style.width = `${availableWidth}px`
@@ -91,10 +106,10 @@ export function useFitText(
         const next = computeFitFontSize(
           (size) => {
             measurer.style.fontSize = `${size}px`
-            return { heightPx: measurer.scrollHeight }
+            return { heightPx: measurer.scrollHeight, widthPx: measurer.scrollWidth }
           },
           availableHeight,
-          { maxPx, minPx, maxLines, stepPx }
+          { maxPx, minPx, maxLines, stepPx, availableWidthPx: availableWidth }
         )
         if (!cancelled) setFontSize(next)
       } finally {

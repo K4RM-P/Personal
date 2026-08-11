@@ -55,7 +55,6 @@ export function PaymentTabScreen({ state }: { state: TabState }): React.JSX.Elem
             fontSize: balanceFontSize,
             fontWeight: 600,
             lineHeight: 1.15,
-            overflowWrap: 'break-word',
             color: credit ? 'var(--success)' : 'var(--owed)'
           }}
         >
