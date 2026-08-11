@@ -239,7 +239,7 @@ export function CustomersScreen(): React.JSX.Element {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search name, phone, address, email"
               aria-label="Search customers"
-              className="input pl-9"
+              className="input pl-10"
             />
           </div>
           <div className="mt-3 space-y-2">
