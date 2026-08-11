@@ -408,7 +408,7 @@ export function ProductsScreen(): React.JSX.Element {
                 <div className="max-h-[600px] overflow-y-auto pr-1">
                   {catalogLoading ? (
                     <div className="flex items-center justify-center gap-2 rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-6 text-sm text-[var(--muted-foreground)]">
-                      <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[var(--muted-foreground)] border-t-transparent" aria-hidden="true" />
+                      <span className="icon-4 shrink-0 animate-spin rounded-full border-2 border-[var(--muted-foreground)] border-t-transparent" aria-hidden="true" />
                       Searching catalogue…
                     </div>
                   ) : displayCatalog.length === 0 ? (

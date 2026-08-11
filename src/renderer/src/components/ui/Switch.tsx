@@ -27,9 +27,14 @@ export function Switch({ checked, onCheckedChange, className, disabled }: Switch
     >
       <span
         aria-hidden="true"
-        style={{ minHeight: '1.5rem', minWidth: '2.75rem' }}
+        // Fixed track geometry (not density-scaled) — the thumb's translate-x
+        // distance below is tied to this exact width, so track/thumb size and
+        // gap classes here are intentionally left off the global density
+        // control-size overrides in index.css (which target Tailwind's plain
+        // `h-6`/`w-11` utility classes) by using inline styles instead.
+        style={{ height: '1.5rem', width: '2.75rem', minHeight: '1.5rem', minWidth: '2.75rem' }}
         className={cn(
-          'relative inline-flex h-6 w-11 items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out',
+          'relative inline-flex items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out',
           checked ? 'bg-[var(--primary)]' : 'bg-[var(--secondary)]'
         )}
       >

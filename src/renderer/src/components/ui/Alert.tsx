@@ -27,7 +27,7 @@ export function Alert({ variant, children, className }: AlertProps): React.JSX.E
   const { icon: Icon, border, bg, text, label } = VARIANT_CONFIG[variant]
   return (
     <div role={variant === 'error' ? 'alert' : 'status'} className={cn('flex items-start gap-2 rounded-[var(--radius)] border p-3 text-xs', border, bg, text, className)}>
-      <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', variant === 'pending' && 'animate-spin')} aria-hidden="true" />
+      <Icon className={cn('mt-0.5 icon-4 shrink-0', variant === 'pending' && 'animate-spin')} aria-hidden="true" />
       <span className="sr-only">{label}: </span>
       <span className="leading-snug">{children}</span>
     </div>

@@ -223,7 +223,7 @@ export function PaymentSettingsCard(): React.JSX.Element {
                   aria-label={showApiKey ? 'Hide API credentials' : 'Show API credentials'}
                   className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
                 >
-                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showApiKey ? <EyeOff className="icon-4" /> : <Eye className="icon-4" />}
                 </button>
               </div>
               <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">

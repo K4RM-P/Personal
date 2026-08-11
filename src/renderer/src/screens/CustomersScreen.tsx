@@ -25,7 +25,7 @@ function Balance({ value }: { value: number }): React.JSX.Element {
     <div
       className={`flex items-center gap-2 text-lg font-semibold ${credit ? 'text-[var(--success)]' : 'text-[var(--owed)]'}`}
     >
-      <Icon className="h-5 w-5 shrink-0" />
+      <Icon className="icon-5 shrink-0" />
       <span>
         {credit
           ? `Credit available: ${formatCurrency(value)}`
@@ -199,7 +199,7 @@ export function CustomersScreen(): React.JSX.Element {
           onClick={openNew}
           className="flex min-h-11 items-center gap-2 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
         >
-          <UserPlus className="h-4 w-4" />
+          <UserPlus className="icon-4" />
           New customer
         </button>
       </div>
@@ -209,7 +209,7 @@ export function CustomersScreen(): React.JSX.Element {
       <div className="grid grid-cols-12 gap-4">
         <Card className="col-span-4 h-fit">
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)]" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 icon-4 -translate-y-1/2 text-[var(--muted-foreground)]" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -347,14 +347,14 @@ export function CustomersScreen(): React.JSX.Element {
                       onClick={() => setAction('funds')}
                       className="flex min-h-11 items-center gap-1.5 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
                     >
-                      <Plus className="h-4 w-4" />
+                      <Plus className="icon-4" />
                       Add funds
                     </button>
                     <button
                       onClick={() => setAction('credit')}
                       className="flex min-h-11 items-center gap-1.5 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 text-sm text-[var(--foreground)] transition-colors duration-150 hover:bg-[var(--muted)]"
                     >
-                      <Lock className="h-4 w-4" />
+                      <Lock className="icon-4" />
                       Adjust balance
                     </button>
                   </div>
@@ -372,7 +372,7 @@ export function CustomersScreen(): React.JSX.Element {
                       onClick={() => setAction('points')}
                       className="mt-4 flex min-h-11 items-center gap-1.5 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 text-sm text-[var(--foreground)] transition-colors duration-150 hover:bg-[var(--muted)]"
                     >
-                      <Lock className="h-4 w-4" />
+                      <Lock className="icon-4" />
                       Adjust points
                     </button>
                   </Card>
@@ -552,7 +552,7 @@ export function CustomersScreen(): React.JSX.Element {
                   checked={managerMode}
                   onChange={(e) => setManagerMode(e.target.checked)}
                 />
-                <Lock className="h-4 w-4 shrink-0" />
+                <Lock className="icon-4 shrink-0" />
                 Manager override confirmed
               </label>
             )}

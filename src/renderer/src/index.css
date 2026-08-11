@@ -1,7 +1,34 @@
 @import "tailwindcss";
 
+/*
+ * Display density — two independent variable systems (see docs/superpowers
+ * pharmacy-pos-ui-ux-guide.md + the density feature spec):
+ *   --pos-density-scale : multiplier (0.68-1.30). Controls ONLY font-size,
+ *                          icon size, control/button sizing, internal padding.
+ *   --pos-spacing-unit  : fixed 8px. Gaps/margins/grid-gutters NEVER read
+ *                          this — they stay on Tailwind's default (unscaled)
+ *                          spacing scale at every density level.
+ * The Tailwind text-* utility tokens below are overridden to multiply by
+ * --pos-density-scale so every `text-sm`/`text-lg`/etc. class in the app
+ * scales automatically — Tailwind's default --spacing scale (which drives
+ * gap-*, space-y-*, m-*, p-*) is deliberately left untouched so spacing never
+ * scales. See src/renderer/src/lib/density.ts for the 8 discrete levels.
+ */
+@theme {
+  --text-xs: calc(0.75rem * var(--pos-density-scale));
+  --text-sm: calc(0.875rem * var(--pos-density-scale));
+  --text-base: calc(1rem * var(--pos-density-scale));
+  --text-lg: calc(1.125rem * var(--pos-density-scale));
+  --text-xl: calc(1.25rem * var(--pos-density-scale));
+  --text-2xl: calc(1.5rem * var(--pos-density-scale));
+  --text-3xl: calc(1.875rem * var(--pos-density-scale));
+  --text-4xl: calc(2.25rem * var(--pos-density-scale));
+}
+
 @layer base {
   :root {
+    --pos-density-scale: 1;
+    --pos-spacing-unit: 8px;
     --background: #f4f6f8;
     --foreground: #111827;
     --card: #ffffff;
@@ -51,16 +78,80 @@ textarea {
   font: inherit;
 }
 
+/* Control hit-area: visible size follows density scale, but the actual
+   tappable/clickable area never drops below 36x36px (accessibility floor —
+   see §5 of the density spec) even at "Maximum Space" (level 8, scale 0.68). */
 button,
 [role='button'],
 input,
 select,
 textarea {
-  min-height: 44px;
+  min-height: max(36px, calc(44px * var(--pos-density-scale)));
 }
 
 button.btn-primary {
-  min-height: 52px;
+  min-height: max(36px, calc(52px * var(--pos-density-scale)));
+}
+
+/* Density-scaled icon sizes (paired with h-* w-* class removal at these call
+   sites — see components/screens). Width/height only; never used for
+   inter-element gaps. */
+.icon-3_5 {
+  width: calc(0.875rem * var(--pos-density-scale));
+  height: calc(0.875rem * var(--pos-density-scale));
+}
+.icon-4 {
+  width: calc(1rem * var(--pos-density-scale));
+  height: calc(1rem * var(--pos-density-scale));
+}
+.icon-5 {
+  width: calc(1.25rem * var(--pos-density-scale));
+  height: calc(1.25rem * var(--pos-density-scale));
+}
+.icon-6 {
+  width: calc(1.5rem * var(--pos-density-scale));
+  height: calc(1.5rem * var(--pos-density-scale));
+}
+.icon-9 {
+  width: calc(2.25rem * var(--pos-density-scale));
+  height: calc(2.25rem * var(--pos-density-scale));
+}
+
+/*
+ * Retroactive density-scaling for the fixed Tailwind control-size utilities
+ * already used across every screen (min-h-11, h-14, w-11, ...) — these are
+ * all *control* dimensions (buttons/inputs, not gaps), so they belong in the
+ * scaled system. These rules live outside any Tailwind @layer, so per CSS
+ * cascade-layer rules they win over Tailwind's layered utilities of the same
+ * name automatically (no !important needed), regardless of source order.
+ * The 36px floor is the accessibility hit-area minimum (§5 of the spec).
+ */
+.min-h-8 {
+  min-height: max(36px, calc(32px * var(--pos-density-scale)));
+}
+.min-h-9 {
+  min-height: max(36px, calc(36px * var(--pos-density-scale)));
+}
+.min-h-11 {
+  min-height: max(36px, calc(44px * var(--pos-density-scale)));
+}
+.min-h-14 {
+  min-height: max(36px, calc(56px * var(--pos-density-scale)));
+}
+.h-11 {
+  height: max(36px, calc(44px * var(--pos-density-scale)));
+}
+.h-12 {
+  height: max(36px, calc(48px * var(--pos-density-scale)));
+}
+.h-14 {
+  height: max(36px, calc(56px * var(--pos-density-scale)));
+}
+.w-11 {
+  width: max(36px, calc(44px * var(--pos-density-scale)));
+}
+.min-w-11 {
+  min-width: max(36px, calc(44px * var(--pos-density-scale)));
 }
 
 .sr-only {
@@ -81,12 +172,14 @@ button.btn-primary {
 .input {
   display: block;
   width: 100%;
-  min-height: 44px;
+  min-height: max(36px, calc(44px * var(--pos-density-scale)));
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: #ffffff;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
+  /* Internal control padding scales with density (sizing, not inter-element
+     spacing) — the 0.75rem horizontal padding tracks text-* scaling above. */
+  padding: calc(0.5rem * var(--pos-density-scale)) calc(0.75rem * var(--pos-density-scale));
+  font-size: calc(0.875rem * var(--pos-density-scale));
   color: var(--foreground);
   transition: border-color 150ms ease, box-shadow 150ms ease;
 }

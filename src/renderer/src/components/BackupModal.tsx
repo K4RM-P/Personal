@@ -115,7 +115,7 @@ export function BackupModal({ userId, standalone = false, presetDrive, onClose }
                         name="backup-drive"
                         checked={selected?.path === drive.path}
                         onChange={() => setSelected({ path: drive.path, name: drive.name })}
-                        className="h-4 w-4 shrink-0"
+                        className="icon-4 shrink-0"
                       />
                       <span className="flex-1 font-medium">{drive.name}</span>
                       <span className="text-xs text-[var(--muted-foreground)]">
@@ -130,7 +130,7 @@ export function BackupModal({ userId, standalone = false, presetDrive, onClose }
               })}
               {selected && !drives.some((d) => d.path === selected.path) && (
                 <label className="flex min-h-11 items-center gap-3 rounded-[var(--radius)] border border-[var(--primary)] px-3 py-3 text-sm text-[var(--foreground)]">
-                  <input type="radio" checked readOnly className="h-4 w-4 shrink-0" />
+                  <input type="radio" checked readOnly className="icon-4 shrink-0" />
                   <span className="flex-1">{selected.path}</span>
                   <span className="text-xs text-[var(--muted-foreground)]">Custom location</span>
                 </label>
