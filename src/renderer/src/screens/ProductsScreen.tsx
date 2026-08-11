@@ -177,11 +177,7 @@ export function ProductsScreen(): React.JSX.Element {
   }
 
   // Tier Table Handlers
-  const handleTierMarkupChange = (index: number, newMarkup: number): void => {
-    const updated = editableTiers.map((t, idx) =>
-      idx === index ? { ...t, markupPercent: newMarkup } : t
-    )
-    setEditableTiers(updated)
+  const schedulePreview = (updated: PricingTier[]): void => {
     // Impact is computed server-side against all 50k+ products; debounce so a
     // burst of keystrokes fires one query, and only a bounded sample crosses IPC.
     if (previewTimer.current) clearTimeout(previewTimer.current)
@@ -195,6 +191,28 @@ export function ProductsScreen(): React.JSX.Element {
         })
         .catch((err) => console.error('Tier preview failed:', err))
     }, 250)
+  }
+
+  const handleTierMarkupChange = (index: number, newMarkup: number): void => {
+    const updated = editableTiers.map((t, idx) =>
+      idx === index ? { ...t, markupPercent: newMarkup } : t
+    )
+    setEditableTiers(updated)
+    schedulePreview(updated)
+  }
+
+  const handleTierMinChange = (index: number, dollars: string): void => {
+    const minCostCents = Math.round((parseFloat(dollars) || 0) * 100)
+    const updated = editableTiers.map((t, idx) => (idx === index ? { ...t, minCostCents } : t))
+    setEditableTiers(updated)
+    schedulePreview(updated)
+  }
+
+  const handleTierMaxChange = (index: number, dollars: string): void => {
+    const maxCostCents = dollars.trim() === '' ? null : Math.round((parseFloat(dollars) || 0) * 100)
+    const updated = editableTiers.map((t, idx) => (idx === index ? { ...t, maxCostCents } : t))
+    setEditableTiers(updated)
+    schedulePreview(updated)
   }
 
   const handleSaveTiers = async (): Promise<void> => {
