@@ -13,6 +13,10 @@ import { log } from '../logging/logger'
  */
 
 const PERIODIC_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000 // every 4 hours while the app is open
+// A failed check is usually a transient network blip (wifi hiccup, router reboot), not a
+// standing outage — retry much sooner than the next scheduled 4-hour cycle so a brief
+// dropout doesn't cost most of a day before the app notices a real update exists again.
+const ERROR_RETRY_DELAY_MS = 15 * 60 * 1000
 
 // States in which a fresh checkForUpdates() call would be redundant or actively harmful:
 // re-checking while a download is running can interfere with it, and re-checking once an
@@ -27,6 +31,7 @@ const CHECK_BLOCKED_STATES: ReadonlySet<UpdateStatus['state']> = new Set([
 let status: UpdateStatus = { state: 'idle' }
 let mainWindow: BrowserWindow | null = null
 let initialized = false
+let errorRetryTimer: ReturnType<typeof setTimeout> | null = null
 
 function broadcast(next: UpdateStatus): void {
   status = next
@@ -102,14 +107,20 @@ export function initAutoUpdater(window: BrowserWindow): void {
 
   // Routine background failures (no internet, GitHub unreachable) are logged, not shown
   // to the cashier — a scary popup over a failed background check would train staff to
-  // ignore real errors.
+  // ignore real errors. Also schedules a short-delay retry rather than waiting out the
+  // full periodic interval, since most failures here are transient.
   autoUpdater.on('error', (err) => {
     log('ERROR', { message: err.message, source: 'autoUpdater' })
     broadcast({ state: 'error', error: err.message })
+    scheduleErrorRetry()
   })
 
   const checkNow = async (): Promise<void> => {
     if (CHECK_BLOCKED_STATES.has(status.state)) return
+    if (errorRetryTimer) {
+      clearTimeout(errorRetryTimer)
+      errorRetryTimer = null
+    }
     try {
       await autoUpdater.checkForUpdates()
     } catch (err) {
@@ -117,7 +128,16 @@ export function initAutoUpdater(window: BrowserWindow): void {
         message: err instanceof Error ? err.message : String(err),
         source: 'autoUpdater'
       })
+      scheduleErrorRetry()
     }
+  }
+
+  function scheduleErrorRetry(): void {
+    if (errorRetryTimer) return // one retry in flight is enough
+    errorRetryTimer = setTimeout(() => {
+      errorRetryTimer = null
+      void checkNow()
+    }, ERROR_RETRY_DELAY_MS)
   }
 
   void checkNow()
