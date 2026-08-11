@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { Lock } from 'lucide-react'
 import { Card, CardTitle, CardDescription } from './ui/Card'
 import { Alert } from './ui/Alert'
 import type { AuthUser } from '@shared/types'
@@ -41,12 +42,23 @@ export function ManagerAuthModal({ description, onCancel, onSuccess }: ManagerAu
     }
   }
 
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape' && !submitting) onCancel()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [submitting, onCancel])
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <Card className="w-[420px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-4">
-        <div>
-          <CardTitle className="text-[var(--foreground)]">Manager Authentication Required</CardTitle>
-          {description && <CardDescription>{description}</CardDescription>}
+        <div className="flex items-start gap-2">
+          <Lock className="icon-5 mt-0.5 shrink-0 text-[var(--warning)]" aria-hidden="true" />
+          <div>
+            <CardTitle className="text-[var(--foreground)]">Manager Authentication Required</CardTitle>
+            {description && <CardDescription>{description}</CardDescription>}
+          </div>
         </div>
 
         {error && <Alert variant="error">{error}</Alert>}
