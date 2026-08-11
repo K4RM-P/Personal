@@ -47,6 +47,15 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps): R
   const [showLogoutConfirm, setShowLogoutConfirm] = React.useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
 
+  React.useEffect(() => {
+    if (!mobileMenuOpen) return
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setMobileMenuOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [mobileMenuOpen])
+
   const handleLogoutClick = async (): Promise<void> => {
     try {
       const shouldPrompt = await window.api.backup.getPromptOnLogout()
@@ -83,7 +92,7 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps): R
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
-      <header className="relative flex h-16 shrink-0 items-center gap-4 border-b border-[var(--border)] bg-[#f8fafb] px-4 md:px-6">
+      <header className="relative flex h-16 shrink-0 items-center gap-4 border-b border-[var(--border)] bg-[var(--card)] px-4 md:px-6">
         <div className="flex shrink-0 items-center gap-3">
           <div className="flex icon-9 items-center justify-center rounded-[var(--radius)] bg-[var(--primary)] font-bold text-[var(--primary-foreground)]">
             Rx
@@ -138,7 +147,7 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps): R
         </button>
 
         {mobileMenuOpen && (
-          <div className="absolute left-0 right-0 top-16 z-30 border-b border-[var(--border)] bg-[#f8fafb] p-4 shadow-sm md:hidden">
+          <div className="absolute left-0 right-0 top-16 z-30 border-b border-[var(--border)] bg-[var(--card)] p-4 shadow-sm md:hidden">
             <nav className="space-y-1">
               {navItems.map((item) => {
                 const Icon = item.icon

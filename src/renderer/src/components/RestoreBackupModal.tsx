@@ -54,12 +54,34 @@ export function RestoreBackupModal({ onClose }: RestoreBackupModalProps): React.
     await window.api.backup.relaunch()
   }
 
+  // Not Escape-dismissable while listing/restoring is in flight — those are
+  // transient, non-interruptible operations.
+  const closable = step === 'pick' || step === 'select' || step === 'confirm' || step === 'error'
+  React.useEffect(() => {
+    if (!closable) return
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [closable, onClose])
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <Card className="w-[560px] border-[var(--warning)] bg-[var(--card)] p-6 space-y-4">
+    <div
+      role="presentation"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+    >
+      <Card
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="restore-modal-title"
+        className="w-[560px] border-[var(--warning)] bg-[var(--card)] p-6 space-y-4 shadow-lg"
+      >
         {step === 'pick' && (
           <>
-            <CardTitle className="text-[var(--foreground)]">Restore from Backup</CardTitle>
+            <CardTitle id="restore-modal-title" className="text-[var(--foreground)]">
+              Restore from Backup
+            </CardTitle>
             <Alert variant="pending">
               This replaces the current database with a backup. Anything entered since that backup
               was taken will be lost. Choose the drive or folder holding the backup to restore from.
@@ -67,13 +89,13 @@ export function RestoreBackupModal({ onClose }: RestoreBackupModalProps): React.
             <div className="grid grid-cols-2 gap-3 pt-2">
               <button
                 onClick={onClose}
-                className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)]"
+                className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
               >
                 Cancel
               </button>
               <button
                 onClick={() => void browse()}
-                className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
+                className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
               >
                 Browse for Backup…
               </button>
@@ -83,14 +105,18 @@ export function RestoreBackupModal({ onClose }: RestoreBackupModalProps): React.
 
         {step === 'listing' && (
           <>
-            <CardTitle className="text-[var(--foreground)]">Restore from Backup</CardTitle>
+            <CardTitle id="restore-modal-title" className="text-[var(--foreground)]">
+              Restore from Backup
+            </CardTitle>
             <Alert variant="pending">Scanning {drivePath} for backups…</Alert>
           </>
         )}
 
         {step === 'select' && (
           <>
-            <CardTitle className="text-[var(--foreground)]">Restore from Backup</CardTitle>
+            <CardTitle id="restore-modal-title" className="text-[var(--foreground)]">
+              Restore from Backup
+            </CardTitle>
             {backups.length === 0 ? (
               <CardDescription>No valid backups found in {drivePath}.</CardDescription>
             ) : (
@@ -127,14 +153,14 @@ export function RestoreBackupModal({ onClose }: RestoreBackupModalProps): React.
             <div className="grid grid-cols-2 gap-3 pt-2">
               <button
                 onClick={onClose}
-                className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)]"
+                className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
               >
                 Cancel
               </button>
               <button
                 onClick={() => setStep('confirm')}
                 disabled={!selected}
-                className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+                className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
               >
                 Continue
               </button>
@@ -144,7 +170,9 @@ export function RestoreBackupModal({ onClose }: RestoreBackupModalProps): React.
 
         {step === 'confirm' && selected && (
           <>
-            <CardTitle className="text-[var(--foreground)]">Confirm Restore</CardTitle>
+            <CardTitle id="restore-modal-title" className="text-[var(--foreground)]">
+              Confirm Restore
+            </CardTitle>
             <Alert variant="error">
               This will permanently replace all current data — sales, customers, credit balances,
               everything — with the backup from {new Date(selected.timestamp).toLocaleString()}.
@@ -153,13 +181,13 @@ export function RestoreBackupModal({ onClose }: RestoreBackupModalProps): React.
             <div className="grid grid-cols-2 gap-3 pt-2">
               <button
                 onClick={() => setStep('select')}
-                className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)]"
+                className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
               >
                 Go Back
               </button>
               <button
                 onClick={() => void confirmRestore()}
-                className="min-h-11 rounded-[var(--radius)] bg-[var(--error)] px-3 text-sm font-semibold text-white"
+                className="min-h-11 rounded-[var(--radius)] bg-[var(--error)] px-3 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
               >
                 Restore & Restart
               </button>
@@ -169,21 +197,25 @@ export function RestoreBackupModal({ onClose }: RestoreBackupModalProps): React.
 
         {step === 'restoring' && (
           <>
-            <CardTitle className="text-[var(--foreground)]">Restoring…</CardTitle>
+            <CardTitle id="restore-modal-title" className="text-[var(--foreground)]">
+              Restoring…
+            </CardTitle>
             <Alert variant="pending">Verifying and staging the backup. Do not close the app.</Alert>
           </>
         )}
 
         {step === 'done' && (
           <>
-            <CardTitle className="text-[var(--foreground)]">Backup Staged</CardTitle>
+            <CardTitle id="restore-modal-title" className="text-[var(--foreground)]">
+              Backup Staged
+            </CardTitle>
             <Alert variant="success">
               The backup has been verified and staged. Restart the application now to complete the
               restore.
             </Alert>
             <button
               onClick={() => void restartNow()}
-              className="min-h-11 w-full rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
+              className="min-h-11 w-full rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
             >
               Restart Now
             </button>
@@ -192,11 +224,13 @@ export function RestoreBackupModal({ onClose }: RestoreBackupModalProps): React.
 
         {step === 'error' && (
           <>
-            <CardTitle className="text-[var(--foreground)]">Restore Failed</CardTitle>
+            <CardTitle id="restore-modal-title" className="text-[var(--foreground)]">
+              Restore Failed
+            </CardTitle>
             <Alert variant="error">{error}</Alert>
             <button
               onClick={onClose}
-              className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)]"
+              className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
             >
               Close
             </button>
