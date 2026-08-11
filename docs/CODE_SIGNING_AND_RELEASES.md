@@ -4,6 +4,36 @@ Status as of this change: **auto-update is fully wired in code; the app is NOT y
 code-signed** — no certificate exists yet. This doc is both the setup guide and the
 outstanding action-item list.
 
+## 0. Decision: shipping unsigned first, cert as a fallback
+
+Explicit decision (not a default/oversight): ship the current unsigned build, accept the
+one-time "unknown publisher" warning on the initial manual install, and **test the actual
+silent auto-update behavior on the client's real machine before deciding whether a
+certificate is required**. Buy the cert only if that test shows auto-update doesn't work
+silently unsigned.
+
+**What "doesn't work silently" can look like, concretely** — this is the thing to watch
+for during testing, not just "does a warning appear":
+- The update silently fails to apply at all — `autoUpdater` logs an `error` event (visible
+  in the daily log file, `type: 'ERROR', source: 'autoUpdater'`), the app reopens on the
+  **old** version, and nothing about that is visible to the cashier. Look at the logs after
+  every test cycle, not just the on-screen version number.
+- Windows surfaces a SmartScreen/UAC prompt during the silent `quitAndInstall()` step even
+  though nothing was double-clicked. Because this happens at quit time, **there may be no
+  one at the register to click "Run anyway"** — worst case, the app closes for the update
+  and simply doesn't come back until someone notices the POS terminal is sitting at a
+  Windows prompt. This is the scenario that most argues for the logout-time "Install &
+  Restart" prompt (already built — see §5) as the primary install trigger over unattended
+  `autoInstallOnAppQuit` at an arbitrary/overnight quit, since at least a person is present
+  at that moment to deal with a stuck installer.
+
+**Test protocol:** publish a second version (§4), let an already-installed unsigned build
+pick it up, and explicitly check: (1) does the log show a clean `update-downloaded` →
+successful relaunch, (2) does the app report the new version afterward, (3) did anything
+interactive appear on screen during the quit/restart. If all three come back clean, no
+cert is needed for now. If not, treat §2 (buying a certificate) as unblocked-but-required
+rather than optional polish.
+
 ## 1. Why this matters together
 
 An unsigned `.exe` triggers Windows SmartScreen's "unknown publisher" warning on every
