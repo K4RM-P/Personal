@@ -503,3 +503,11 @@ export interface ReaderStatus {
   provider: PaymentProviderName
   message?: string
 }
+
+export type UpdateState = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error'
+
+export interface UpdateStatus {
+  state: UpdateState
+  version?: string
+  error?: string
+}

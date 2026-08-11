@@ -3,7 +3,6 @@ import { join } from 'path'
 import { existsSync } from 'fs'
 import http from 'http'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
 import { getDb, closeDb } from './db/prisma'
 import { runPendingMigrations } from './db/migrate'
@@ -11,6 +10,7 @@ import { registerAllHandlers } from './ipc'
 import { applyPendingRestoreIfStaged } from './backup/backupService'
 import { resolveDbFilePath } from './backup/dbPath'
 import { initLogger, log } from './logging/logger'
+import { initAutoUpdater, setUpdateWindow } from './update/autoUpdate'
 
 // .env (dev-only, gitignored) is the only thing that sets DATABASE_URL, and it's
 // intentionally excluded from the packaged app. Without this fallback, Prisma has
@@ -71,7 +71,7 @@ async function loadRenderer(mainWindow: BrowserWindow): Promise<void> {
   )
 }
 
-function createWindow(): void {
+function createWindow(): BrowserWindow {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 1100,
@@ -95,6 +95,7 @@ function createWindow(): void {
   })
 
   void loadRenderer(mainWindow)
+  return mainWindow
 }
 
 app.whenReady().then(async () => {
@@ -125,21 +126,22 @@ app.whenReady().then(async () => {
     })
   })
 
-  createWindow()
+  const mainWindow = createWindow()
 
   app.on('activate', function () {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) {
+      const newWindow = createWindow()
+      // Keep the updater pointed at whichever window is actually on screen, so status
+      // broadcasts (banner/settings card) don't try to reach the destroyed original.
+      if (!is.dev) setUpdateWindow(newWindow)
+    }
   })
 
-  // Checks GitHub Releases for a newer build and installs it automatically, so the
-  // POS device never needs a manual browser re-download after the first install.
+  // Checks GitHub Releases for a newer signed build and downloads it in the background;
+  // installing only ever happens on quit/restart (see main/update/autoUpdate.ts), never
+  // mid-session, so an update landing never interrupts an in-progress sale.
   if (!is.dev) {
-    autoUpdater.on('error', (err) => {
-      log('ERROR', { message: err.message, source: 'autoUpdater' })
-    })
-    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
-      log('ERROR', { message: err instanceof Error ? err.message : String(err), source: 'autoUpdater' })
-    })
+    initAutoUpdater(mainWindow)
   }
 })
 

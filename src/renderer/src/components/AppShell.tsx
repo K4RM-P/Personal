@@ -1,10 +1,23 @@
 import * as React from 'react'
-import { ShoppingCart, Package, Users, Settings, BarChart3, Receipt, UserCog, LogOut, Menu, X } from 'lucide-react'
+import {
+  ShoppingCart,
+  Package,
+  Users,
+  Settings,
+  BarChart3,
+  Receipt,
+  UserCog,
+  LogOut,
+  Menu,
+  X
+} from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useCurrentUser } from '../context/CurrentUserContext'
 import { LogoutConfirmModal } from './LogoutConfirmModal'
+import { UpdateBanner } from './UpdateBanner'
 
-export type NavTab = 'checkout' | 'products' | 'customers' | 'settings' | 'reports' | 'users' | 'sales'
+export type NavTab =
+  'checkout' | 'products' | 'customers' | 'settings' | 'reports' | 'users' | 'sales'
 
 interface AppShellProps {
   activeTab: NavTab
@@ -15,17 +28,18 @@ interface AppShellProps {
 // Refunds is not a nav tab — it's reached from a button on Checkout, gated by
 // manager auth there (see RefundsScreen). Cashiers never see it in the sidebar.
 // Past Sales is manager-only too — cashiers only get the Refunds button.
-const allNavItems: { id: NavTab; label: string; icon: React.ElementType; managerOnly: boolean }[] = [
-  { id: 'checkout', label: 'Checkout', icon: ShoppingCart, managerOnly: false },
-  { id: 'sales', label: 'Past Sales', icon: Receipt, managerOnly: true },
-  { id: 'customers', label: 'Customers', icon: Users, managerOnly: true },
-  { id: 'products', label: 'Products', icon: Package, managerOnly: true },
-  { id: 'reports', label: 'Reports', icon: BarChart3, managerOnly: true },
-  { id: 'settings', label: 'Settings', icon: Settings, managerOnly: true },
-  { id: 'users', label: 'Users', icon: UserCog, managerOnly: true }
-]
+const allNavItems: { id: NavTab; label: string; icon: React.ElementType; managerOnly: boolean }[] =
+  [
+    { id: 'checkout', label: 'Checkout', icon: ShoppingCart, managerOnly: false },
+    { id: 'sales', label: 'Past Sales', icon: Receipt, managerOnly: true },
+    { id: 'customers', label: 'Customers', icon: Users, managerOnly: true },
+    { id: 'products', label: 'Products', icon: Package, managerOnly: true },
+    { id: 'reports', label: 'Reports', icon: BarChart3, managerOnly: true },
+    { id: 'settings', label: 'Settings', icon: Settings, managerOnly: true },
+    { id: 'users', label: 'Users', icon: UserCog, managerOnly: true }
+  ]
 
-export function AppShell({ activeTab, onTabChange, children }: AppShellProps) {
+export function AppShell({ activeTab, onTabChange, children }: AppShellProps): React.JSX.Element {
   const { user, logout } = useCurrentUser()
   const isManager = user?.role === 'MANAGER'
   const navItems = allNavItems.filter((item) => !item.managerOnly || isManager)
@@ -75,7 +89,9 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps) {
             Rx
           </div>
           <div className="hidden sm:block">
-            <h1 className="text-base font-semibold leading-tight text-[var(--foreground)]">PharmaPOS</h1>
+            <h1 className="text-base font-semibold leading-tight text-[var(--foreground)]">
+              PharmaPOS
+            </h1>
             <p className="text-xs text-[var(--muted-foreground)]">Pharmacy Management</p>
           </div>
         </div>
@@ -157,6 +173,8 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps) {
           </div>
         )}
       </header>
+
+      <UpdateBanner />
 
       <main className="flex-1 overflow-y-auto bg-[var(--background)] p-8">{children}</main>
 
