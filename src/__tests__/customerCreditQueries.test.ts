@@ -131,6 +131,31 @@ describe('customer credit ledger', () => {
     expect(sale.changeCents).toBe(0)
   })
 
+  it('rejects a card surcharge on a non-card tender', async () => {
+    await expect(
+      createTransaction(db, {
+        items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
+        taxRatePercent: 0,
+        tenderType: 'CASH',
+        tenderedCents: 1020,
+        surchargeCents: 20
+      })
+    ).rejects.toThrow('Card surcharge cannot be applied to a non-card tender.')
+  })
+
+  it('rejects a card surcharge that does not match the configured rate', async () => {
+    // Configured rate is 2%; 1000 * 2% = 20, so 999 is wrong regardless of what the client sent.
+    await expect(
+      createTransaction(db, {
+        items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
+        taxRatePercent: 0,
+        tenderType: 'CARD',
+        tenderedCents: 1999,
+        surchargeCents: 999
+      })
+    ).rejects.toThrow('Card surcharge does not match the configured rate.')
+  })
+
   it('records an E-Transfer tender with email and no ledger entry', async () => {
     const sale = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],

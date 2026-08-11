@@ -62,7 +62,10 @@ export function registerReceiptHandlers(db: PrismaClient): void {
     }
   })
 
+  // Only reachable from Settings (manager-only nav) — also affects card surcharge % and
+  // whether short cash payments can go to a customer's tab, both money-relevant.
   ipcMain.handle(IPC.SETTINGS_SAVE_CHECKOUT, async (_e, input: CheckoutSettings) => {
+    requireManager()
     await Promise.all([
       saveAllowCreditCardSurcharge(db, input.allowCreditCardSurcharge),
       saveCardSurchargePercent(db, input.cardSurchargePercent),

@@ -33,6 +33,26 @@ describe('SquareTerminalAdapter', () => {
     expect(res.transactionId).toBe('pay_1')
   })
 
+  it('reuses the same idempotency key for the same orderRef (retry safety)', async () => {
+    const seenKeys: string[] = []
+    const http = router((method, url, body) => {
+      if (method === 'POST' && url.endsWith('/v2/terminals/checkouts')) {
+        seenKeys.push((body as { idempotency_key: string }).idempotency_key)
+        return ok({ checkout: { id: 'co_1', status: 'PENDING' } })
+      }
+      if (method === 'GET' && url.endsWith('/v2/terminals/checkouts/co_1'))
+        return ok({ checkout: { id: 'co_1', status: 'COMPLETED', payment_ids: ['pay_1'] } })
+      return undefined
+    })
+    const a = new SquareTerminalAdapter(http)
+    await a.init({ provider: 'square', environment: 'sandbox', terminalId: 'device_1', apiKey: 'tok' })
+    await a.charge(4217, 'SALE-1')
+    await a.charge(4217, 'SALE-1') // retry of the same logical attempt, same orderRef
+    expect(seenKeys).toHaveLength(2)
+    expect(seenKeys[0]).toBe(seenKeys[1])
+    expect(seenKeys[0]).toBe('checkout-SALE-1')
+  })
+
   it('declines when the checkout is canceled', async () => {
     const http = router((method, url) => {
       if (method === 'POST' && url.endsWith('/v2/terminals/checkouts')) return ok({ checkout: { id: 'co_2', status: 'PENDING' } })

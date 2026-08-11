@@ -20,6 +20,7 @@ import {
 } from '../catalog/catalogQueries'
 import { getCatalogProvince, setCatalogProvince } from '../db/queries/settingsQueries'
 import { log } from '../logging/logger'
+import { requireManager } from '../auth/session'
 
 /** Wraps a handler so a thrown error surfaces as a clean message, not an unhandled rejection. */
 function guard<A extends unknown[], R>(
@@ -56,6 +57,7 @@ export function registerCatalogHandlers(db: PrismaClient): void {
   ipcMain.handle(
     IPC.CATALOG_START_IMPORT,
     guard('Catalogue import', async (event: Electron.IpcMainInvokeEvent, filePath: string) => {
+      requireManager()
       const sender = event.sender
       const onProgress = (progress: CatalogImportProgress): void => {
         if (!sender.isDestroyed()) sender.send(IPC.CATALOG_IMPORT_PROGRESS, progress)
@@ -72,6 +74,7 @@ export function registerCatalogHandlers(db: PrismaClient): void {
         _e: Electron.IpcMainInvokeEvent,
         payload: { batchId: number; confirmations?: string[] }
       ) => {
+        requireManager()
         const result = await commitImport(db, payload.batchId, {
           confirmations: payload.confirmations
         })
@@ -84,6 +87,7 @@ export function registerCatalogHandlers(db: PrismaClient): void {
   ipcMain.handle(
     IPC.CATALOG_DISCARD_IMPORT,
     guard('Catalogue discard', async (_e: Electron.IpcMainInvokeEvent, batchId: number) => {
+      requireManager()
       await discardImport(db, batchId)
       return { ok: true }
     })
@@ -91,7 +95,10 @@ export function registerCatalogHandlers(db: PrismaClient): void {
 
   ipcMain.handle(
     IPC.CATALOG_ROLLBACK,
-    guard('Catalogue rollback', async () => rollbackImport(db))
+    guard('Catalogue rollback', async () => {
+      requireManager()
+      return rollbackImport(db)
+    })
   )
 
   ipcMain.handle(
@@ -128,19 +135,25 @@ export function registerCatalogHandlers(db: PrismaClient): void {
     IPC.CATALOG_PROMOTE,
     guard(
       'Promote catalogue item',
-      async (_e: Electron.IpcMainInvokeEvent, catalogProductId: number) =>
-        promoteCatalogProduct(db, catalogProductId)
+      async (_e: Electron.IpcMainInvokeEvent, catalogProductId: number) => {
+        requireManager()
+        return promoteCatalogProduct(db, catalogProductId)
+      }
     )
   )
 
   ipcMain.handle(
     IPC.CATALOG_PROMOTE_ALL,
-    guard('Promote all catalogue items', async () => promoteAllCatalogProducts(db))
+    guard('Promote all catalogue items', async () => {
+      requireManager()
+      return promoteAllCatalogProducts(db)
+    })
   )
 
   ipcMain.handle(
     IPC.CATALOG_AUTO_IMPORT,
     guard('Auto import catalogue', async (event: Electron.IpcMainInvokeEvent, filePath: string) => {
+      requireManager()
       const sender = event.sender
       const onProgress = (progress: CatalogImportProgress): void => {
         if (!sender.isDestroyed()) sender.send(IPC.CATALOG_IMPORT_PROGRESS, progress)
@@ -156,8 +169,9 @@ export function registerCatalogHandlers(db: PrismaClient): void {
 
   ipcMain.handle(
     IPC.CATALOG_SET_PROVINCE,
-    guard('Set catalogue province', async (_e: Electron.IpcMainInvokeEvent, province: string) =>
-      setCatalogProvince(db, province)
-    )
+    guard('Set catalogue province', async (_e: Electron.IpcMainInvokeEvent, province: string) => {
+      requireManager()
+      return setCatalogProvince(db, province)
+    })
   )
 }

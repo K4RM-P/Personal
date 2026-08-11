@@ -30,14 +30,17 @@ export function registerCustomerHandlers(db: PrismaClient): void {
   ipcMain.handle(IPC.CUSTOMER_ADD_FUNDS, (_e, { customerId, amountCents, note }) =>
     addFunds(db, customerId, amountCents, note)
   )
-  ipcMain.handle(
-    IPC.CUSTOMER_ADJUST_CREDIT,
-    (_e, { customerId, amountCents, note, managerGranted }) =>
-      adjustCredit(db, customerId, amountCents, note, managerGranted)
-  )
-  ipcMain.handle(IPC.CUSTOMER_ADJUST_POINTS, (_e, { customerId, points, note, managerGranted }) =>
-    adjustPoints(db, customerId, points, note, managerGranted)
-  )
+  ipcMain.handle(IPC.CUSTOMER_ADJUST_CREDIT, (_e, { customerId, amountCents, note }) => {
+    // managerGranted used to come straight from the renderer payload — a caller invoking
+    // this channel directly (e.g. devtools) could pass true without ever authenticating.
+    // Re-derive it from the real backend session instead of trusting the client.
+    requireManager()
+    return adjustCredit(db, customerId, amountCents, note, true)
+  })
+  ipcMain.handle(IPC.CUSTOMER_ADJUST_POINTS, (_e, { customerId, points, note }) => {
+    requireManager()
+    return adjustPoints(db, customerId, points, note, true)
+  })
   ipcMain.handle(IPC.CUSTOMER_GET_CREDIT_SETTINGS, () => getCreditSettings(db))
   ipcMain.handle(IPC.CUSTOMER_SAVE_CREDIT_SETTINGS, (_e, input) => saveCreditSettings(db, input))
 

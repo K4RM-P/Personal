@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client'
 import { IPC } from '../../shared/channels'
 import { getActiveProvider, resetActiveProvider } from '../payment/paymentService'
 import { getPaymentConfigView, savePaymentConfig } from '../payment/paymentConfig'
+import { requireManager } from '../auth/session'
 import type {
   ChargeOptions,
   ChargeResult,
@@ -67,7 +68,10 @@ export function registerPaymentHandlers(db: PrismaClient): void {
 
   ipcMain.handle(IPC.SETTINGS_GET_PAYMENT, () => getPaymentConfigView(db))
 
+  // Only reachable from the Settings screen (manager-only nav) — enforce server-side too,
+  // since it changes which payment processor/credentials are live.
   ipcMain.handle(IPC.SETTINGS_SAVE_PAYMENT, async (_e, input: SavePaymentConfigInput) => {
+    requireManager()
     const view = await savePaymentConfig(db, input)
     resetActiveProvider() // next operation re-inits with the new provider/creds
     return view
