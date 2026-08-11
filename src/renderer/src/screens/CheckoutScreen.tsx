@@ -1184,6 +1184,59 @@ export function CheckoutScreen(): React.JSX.Element {
                       </button>
                     )}
 
+                    {tenderedCents > 0 && tenderedCents < effectiveTotal && !attachedCustomer && (
+                      <div>
+                        <label className="mb-1 block font-semibold text-[var(--foreground)]">
+                          Attach a customer to put {formatCurrency(shortCents)} on their tab
+                        </label>
+                        <div className="relative">
+                          <input
+                            ref={searchRef}
+                            value={customerSearchQuery}
+                            onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') void handleCustomerSearch()
+                            }}
+                            placeholder="Search name or phone, then Enter"
+                            className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm"
+                          />
+                          {customerSearchResults.length > 0 && (
+                            <div className="relative z-20 mt-1 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">
+                              {customerSearchResults.map((customer) => (
+                                <button
+                                  key={customer.id}
+                                  onClick={() => void attachCustomer(customer)}
+                                  className="block min-h-11 w-full border-b border-[var(--border)] px-3 text-left text-sm last:border-0"
+                                >
+                                  <b>
+                                    {customer.firstName} {customer.lastName}
+                                  </b>{' '}
+                                  · {customer.phone}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {/* No results → offer to add a new customer */}
+                          {customerSearchQuery.trim() !== '' &&
+                            customerSearchResults.length === 0 && (
+                              <div className="relative z-20 mt-1 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white p-3 text-center text-sm shadow-sm">
+                                <div className="mb-2 text-[var(--muted-foreground)]">
+                                  Customer not found
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setShowAddCustomer(true)
+                                  }}
+                                  className="min-h-11 w-full rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
+                                >
+                                  + Add new customer
+                                </button>
+                              </div>
+                            )}
+                        </div>
+                      </div>
+                    )}
+
                     {tenderedCents > 0 && tenderedCents < effectiveTotal && attachedCustomer && (
                       <button
                         onClick={() => void completeSale('CASH', shortCents)}
