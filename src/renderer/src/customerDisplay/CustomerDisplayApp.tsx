@@ -10,6 +10,7 @@ import { PaymentCashScreen } from './screens/PaymentCashScreen'
 import { PaymentCardScreen } from './screens/PaymentCardScreen'
 import { PaymentETransferScreen } from './screens/PaymentETransferScreen'
 import { PaymentTabScreen } from './screens/PaymentTabScreen'
+import { ThankYouScreen } from './screens/ThankYouScreen'
 
 const DEFAULT_SETTINGS: CustomerDisplaySettingsDTO = {
   enabled: true,
@@ -68,6 +69,8 @@ export function CustomerDisplayApp(): React.JSX.Element {
       )
     case 'payment-tab':
       return <PaymentTabScreen state={state} />
+    case 'thank-you':
+      return <ThankYouScreen pharmacyName={state.pharmacyName || settings.pharmacyName} />
     default:
       // Unreachable: 'idle' is handled above and every other mode has a screen.
       return (
