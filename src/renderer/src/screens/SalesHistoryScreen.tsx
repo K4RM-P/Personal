@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Receipt } from 'lucide-react'
+import { CheckCircle2, Loader2, Receipt, XCircle } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
 import { RefundWorkflowModal } from '../components/RefundWorkflowModal'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -83,7 +83,7 @@ export function SalesHistoryScreen(): React.JSX.Element {
                   value={fromDate}
                   max={toDate}
                   onChange={(e) => setFromDate(e.target.value)}
-                  className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
+                  className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:shadow-[0_0_0_3px_rgba(15,118,110,0.15)] focus:outline-none"
                 />
               </div>
               <div>
@@ -94,7 +94,7 @@ export function SalesHistoryScreen(): React.JSX.Element {
                   min={fromDate}
                   max={today}
                   onChange={(e) => setToDate(e.target.value)}
-                  className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
+                  className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:shadow-[0_0_0_3px_rgba(15,118,110,0.15)] focus:outline-none"
                 />
               </div>
             </>
@@ -106,7 +106,7 @@ export function SalesHistoryScreen(): React.JSX.Element {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="e.g. R-1024"
-              className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
+              className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:shadow-[0_0_0_3px_rgba(15,118,110,0.15)] focus:outline-none"
             />
           </div>
           {isManager && (
@@ -133,45 +133,79 @@ export function SalesHistoryScreen(): React.JSX.Element {
               : 'Sales you and other cashiers rang up in the last 24 hours.'}
           </CardDescription>
         </CardHeader>
-        <div className="mt-2 space-y-2">
-          {!loading && sales.length === 0 && (
-            <EmptyState icon={Receipt} title="No sales match this filter" description="Try a different date range or sale number." />
+        <div className="mt-2">
+          {!loading && sales.length > 0 && (
+            <div className="flex items-center gap-3 border-b border-[var(--border)] px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+              <div className="flex-1">Sale</div>
+              <div className="w-24 shrink-0 text-right">Total</div>
+              {isManager && <div className="w-24 shrink-0 text-right">Action</div>}
+            </div>
           )}
-          {sales.map((sale) => {
-            const isRefundable = isManager && sale.status !== 'VOIDED' && sale.refundedCents < sale.totalCents
-            return (
-              <div
-                key={sale.id}
-                className="flex min-h-11 items-center justify-between gap-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3 text-xs"
-              >
-                <div>
-                  <div className="font-bold text-[var(--foreground)]">{sale.receiptNumber}</div>
-                  <div className="text-[var(--muted-foreground)]">
-                    {new Date(sale.createdAt).toLocaleString()} • {sale.itemCount} items • {sale.tenderType}
-                    {sale.cashierName ? ` • ${sale.cashierName}` : ''}
-                    {' • '}
-                    <span className={sale.status === 'VOIDED' ? 'font-bold text-[var(--error)]' : 'text-[var(--success)]'}>
-                      {sale.status}
-                    </span>
-                    {sale.refundedCents > 0 && ` • refunded ${formatCurrency(sale.refundedCents)}`}
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-bold text-[var(--primary)]">{formatCurrency(sale.totalCents)}</span>
-                  {isManager && (
-                    <button
-                      onClick={() => setRefundTargetId(sale.id)}
-                      disabled={!isRefundable}
-                      title={!isRefundable ? 'This sale has already been fully refunded or was voided.' : undefined}
-                      className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-xs font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      Refund
-                    </button>
-                  )}
-                </div>
+          <div className="space-y-2 pt-2">
+            {loading && (
+              <div className="flex items-center justify-center gap-2 py-8 text-sm text-[var(--muted-foreground)]">
+                <Loader2 className="icon-4 animate-spin" aria-hidden="true" />
+                Loading sales…
               </div>
-            )
-          })}
+            )}
+            {!loading && sales.length === 0 && (
+              <EmptyState
+                icon={Receipt}
+                title="No sales match this filter"
+                description="Try a different date range or sale number."
+              />
+            )}
+            {!loading &&
+              sales.map((sale) => {
+                const isRefundable =
+                  isManager && sale.status !== 'VOIDED' && sale.refundedCents < sale.totalCents
+                const isVoided = sale.status === 'VOIDED'
+                const StatusIcon = isVoided ? XCircle : CheckCircle2
+                return (
+                  <div
+                    key={sale.id}
+                    className="flex min-h-11 items-center justify-between gap-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3 text-xs"
+                  >
+                    <div>
+                      <div className="font-bold text-[var(--foreground)]">{sale.receiptNumber}</div>
+                      <div className="flex flex-wrap items-center gap-x-1 text-[var(--muted-foreground)]">
+                        <span>
+                          {new Date(sale.createdAt).toLocaleString()} • {sale.itemCount} items •{' '}
+                          {sale.tenderType}
+                          {sale.cashierName ? ` • ${sale.cashierName}` : ''} •
+                        </span>
+                        <span
+                          className={`inline-flex items-center gap-1 font-semibold ${isVoided ? 'text-[var(--error)]' : 'text-[var(--success)]'}`}
+                        >
+                          <StatusIcon className="icon-3_5 shrink-0" aria-hidden="true" />
+                          {sale.status}
+                        </span>
+                        {sale.refundedCents > 0 && <span>• refunded {formatCurrency(sale.refundedCents)}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="w-24 shrink-0 text-right text-sm font-bold tabular-nums text-[var(--primary)]">
+                        {formatCurrency(sale.totalCents)}
+                      </span>
+                      {isManager && (
+                        <button
+                          onClick={() => setRefundTargetId(sale.id)}
+                          disabled={!isRefundable}
+                          title={
+                            !isRefundable
+                              ? 'This sale has already been fully refunded or was voided.'
+                              : undefined
+                          }
+                          className="min-h-11 w-24 shrink-0 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-xs font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Refund
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+          </div>
         </div>
       </Card>
 
