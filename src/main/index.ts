@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow } from 'electron'
+import { app, shell, BrowserWindow, nativeImage } from 'electron'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import http from 'http'
@@ -81,7 +81,7 @@ function createWindow(): BrowserWindow {
     height: 750,
     show: false,
     autoHideMenuBar: true,
-    ...(process.platform === 'linux' ? { icon } : {}),
+    icon,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
@@ -103,6 +103,14 @@ function createWindow(): BrowserWindow {
 
 app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.pharmacy.pos')
+
+  // BrowserWindow's `icon` option is a no-op on macOS (window icons aren't a thing there) —
+  // only the Dock icon is visible, and in dev that defaults to Electron's own atom icon
+  // since there's no packaged .app bundle to source it from. Packaged builds get the right
+  // icon automatically from build/icon.icns via electron-builder, so this only matters here.
+  if (process.platform === 'darwin' && is.dev) {
+    app.dock?.setIcon(nativeImage.createFromPath(icon))
+  }
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
