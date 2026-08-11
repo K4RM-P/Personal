@@ -12,16 +12,23 @@ import { resolveDbFilePath } from './backup/dbPath'
 import { initLogger, log } from './logging/logger'
 import { initAutoUpdater, setUpdateWindow } from './update/autoUpdate'
 import { initCustomerDisplayWindow, teardownCustomerDisplayWindow } from './customerDisplayWindow'
-import { isDemoModeEnabled, isDemoDatabaseUninitialized, resolveDatabaseUrl } from './demoMode'
-import { seedDemoDatabase } from './db/seedDemo'
+import { join as joinPath } from 'path'
 
 // .env (dev-only, gitignored) is the only thing that sets DATABASE_URL under normal
-// circumstances, and it's intentionally excluded from the packaged app. resolveDatabaseUrl()
-// honors it when present and falls back appropriately otherwise (including right after an
-// app.relaunch(), which loses .env — see the comment on resolveDatabaseUrl for why that
-// matters). Demo mode always wins over .env — it needs a fully separate, swappable database
-// file regardless of dev/prod, so a client demo never touches real data.
-process.env.DATABASE_URL = resolveDatabaseUrl()
+// circumstances, and it's intentionally excluded from the packaged app.
+//
+// `app.relaunch()` (used for staged backup restores) spawns a bare `electron` process
+// outside electron-vite's dev orchestration, so `.env` never gets reinjected into
+// `process.env` on the relaunched process — see the loadRenderer() comment below for the
+// same gotcha. That means `process.env.DATABASE_URL` can legitimately be unset here even
+// in dev, right after a relaunch. Falling back to the packaged-style userData path in
+// that case would silently connect to a brand-new, unmigrated database instead of the
+// real `prisma/dev.db` — so the dev fallback below must match what `.env` normally provides.
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = is.dev
+    ? `file:${joinPath(app.getAppPath(), 'prisma', 'dev.db')}`
+    : `file:${joinPath(app.getPath('userData'), 'pharmapos.db')}`
+}
 
 /**
  * Checks that the electron-vite dev server is actually reachable before pointing the
@@ -121,18 +128,9 @@ app.whenReady().then(async () => {
   const restore = applyPendingRestoreIfStaged(resolveDbFilePath())
   if (restore.applied) log('RESTORE_STAGED', { dbFilePath: resolveDbFilePath() })
 
-  const demoMode = isDemoModeEnabled()
-  const demoDbIsNew = demoMode && isDemoDatabaseUninitialized()
-
   const db = getDb()
-  // The demo database is never touched by `prisma migrate dev`/deploy — it's created
-  // and migrated here on first activation, in both dev and packaged builds.
-  if (!is.dev || demoMode) {
+  if (!is.dev) {
     await runPendingMigrations(db)
-  }
-  if (demoDbIsNew) {
-    await seedDemoDatabase(db)
-    log('DEMO_MODE_SEEDED', {})
   }
   registerAllHandlers(db)
 

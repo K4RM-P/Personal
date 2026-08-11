@@ -89,8 +89,6 @@ export const IPC = {
   SETTINGS_SAVE_IDLE_TIMEOUT: 'settings:saveIdleTimeout',
   SETTINGS_GET_DISPLAY_DENSITY: 'settings:getDisplayDensity',
   SETTINGS_SAVE_DISPLAY_DENSITY: 'settings:saveDisplayDensity',
-  SETTINGS_GET_DEMO_MODE: 'settings:getDemoMode',
-  SETTINGS_SET_DEMO_MODE: 'settings:setDemoMode',
 
   // Auth & user management channels
   AUTH_LOGIN: 'auth:login',

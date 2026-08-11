@@ -1,4 +1,4 @@
-import { dialog, ipcMain, BrowserWindow, app } from 'electron'
+import { dialog, ipcMain, BrowserWindow } from 'electron'
 import { PrismaClient } from '@prisma/client'
 import { readFile, writeFile } from 'fs/promises'
 import { extname } from 'path'
@@ -31,8 +31,7 @@ import {
   getDisplayDensityLevel,
   saveDisplayDensityLevel
 } from '../db/queries/settingsQueries'
-import { requireManager, clearSession } from '../auth/session'
-import { isDemoModeEnabled, setDemoModeEnabled } from '../demoMode'
+import { requireManager } from '../auth/session'
 import type {
   PrinterConfig,
   StoreInfo,
@@ -356,17 +355,5 @@ export function registerReceiptHandlers(db: PrismaClient): void {
   ipcMain.handle(IPC.SETTINGS_GET_DISPLAY_DENSITY, () => getDisplayDensityLevel(db))
   ipcMain.handle(IPC.SETTINGS_SAVE_DISPLAY_DENSITY, (_e, level: number) =>
     saveDisplayDensityLevel(db, level)
-  )
-
-  ipcMain.handle(IPC.SETTINGS_GET_DEMO_MODE, () => isDemoModeEnabled())
-  ipcMain.handle(
-    IPC.SETTINGS_SET_DEMO_MODE,
-    guard('Toggle demo mode', async (_e, enabled: boolean) => {
-      requireManager()
-      setDemoModeEnabled(enabled)
-      clearSession()
-      app.relaunch()
-      app.exit(0)
-    })
   )
 }
