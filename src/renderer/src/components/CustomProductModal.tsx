@@ -28,6 +28,16 @@ export function CustomProductModal({ mode, onApply, onCancel }: CustomProductMod
     })
   }
 
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onCancel()
+      else if (e.key === 'Enter') handleSubmit()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onCancel, canSubmit, rxNumber, itemName, priceCents])
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <Card className="w-[420px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-4">
