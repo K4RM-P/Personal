@@ -8,7 +8,7 @@ import { RefundsScreen } from './RefundsScreen'
 import { formatCurrency } from '@shared/formatCurrency'
 import type { Product, Customer, TransactionWithItems, ChargeResult } from '@shared/types'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
-import { Lock, RotateCcw, ShoppingCart, ArrowUpRight, ArrowDownRight, Banknote, Send, CreditCard, HeartHandshake, ChevronLeft, Pill, PackagePlus, Percent, Trash2 } from 'lucide-react'
+import { Lock, RotateCcw, ShoppingCart, ArrowUpRight, ArrowDownRight, Banknote, Send, CreditCard, HeartHandshake, ChevronLeft, Pill, PackagePlus, Trash2 } from 'lucide-react'
 
 type ScanFeedback = { type: 'success' | 'error'; message: string } | null
 type PaymentMethod = 'CASH' | 'E_TRANSFER' | 'CARD' | 'PHARMACY_CREDIT' | null
@@ -138,7 +138,6 @@ export function CheckoutScreen(): React.JSX.Element {
       }
       return [...prev, { product, quantity: 1, unitPriceCents: product.priceCents }]
     })
-    setScanFeedback({ type: 'success', message: `Added ${product.name}` })
     setSearchQuery('')
     setProducts([])
   }
@@ -215,7 +214,6 @@ export function CheckoutScreen(): React.JSX.Element {
           }
           return [...prev, { product, quantity: 1, unitPriceCents: product.priceCents }]
         })
-        setScanFeedback({ type: 'success', message: `Added ${product.name}` })
       } catch (err) {
         setScanFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Scan failed' })
       }
@@ -584,9 +582,48 @@ export function CheckoutScreen(): React.JSX.Element {
         </button>
       </div>
 
-      {/* Scan feedback */}
+      {/* Scan feedback — errors only; a successful add is already visible in the cart. */}
       {scanFeedback && <Alert variant={scanFeedback.type}>{scanFeedback.message}</Alert>}
 
+      <div className="flex items-start gap-4">
+      {/* Parked Sales — sits to the left of the main column instead of stacking
+          above the cart, so it doesn't push checkout content down the page. */}
+      {parkedCarts.length > 0 && (
+        <div className="w-56 shrink-0 space-y-2">
+          <Card className="border-[var(--warning)]/30 bg-[var(--warning-bg)]">
+            <h3 className="mb-2 text-sm font-semibold text-[var(--warning)]">Parked ({parkedCarts.length})</h3>
+            <div className="space-y-2">
+              {parkedCarts.map((parked) => (
+                <div key={parked.id} className="rounded-[var(--radius)] border border-[var(--border)] bg-white p-2 text-xs">
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-[var(--foreground)]">{parked.name}</div>
+                    {parked.customer && (
+                      <div className="truncate text-[var(--muted-foreground)]">{parked.customer.firstName} {parked.customer.lastName}</div>
+                    )}
+                  </div>
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <button
+                      onClick={() => handleResumeParkedSale(parked.id)}
+                      className="min-h-8 flex-1 rounded-[var(--radius)] bg-[var(--warning)] px-2 py-1 font-medium text-[var(--primary-foreground)]"
+                    >
+                      Resume
+                    </button>
+                    <button
+                      onClick={() => handleDeleteParkedSale(parked.id)}
+                      aria-label="Delete parked sale"
+                      className="flex min-h-8 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] px-2 py-1 font-medium text-[var(--error)] hover:bg-[var(--error-bg)]"
+                    >
+                      <Trash2 className="icon-3_5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      <div className="min-w-0 flex-1 space-y-4">
       {/* Product search — compact single row. A single match auto-adds to the
           cart (same as a barcode scan); multiple matches drop into a small
           overlay dropdown that never pushes page content down or scrolls
@@ -645,40 +682,6 @@ export function CheckoutScreen(): React.JSX.Element {
           </button>
         </div>
       </Card>
-
-      {/* Parked Sales */}
-      {parkedCarts.length > 0 && (
-        <Card className="border-[var(--warning)]/30 bg-[var(--warning-bg)]">
-          <h3 className="mb-2 text-sm font-semibold text-[var(--warning)]">Parked Sales ({parkedCarts.length})</h3>
-          <div className="space-y-2">
-            {parkedCarts.map((parked) => (
-              <div key={parked.id} className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-white p-2 text-xs">
-                <div>
-                  <span className="font-medium text-[var(--foreground)]">{parked.name}</span>
-                  {parked.customer && (
-                    <div className="text-[var(--muted-foreground)]">{parked.customer.firstName} {parked.customer.lastName}</div>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleResumeParkedSale(parked.id)}
-                    className="min-h-8 rounded-[var(--radius)] bg-[var(--warning)] px-2 py-1 font-medium text-[var(--primary-foreground)]"
-                  >
-                    Resume Sale
-                  </button>
-                  <button
-                    onClick={() => handleDeleteParkedSale(parked.id)}
-                    aria-label="Delete parked sale"
-                    className="flex min-h-8 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] px-2 py-1 font-medium text-[var(--error)] hover:bg-[var(--error-bg)]"
-                  >
-                    <Trash2 className="icon-3_5" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
 
       {/* Cart — full width */}
       <Card>
@@ -788,9 +791,8 @@ export function CheckoutScreen(): React.JSX.Element {
               disabled={cart.length === 0}
               title={effectiveBillDiscountCents > 0 ? 'Edit whole-bill discount' : 'Whole Bill Discount'}
               aria-label={effectiveBillDiscountCents > 0 ? 'Edit whole-bill discount' : 'Whole Bill Discount'}
-              className={`flex h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-[var(--radius)] border text-[10px] font-semibold disabled:opacity-50 ${effectiveBillDiscountCents > 0 ? 'border-[var(--success)] bg-[var(--success-bg)] text-[var(--success)]' : 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]'}`}
+              className={`flex h-14 flex-1 items-center justify-center rounded-[var(--radius)] border text-xs font-semibold disabled:opacity-50 ${effectiveBillDiscountCents > 0 ? 'border-[var(--success)] bg-[var(--success-bg)] text-[var(--success)]' : 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]'}`}
             >
-              <Percent className="icon-4" />
               Disc.
             </button>
             <button
@@ -803,6 +805,8 @@ export function CheckoutScreen(): React.JSX.Element {
           </div>
         </div>
       </Card>
+      </div>
+      </div>
 
       {/* PAY popup — not dismissable by outside click; explicit Cancel only before a method is picked */}
       {showPayModal && (
