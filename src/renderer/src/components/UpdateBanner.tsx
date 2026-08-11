@@ -35,15 +35,15 @@ export function UpdateBanner(): React.JSX.Element | null {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--muted)] px-4 py-2 text-sm text-[var(--foreground)]">
       <div className="flex items-center gap-2">
-        <Download className="h-4 w-4 shrink-0" />
+        <Download className="icon-4 shrink-0" aria-hidden="true" />
         <span>{message}</span>
       </div>
       <button
         onClick={() => setDismissed(true)}
         aria-label="Dismiss update notice"
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--radius)] text-[var(--muted-foreground)] hover:bg-[var(--border)] hover:text-[var(--foreground)]"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] text-[var(--muted-foreground)] hover:bg-[var(--border)] hover:text-[var(--foreground)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
       >
-        <X className="h-4 w-4" />
+        <X className="icon-4" aria-hidden="true" />
       </button>
     </div>
   )

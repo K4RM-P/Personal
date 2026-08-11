@@ -10,25 +10,30 @@ function isError<T>(v: T | { error: string }): v is { error: string } {
   return typeof v === 'object' && v !== null && 'error' in v
 }
 
-const inputCls =
-  'w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none'
+const inputCls = 'input'
 
 export function UsersScreen(): React.JSX.Element {
   const { user: currentUser } = useCurrentUser()
   const [users, setUsers] = React.useState<AuthUser[]>([])
+  const [loading, setLoading] = React.useState(true)
   const [loadError, setLoadError] = React.useState<string | null>(null)
   const [showAdd, setShowAdd] = React.useState(false)
   const [editing, setEditing] = React.useState<AuthUser | null>(null)
   const [deleting, setDeleting] = React.useState<AuthUser | null>(null)
 
   const refresh = React.useCallback(async (): Promise<void> => {
-    const result = await window.api.user.list()
-    if (isError(result)) {
-      setLoadError(result.error)
-      return
+    setLoading(true)
+    try {
+      const result = await window.api.user.list()
+      if (isError(result)) {
+        setLoadError(result.error)
+        return
+      }
+      setLoadError(null)
+      setUsers(result)
+    } finally {
+      setLoading(false)
     }
-    setLoadError(null)
-    setUsers(result)
   }, [])
 
   React.useEffect(() => {
@@ -64,7 +69,14 @@ export function UsersScreen(): React.JSX.Element {
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => (
+            {loading && (
+              <tr>
+                <td colSpan={5} className="py-6 text-center text-sm text-[var(--muted-foreground)]">
+                  Loading users…
+                </td>
+              </tr>
+            )}
+            {!loading && users.map((u) => (
               <tr key={u.id} className="border-b border-[var(--border)] last:border-0 text-[var(--foreground)]">
                 <td className="py-3 pr-4 font-medium">
                   {u.fullName}
@@ -95,7 +107,7 @@ export function UsersScreen(): React.JSX.Element {
                 </td>
               </tr>
             ))}
-            {users.length === 0 && !loadError && (
+            {!loading && users.length === 0 && !loadError && (
               <tr>
                 <td colSpan={5} className="py-2">
                   <EmptyState icon={UsersIcon} title="No users yet" description="Add a staff account to get started." />
@@ -144,9 +156,29 @@ function PasswordField({
   )
 }
 
-function Modal({ children }: { children: React.ReactNode }): React.JSX.Element {
+function Modal({
+  children,
+  onClose
+}: {
+  children: React.ReactNode
+  onClose?: () => void
+}): React.JSX.Element {
+  React.useEffect(() => {
+    if (!onClose) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose?.()
+      }}
+    >
       <Card className="w-[440px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-3">{children}</Card>
     </div>
   )
@@ -176,7 +208,7 @@ function AddUserModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
   }
 
   return (
-    <Modal>
+    <Modal onClose={() => !busy && onClose()}>
       <CardHeader>
         <CardTitle>Add New User</CardTitle>
         <CardDescription>Create a staff account.</CardDescription>
@@ -219,7 +251,7 @@ function EditUserModal({ user, isSelf, onClose, onSaved }: { user: AuthUser; isS
   }
 
   return (
-    <Modal>
+    <Modal onClose={() => !busy && onClose()}>
       <CardHeader>
         <CardTitle>Edit User</CardTitle>
         <CardDescription>{user.fullName}</CardDescription>
@@ -264,7 +296,7 @@ function DeleteUserDialog({ user, onClose, onDeleted }: { user: AuthUser; onClos
   }
 
   return (
-    <Modal>
+    <Modal onClose={() => !busy && onClose()}>
       <CardTitle>Delete user</CardTitle>
       <p className="text-sm text-[var(--foreground)]">Are you sure you want to delete {user.fullName}? This action cannot be undone.</p>
       <p className="text-xs text-[var(--muted-foreground)]">Their sales history and other records stay attributed to them for audit purposes.</p>

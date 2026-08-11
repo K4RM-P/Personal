@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { CheckCircle2, Loader2, Download, AlertTriangle } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription } from './ui/Card'
 import type { UpdateStatus } from '../../../shared/types'
 import { useUpdateStatus } from '../hooks/useUpdateStatus'
@@ -10,6 +11,24 @@ const stateLabel: Record<UpdateStatus['state'], string> = {
   downloading: 'Downloading update…',
   ready: 'Update downloaded — will install on next restart',
   error: 'Last check failed — will retry automatically'
+}
+
+const stateIcon: Record<UpdateStatus['state'], React.ElementType> = {
+  idle: CheckCircle2,
+  checking: Loader2,
+  available: Download,
+  downloading: Download,
+  ready: CheckCircle2,
+  error: AlertTriangle
+}
+
+const stateColor: Record<UpdateStatus['state'], string> = {
+  idle: 'text-[var(--muted-foreground)]',
+  checking: 'text-[var(--muted-foreground)]',
+  available: 'text-[var(--primary)]',
+  downloading: 'text-[var(--primary)]',
+  ready: 'text-[var(--success)]',
+  error: 'text-[var(--warning)]'
 }
 
 /** Manual "Check for Updates" control (spec §3.4) for a client who wants to force a check. */
@@ -36,11 +55,17 @@ export function UpdateSettingsCard(): React.JSX.Element {
         </CardDescription>
       </CardHeader>
       <div className="mt-4 flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3 text-sm">
-        <div>
-          <p className="font-semibold text-[var(--foreground)]">{stateLabel[status.state]}</p>
-          {status.version && (
-            <p className="text-[var(--muted-foreground)]">Version {status.version}</p>
-          )}
+        <div className="flex items-start gap-2">
+          {React.createElement(stateIcon[status.state], {
+            className: `icon-4 mt-0.5 shrink-0 ${stateColor[status.state]} ${status.state === 'checking' ? 'animate-spin' : ''}`,
+            'aria-hidden': true
+          })}
+          <div>
+            <p className={`font-semibold ${stateColor[status.state]}`}>{stateLabel[status.state]}</p>
+            {status.version && (
+              <p className="text-[var(--muted-foreground)]">Version {status.version}</p>
+            )}
+          </div>
         </div>
         <button
           onClick={() => void handleCheck()}

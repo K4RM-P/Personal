@@ -8,6 +8,7 @@ import {
   StoreInfo,
   SystemPrinterInfo
 } from '@shared/types'
+import { CheckCircle2, Circle } from 'lucide-react'
 import { FeatureFlagCard } from '../components/FeatureFlagCard'
 import { PaymentSettingsCard } from '../components/PaymentSettingsCard'
 import { UpdateSettingsCard } from '../components/UpdateSettingsCard'
@@ -18,6 +19,18 @@ import { Switch } from '../components/ui/Switch'
 import { Alert } from '../components/ui/Alert'
 import { useCurrentUser } from '../context/CurrentUserContext'
 import { DisplayDensityCard } from '../components/DisplayDensityCard'
+
+function ModuleStatusBadge({ enabled }: { enabled?: boolean }): React.JSX.Element {
+  const Icon = enabled ? CheckCircle2 : Circle
+  return (
+    <span
+      className={`flex items-center gap-1 text-xs font-medium ${enabled ? 'text-[var(--success)]' : 'text-[var(--muted-foreground)]'}`}
+    >
+      <Icon className="icon-3_5" aria-hidden="true" />
+      {enabled ? 'On' : 'Off'}
+    </span>
+  )
+}
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`
@@ -371,20 +384,18 @@ export function SettingsScreen() {
                   className="input w-28"
                 />
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <button
                   onClick={handleTestNetworkPrinter}
                   disabled={testing}
-                  className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-4 py-2 text-sm text-[var(--foreground)] disabled:opacity-50"
+                  className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-4 text-sm text-[var(--foreground)] disabled:opacity-50"
                 >
                   {testing ? 'Testing…' : 'Test Network Printer'}
                 </button>
                 {testResult && (
-                  <span
-                    className={`text-xs ${testResult.ok ? 'text-[var(--success)]' : 'text-[var(--error)]'}`}
-                  >
+                  <Alert variant={testResult.ok ? 'success' : 'error'} className="flex-1 min-w-[200px]">
                     {testResult.message}
-                  </span>
+                  </Alert>
                 )}
               </div>
             </>
@@ -423,7 +434,7 @@ export function SettingsScreen() {
               </div>
               <button
                 onClick={() => void loadSystemPrinters()}
-                className="w-fit rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-4 py-2 text-sm text-[var(--foreground)]"
+                className="min-h-11 w-fit rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-4 text-sm text-[var(--foreground)]"
               >
                 Rescan Printers
               </button>
@@ -433,18 +444,15 @@ export function SettingsScreen() {
 
         <button
           onClick={handleSaveHardwareSettings}
-          className="mt-4 rounded-[var(--radius)] bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-foreground)]"
+          className="min-h-11 mt-4 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-medium text-[var(--primary-foreground)]"
         >
           Save Hardware Settings
         </button>
       </Card>
 
-      <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4">
-        <div className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
-          Payments
-        </div>
+      <Card>
         <PaymentSettingsCard />
-      </div>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -523,27 +531,22 @@ export function SettingsScreen() {
         </CardHeader>
         <div className="space-y-3 mt-4 text-sm">
           {lastBackup ? (
-            <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
-              <p className="text-[var(--foreground)]">
-                Last backup:{' '}
-                <span
-                  className={
-                    lastBackup.status === 'SUCCESS'
-                      ? 'text-[var(--success)]'
-                      : 'text-[var(--error)]'
-                  }
-                >
-                  {new Date(lastBackup.timestamp).toLocaleString()} (
-                  {lastBackup.status.toLowerCase()})
-                </span>
-              </p>
-              <p className="text-[var(--muted-foreground)]">
+            <Alert variant={lastBackup.status === 'SUCCESS' ? 'success' : 'error'}>
+              <span className="text-[var(--foreground)]">
+                Last backup: {new Date(lastBackup.timestamp).toLocaleString()} (
+                {lastBackup.status === 'SUCCESS' ? 'succeeded' : 'failed'})
+              </span>
+              <br />
+              <span className="text-[var(--muted-foreground)]">
                 Location: {lastBackup.backupPath} · {formatBytes(lastBackup.backupSizeBytes)}
-              </p>
+              </span>
               {lastBackup.errorMessage && (
-                <p className="text-[var(--error)]">{lastBackup.errorMessage}</p>
+                <>
+                  <br />
+                  <span>{lastBackup.errorMessage}</span>
+                </>
               )}
-            </div>
+            </Alert>
           ) : (
             <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3 text-[var(--muted-foreground)]">
               No backups have been run yet.
@@ -600,14 +603,14 @@ export function SettingsScreen() {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => void handleRescanDrives()}
-                className="rounded-[var(--radius)] border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--foreground)] hover:bg-[var(--card)]"
+                className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-xs text-[var(--foreground)] hover:bg-[var(--card)]"
               >
                 Rescan Drives
               </button>
               <button
                 onClick={() => void handleBrowseBackupDestination()}
                 disabled={savingDestination}
-                className="rounded-[var(--radius)] border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--foreground)] hover:bg-[var(--card)] disabled:opacity-50"
+                className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-xs text-[var(--foreground)] hover:bg-[var(--card)] disabled:opacity-50"
               >
                 Browse…
               </button>
@@ -617,20 +620,20 @@ export function SettingsScreen() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setShowBackupModal(true)}
-              className="rounded-[var(--radius)] bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-foreground)]"
+              className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-medium text-[var(--primary-foreground)]"
             >
               Manual Backup Now
             </button>
             <button
               onClick={() => void handleBrowsePreviousBackups()}
               disabled={!lastBackup}
-              className="rounded-[var(--radius)] border border-[var(--border)] px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--muted)] disabled:opacity-50"
+              className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-4 text-sm text-[var(--foreground)] hover:bg-[var(--muted)] disabled:opacity-50"
             >
               Browse Previous Backups
             </button>
             <button
               onClick={() => setShowRestoreModal(true)}
-              className="rounded-[var(--radius)] border border-[var(--error)] px-4 py-2 text-sm text-[var(--error)] hover:bg-[var(--error-bg)]"
+              className="min-h-11 rounded-[var(--radius)] border border-[var(--error)] px-4 text-sm text-[var(--error)] hover:bg-[var(--error-bg)]"
             >
               Restore from Backup…
             </button>
@@ -734,11 +737,7 @@ export function SettingsScreen() {
                   Enable dollar- or product-based loyalty.
                 </p>
               </div>
-              <span
-                className={`text-xs ${rewardFlag?.enabled ? 'text-[var(--success)]' : 'text-[var(--muted-foreground)]'}`}
-              >
-                {rewardFlag?.enabled ? 'On' : 'Off'}
-              </span>
+              <ModuleStatusBadge enabled={rewardFlag?.enabled} />
             </div>
             <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
               <div>
@@ -747,11 +746,7 @@ export function SettingsScreen() {
                   Turn on ticket sales and win tracking when installed.
                 </p>
               </div>
-              <span
-                className={`text-xs ${lotteryFlag?.enabled ? 'text-[var(--success)]' : 'text-[var(--muted-foreground)]'}`}
-              >
-                {lotteryFlag?.enabled ? 'On' : 'Off'}
-              </span>
+              <ModuleStatusBadge enabled={lotteryFlag?.enabled} />
             </div>
             <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
               <div>
@@ -760,11 +755,7 @@ export function SettingsScreen() {
                   Support invoice and statement billing.
                 </p>
               </div>
-              <span
-                className={`text-xs ${chargeFlag?.enabled ? 'text-[var(--success)]' : 'text-[var(--muted-foreground)]'}`}
-              >
-                {chargeFlag?.enabled ? 'On' : 'Off'}
-              </span>
+              <ModuleStatusBadge enabled={chargeFlag?.enabled} />
             </div>
             <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
               <div>
@@ -775,11 +766,7 @@ export function SettingsScreen() {
                   Allow short-pay, advance-fill, and credit-ledger flows.
                 </p>
               </div>
-              <span
-                className={`text-xs ${tabFlag?.enabled ? 'text-[var(--success)]' : 'text-[var(--muted-foreground)]'}`}
-              >
-                {tabFlag?.enabled ? 'On' : 'Off'}
-              </span>
+              <ModuleStatusBadge enabled={tabFlag?.enabled} />
             </div>
           </div>
         </Card>
