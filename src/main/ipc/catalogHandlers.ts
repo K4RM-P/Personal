@@ -135,9 +135,12 @@ export function registerCatalogHandlers(db: PrismaClient): void {
     IPC.CATALOG_PROMOTE,
     guard(
       'Promote catalogue item',
-      async (_e: Electron.IpcMainInvokeEvent, catalogProductId: number) => {
+      async (
+        _e: Electron.IpcMainInvokeEvent,
+        payload: { catalogProductId: number; priceCentsOverride?: number }
+      ) => {
         requireManager()
-        return promoteCatalogProduct(db, catalogProductId)
+        return promoteCatalogProduct(db, payload.catalogProductId, payload.priceCentsOverride)
       }
     )
   )

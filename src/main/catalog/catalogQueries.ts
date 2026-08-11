@@ -16,7 +16,7 @@ import type {
   PromoteAllResult
 } from '../../shared/catalogTypes'
 import { gtinNorm } from './webcatParser'
-import { calculateRetailPriceCents } from '../../shared/pricingEngine'
+import { calculateRetailPriceCents, findPricingTier } from '../../shared/pricingEngine'
 import { getAllPricingTiers } from '../db/queries/posQueries'
 import { getCatalogProvince, getCatalogStaleThresholdDays } from '../db/queries/settingsQueries'
 import { ensureSearchIndex } from './importService'
@@ -59,18 +59,22 @@ async function getActiveBatchId(db: PrismaClient): Promise<number | null> {
  */
 async function attachStockedProducts(
   db: PrismaClient,
-  rows: Omit<CatalogSearchRow, 'stockedProductId'>[]
+  rows: Omit<CatalogSearchRow, 'stockedProductId' | 'stockedPriceCents'>[]
 ): Promise<CatalogSearchRow[]> {
   if (rows.length === 0) return []
   const stocked = await db.product.findMany({
     where: { sourceItemNumber: { in: rows.map((r) => r.itemNumber) }, origin: 'CATALOG' },
-    select: { id: true, sourceItemNumber: true }
+    select: { id: true, sourceItemNumber: true, priceCents: true }
   })
-  const byItemNumber = new Map(stocked.map((p) => [p.sourceItemNumber, p.id]))
-  return rows.map((row) => ({
-    ...row,
-    stockedProductId: byItemNumber.get(row.itemNumber) ?? null
-  }))
+  const byItemNumber = new Map(stocked.map((p) => [p.sourceItemNumber, p]))
+  return rows.map((row) => {
+    const match = byItemNumber.get(row.itemNumber)
+    return {
+      ...row,
+      stockedProductId: match?.id ?? null,
+      stockedPriceCents: match?.priceCents ?? null
+    }
+  })
 }
 
 export async function getCatalogStatus(db: PrismaClient): Promise<CatalogStatus> {
@@ -140,8 +144,7 @@ export async function searchCatalog(
   if (activeBatchId === null) return []
 
   const limit = options.limit ?? SEARCH_LIMIT
-  const province =
-    options.province === undefined ? await getCatalogProvince(db) : options.province
+  const province = options.province === undefined ? await getCatalogProvince(db) : options.province
   const raw = options.query.trim()
 
   const where = {
@@ -203,7 +206,7 @@ export async function searchCatalog(
         { strength: { contains: raw } },
         { vendorCode: { contains: raw } },
         { gtinPrimary: { contains: raw } }
-        // Price/cost contains raw string is hard for Prisma `contains` on Int, 
+        // Price/cost contains raw string is hard for Prisma `contains` on Int,
         // but fallback to LIKE scan is only for when FTS fails.
       ]
     },
@@ -292,21 +295,34 @@ export interface PromoteResult {
   created: boolean
   priceCents: number
   costCents: number
-  /** McKesson's list price — shown as a reference figure only, never used as retail. */
+  /**
+   * McKesson's list price — a reference figure, and also the retail fallback
+   * when the cost is zero, when no markup tier matches the cost, or when the
+   * pharmacist explicitly sets a retail price.
+   */
   listPriceCents: number
   barcodeSkipped: boolean
+  /** True when the retail price was pinned instead of tier-calculated (zero cost, no matching tier, or an explicit override). */
   pricePinnedForZeroCost: boolean
 }
 
 /**
- * "Start selling this item" — create a `Product` from a catalogue entry.
+ * "Start selling this item" — create (or price-edit) a `Product` from a
+ * catalogue entry.
  *
  * Retail comes from the pharmacy's own tier engine, NOT McKesson's list price;
- * the list price is surfaced alongside as a reference figure only.
+ * the list price is surfaced alongside as a reference figure, and used as the
+ * fallback whenever the tier engine has nothing to compute from (see below).
+ *
+ * `priceCentsOverride`, when given, is the pharmacist manually setting the
+ * retail price (from the Products screen) — it always wins and pins the
+ * price, whether this call creates the product or edits an already-promoted
+ * one, so a later tier-table save never silently overwrites it.
  */
 export async function promoteCatalogProduct(
   db: PrismaClient,
-  catalogProductId: number
+  catalogProductId: number,
+  priceCentsOverride?: number
 ): Promise<PromoteResult> {
   const item = await db.catalogProduct.findUniqueOrThrow({ where: { id: catalogProductId } })
 
@@ -314,14 +330,29 @@ export async function promoteCatalogProduct(
     where: { sourceItemNumber: item.itemNumber, origin: 'CATALOG' }
   })
   if (existing) {
+    if (priceCentsOverride === undefined) {
+      return {
+        productId: existing.id,
+        created: false,
+        priceCents: existing.priceCents,
+        costCents: existing.costCents,
+        listPriceCents: item.listPriceCents,
+        barcodeSkipped: false,
+        pricePinnedForZeroCost: existing.isPinned
+      }
+    }
+    const updated = await db.product.update({
+      where: { id: existing.id },
+      data: { priceCents: priceCentsOverride, isPinned: true }
+    })
     return {
-      productId: existing.id,
+      productId: updated.id,
       created: false,
-      priceCents: existing.priceCents,
-      costCents: existing.costCents,
+      priceCents: updated.priceCents,
+      costCents: updated.costCents,
       listPriceCents: item.listPriceCents,
       barcodeSkipped: false,
-      pricePinnedForZeroCost: existing.isPinned
+      pricePinnedForZeroCost: true
     }
   }
 
@@ -329,12 +360,17 @@ export async function promoteCatalogProduct(
   const costCents = item.costPriceCents
 
   // A zero cost must never reach the tier engine — it yields a $0.00 shelf
-  // price. Fall back to McKesson's list price and pin it so the pharmacist
-  // sets a real one deliberately.
-  const pricePinnedForZeroCost = costCents <= 0
-  const priceCents = pricePinnedForZeroCost
-    ? item.listPriceCents
-    : calculateRetailPriceCents(costCents, tiers)
+  // price. Likewise, a cost that falls outside every configured tier has
+  // nothing to compute a markup from. Both fall back to McKesson's own list
+  // price and pin it, same as an explicit pharmacist override, so the price
+  // is never silently a bare re-statement of the supplier cost.
+  const noTierMatched = costCents > 0 && findPricingTier(costCents, tiers) === undefined
+  const pricePinnedForZeroCost = priceCentsOverride !== undefined || costCents <= 0 || noTierMatched
+  const priceCents =
+    priceCentsOverride ??
+    (costCents <= 0 || noTierMatched
+      ? item.listPriceCents
+      : calculateRetailPriceCents(costCents, tiers))
 
   // `barcode` is globally unique on Product; never fail a promote over a clash.
   let barcode: string | null = item.gtinPrimaryNorm
@@ -387,7 +423,6 @@ export async function countDiscontinuedProducts(db: PrismaClient): Promise<numbe
   return db.product.count({ where: { origin: 'CATALOG', discontinued: true } })
 }
 
-
 /**
  * Promote EVERY unstocked catalogue item from the active batch into sellable
  * inventory in one pass. Items already linked to a Product are skipped.
@@ -423,7 +458,9 @@ export async function promoteAllCatalogProducts(db: PrismaClient): Promise<Promo
   ])
 
   const stockedByItemNumber = new Map(existingProducts.map((p) => [p.sourceItemNumber, p]))
-  const existingBarcodes = new Set(existingProducts.map((p) => p.barcode).filter((b): b is string => b !== null))
+  const existingBarcodes = new Set(
+    existingProducts.map((p) => p.barcode).filter((b): b is string => b !== null)
+  )
   const existingSkus = new Set(existingProducts.map((p) => p.sku))
 
   let created = 0
@@ -465,9 +502,12 @@ export async function promoteAllCatalogProducts(db: PrismaClient): Promise<Promo
     }
 
     const costCents = item.costPriceCents
-    const pricePinnedForZeroCost = costCents <= 0
+    const noTierMatched = costCents > 0 && findPricingTier(costCents, tiers) === undefined
+    const pricePinnedForZeroCost = costCents <= 0 || noTierMatched
     if (pricePinnedForZeroCost) zeroCostPinned++
-    const priceCents = pricePinnedForZeroCost ? item.listPriceCents : calculateRetailPriceCents(costCents, tiers)
+    const priceCents = pricePinnedForZeroCost
+      ? item.listPriceCents
+      : calculateRetailPriceCents(costCents, tiers)
 
     let barcode: string | null = item.gtinPrimaryNorm
     if (barcode) {

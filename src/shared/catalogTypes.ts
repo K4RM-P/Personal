@@ -138,6 +138,8 @@ export interface CatalogSearchRow {
   gtinCaseNorm: string | null
   /** Set when this catalogue item is already stocked as a Product. */
   stockedProductId: number | null
+  /** The stocked Product's current retail price, when stockedProductId is set. */
+  stockedPriceCents: number | null
 }
 
 export interface CatalogDealRow {
