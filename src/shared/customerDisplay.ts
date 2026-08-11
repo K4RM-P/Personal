@@ -29,7 +29,12 @@ export type CustomerDisplayState =
     }
   | { mode: 'payment-card'; totalCents: number }
   | { mode: 'payment-etransfer'; totalCents: number; pharmacyEmail: string }
-  | { mode: 'payment-tab'; totalCents: number; chargedToTabCents: number; balanceAfterCents: number }
+  | {
+      mode: 'payment-tab'
+      totalCents: number
+      chargedToTabCents: number
+      balanceAfterCents: number
+    }
   | { mode: 'thank-you'; pharmacyName: string }
 
 export interface CustomerDisplaySlideDTO {
