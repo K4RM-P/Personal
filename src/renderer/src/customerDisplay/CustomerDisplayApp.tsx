@@ -6,6 +6,10 @@ import type {
 } from '../../../shared/customerDisplay'
 import { IdleScreen } from './screens/IdleScreen'
 import { CartScreen } from './screens/CartScreen'
+import { PaymentCashScreen } from './screens/PaymentCashScreen'
+import { PaymentCardScreen } from './screens/PaymentCardScreen'
+import { PaymentETransferScreen } from './screens/PaymentETransferScreen'
+import { PaymentTabScreen } from './screens/PaymentTabScreen'
 
 const DEFAULT_SETTINGS: CustomerDisplaySettingsDTO = {
   enabled: true,
@@ -48,14 +52,30 @@ export function CustomerDisplayApp(): React.JSX.Element {
     )
   }
 
-  if (state.mode === 'cart') {
-    return <CartScreen state={state} />
+  switch (state.mode) {
+    case 'cart':
+      return <CartScreen state={state} />
+    case 'payment-cash':
+      return <PaymentCashScreen state={state} />
+    case 'payment-card':
+      return <PaymentCardScreen totalCents={state.totalCents} />
+    case 'payment-etransfer':
+      return (
+        <PaymentETransferScreen
+          totalCents={state.totalCents}
+          pharmacyEmail={state.pharmacyEmail || settings.eTransferEmail}
+        />
+      )
+    case 'payment-tab':
+      return <PaymentTabScreen state={state} />
+    default:
+      // Unreachable: 'idle' is handled above and every other mode has a screen.
+      return (
+        <IdleScreen
+          slides={slides}
+          pharmacyName={settings.pharmacyName}
+          durationSeconds={settings.slideDurationSeconds}
+        />
+      )
   }
-
-  // Remaining modes are built in later tasks.
-  return (
-    <div style={{ fontFamily: 'monospace', padding: 24, whiteSpace: 'pre-wrap' }}>
-      {JSON.stringify(state, null, 2)}
-    </div>
-  )
 }
