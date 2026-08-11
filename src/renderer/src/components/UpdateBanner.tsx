@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Download, X } from 'lucide-react'
-import type { UpdateStatus } from '../../../shared/types'
+import { useUpdateStatus } from '../hooks/useUpdateStatus'
 
 /**
  * Non-blocking notice shown when a background update has been found/downloaded. Never a
@@ -8,19 +8,20 @@ import type { UpdateStatus } from '../../../shared/types'
  * Dismissible; the update still installs on next quit/restart regardless of dismissal.
  */
 export function UpdateBanner(): React.JSX.Element | null {
-  const [status, setStatus] = React.useState<UpdateStatus>({ state: 'idle' })
+  const status = useUpdateStatus()
   const [dismissed, setDismissed] = React.useState(false)
+  const lastNonIdleState = React.useRef(status.state)
 
+  // Re-surface a dismissed banner if the update actually progressed to a new stage
+  // (e.g. downloading -> ready) rather than un-dismissing on every unrelated status
+  // broadcast — a periodic 'checking' pulse (when nothing is pending) shouldn't undo
+  // a dismissal.
   React.useEffect(() => {
-    window.api.update
-      .getStatus()
-      .then(setStatus)
-      .catch(() => undefined)
-    return window.api.update.onStatusChanged((next) => {
+    if (status.state !== lastNonIdleState.current) {
       setDismissed(false)
-      setStatus(next)
-    })
-  }, [])
+      lastNonIdleState.current = status.state
+    }
+  }, [status.state])
 
   if (dismissed) return null
   if (status.state !== 'available' && status.state !== 'downloading' && status.state !== 'ready')

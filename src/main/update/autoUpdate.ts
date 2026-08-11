@@ -13,12 +13,32 @@ import { log } from '../logging/logger'
 
 const PERIODIC_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000 // every 4 hours while the app is open
 
+// States in which a fresh checkForUpdates() call would be redundant or actively harmful:
+// re-checking while a download is running can interfere with it, and re-checking once an
+// update is already staged just re-fires 'checking' and briefly clobbers the 'ready'
+// status the UI is showing (the banner/settings card would flicker away and back).
+const CHECK_BLOCKED_STATES: ReadonlySet<UpdateStatus['state']> = new Set([
+  'checking',
+  'downloading',
+  'ready'
+])
+
 let status: UpdateStatus = { state: 'idle' }
 let mainWindow: BrowserWindow | null = null
+let initialized = false
 
 function broadcast(next: UpdateStatus): void {
   status = next
-  mainWindow?.webContents.send(IPC.UPDATE_STATUS_CHANGED, status)
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(IPC.UPDATE_STATUS_CHANGED, status)
+  }
+}
+
+/** Keeps the update module pointed at whichever window is currently on screen, so a
+ *  window recreated after all windows close (e.g. macOS 'activate') still receives
+ *  status broadcasts instead of hitting a destroyed BrowserWindow. */
+export function setUpdateWindow(window: BrowserWindow): void {
+  mainWindow = window
 }
 
 export function getUpdateStatus(): UpdateStatus {
@@ -31,10 +51,15 @@ export function isUpdateReadyToInstall(): boolean {
 
 export function installUpdateNow(): void {
   if (status.state !== 'ready') return
-  autoUpdater.quitAndInstall()
+  // Explicit (isSilent=true, isForceRunAfter=true): the default quitAndInstall() leaves
+  // isSilent false, which lets the NSIS installer show its own UI — exactly the "manual
+  // file handling" / installer-window experience this feature exists to eliminate.
+  autoUpdater.quitAndInstall(true, true)
 }
 
 export function initAutoUpdater(window: BrowserWindow): void {
+  if (initialized) return
+  initialized = true
   mainWindow = window
 
   // Download automatically as soon as a newer version is found — no interaction
@@ -71,21 +96,24 @@ export function initAutoUpdater(window: BrowserWindow): void {
     broadcast({ state: 'error', error: err.message })
   })
 
-  const checkNow = (): void => {
-    autoUpdater.checkForUpdates().catch((err) => {
+  const checkNow = async (): Promise<void> => {
+    if (CHECK_BLOCKED_STATES.has(status.state)) return
+    try {
+      await autoUpdater.checkForUpdates()
+    } catch (err) {
       log('ERROR', {
         message: err instanceof Error ? err.message : String(err),
         source: 'autoUpdater'
       })
-    })
+    }
   }
 
-  checkNow()
-  setInterval(checkNow, PERIODIC_CHECK_INTERVAL_MS)
+  void checkNow()
+  setInterval(() => void checkNow(), PERIODIC_CHECK_INTERVAL_MS)
 
-  ipcMain.handle(IPC.UPDATE_CHECK_NOW, () => {
-    checkNow()
-  })
+  // Awaits the real check so the renderer's "Checking…" button state reflects how long
+  // the check actually took, instead of resolving instantly and lying about progress.
+  ipcMain.handle(IPC.UPDATE_CHECK_NOW, () => checkNow())
   ipcMain.handle(IPC.UPDATE_INSTALL_NOW, () => {
     installUpdateNow()
   })

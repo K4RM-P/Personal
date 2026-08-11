@@ -10,7 +10,7 @@ import { registerAllHandlers } from './ipc'
 import { applyPendingRestoreIfStaged } from './backup/backupService'
 import { resolveDbFilePath } from './backup/dbPath'
 import { initLogger, log } from './logging/logger'
-import { initAutoUpdater } from './update/autoUpdate'
+import { initAutoUpdater, setUpdateWindow } from './update/autoUpdate'
 
 // .env (dev-only, gitignored) is the only thing that sets DATABASE_URL, and it's
 // intentionally excluded from the packaged app. Without this fallback, Prisma has
@@ -129,7 +129,12 @@ app.whenReady().then(async () => {
   const mainWindow = createWindow()
 
   app.on('activate', function () {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) {
+      const newWindow = createWindow()
+      // Keep the updater pointed at whichever window is actually on screen, so status
+      // broadcasts (banner/settings card) don't try to reach the destroyed original.
+      if (!is.dev) setUpdateWindow(newWindow)
+    }
   })
 
   // Checks GitHub Releases for a newer signed build and downloads it in the background;

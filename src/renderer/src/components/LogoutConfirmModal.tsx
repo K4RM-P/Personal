@@ -2,6 +2,7 @@ import * as React from 'react'
 import { Card, CardTitle, CardDescription } from './ui/Card'
 import { BackupModal } from './BackupModal'
 import { useCurrentUser } from '../context/CurrentUserContext'
+import { useUpdateStatus } from '../hooks/useUpdateStatus'
 
 interface LogoutConfirmModalProps {
   onCancel: () => void
@@ -11,16 +12,8 @@ interface LogoutConfirmModalProps {
 export function LogoutConfirmModal({ onCancel }: LogoutConfirmModalProps): React.JSX.Element {
   const { user, logout } = useCurrentUser()
   const [showBackup, setShowBackup] = React.useState(false)
-  const [updateReadyVersion, setUpdateReadyVersion] = React.useState<string | null>(null)
-
-  React.useEffect(() => {
-    window.api.update
-      .getStatus()
-      .then((status) =>
-        setUpdateReadyVersion(status.state === 'ready' ? (status.version ?? '') : null)
-      )
-      .catch(() => undefined)
-  }, [])
+  const updateStatus = useUpdateStatus()
+  const updateReadyVersion = updateStatus.state === 'ready' ? (updateStatus.version ?? '') : null
 
   if (showBackup && user) {
     return <BackupModal userId={user.id} standalone={false} onClose={() => void logout()} />
@@ -42,7 +35,7 @@ export function LogoutConfirmModal({ onCancel }: LogoutConfirmModalProps): React
           </CardDescription>
           <div className="grid grid-cols-2 gap-3 pt-2">
             <button
-              onClick={() => setUpdateReadyVersion(null)}
+              onClick={() => void logout()}
               className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]"
             >
               Not Now, Just Log Out

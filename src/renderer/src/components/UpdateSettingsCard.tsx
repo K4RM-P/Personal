@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Card, CardHeader, CardTitle, CardDescription } from './ui/Card'
 import type { UpdateStatus } from '../../../shared/types'
+import { useUpdateStatus } from '../hooks/useUpdateStatus'
 
 const stateLabel: Record<UpdateStatus['state'], string> = {
   idle: 'Up to date',
@@ -13,16 +14,8 @@ const stateLabel: Record<UpdateStatus['state'], string> = {
 
 /** Manual "Check for Updates" control (spec §3.4) for a client who wants to force a check. */
 export function UpdateSettingsCard(): React.JSX.Element {
-  const [status, setStatus] = React.useState<UpdateStatus>({ state: 'idle' })
+  const status = useUpdateStatus()
   const [checking, setChecking] = React.useState(false)
-
-  React.useEffect(() => {
-    window.api.update
-      .getStatus()
-      .then(setStatus)
-      .catch(() => undefined)
-    return window.api.update.onStatusChanged(setStatus)
-  }, [])
 
   const handleCheck = async (): Promise<void> => {
     setChecking(true)
