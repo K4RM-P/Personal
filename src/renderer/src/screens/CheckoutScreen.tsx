@@ -915,14 +915,19 @@ export function CheckoutScreen(): React.JSX.Element {
                           onClick={() => !item.hstLocked && handleToggleItemHst(item.product.id)}
                           disabled={item.hstLocked}
                           aria-pressed={itemHstOn}
-                          className={`flex min-h-8 items-center gap-0.5 rounded-[var(--radius)] border px-2 text-xs font-semibold ${itemHstOn ? 'border-[var(--border)] text-[var(--foreground)]' : 'border-[var(--warning)] text-[var(--warning)]'} ${item.hstLocked ? 'opacity-60' : ''}`}
+                          className={`flex min-h-8 items-center gap-0.5 rounded-[var(--radius)] border px-2 text-xs font-semibold ${itemHstOn ? 'border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)]' : 'border-[var(--warning)] text-[var(--warning)]'} ${item.hstLocked ? 'opacity-60' : ''}`}
                           title={
                             item.hstLocked
                               ? 'RX items cannot be charged HST'
                               : 'Charge HST on this item'
                           }
                         >
-                          {itemHstOn && <Check className="icon-3_5" aria-hidden="true" />}
+                          {itemHstOn && (
+                            <Check
+                              className="icon-3_5 text-[var(--primary-foreground)]"
+                              aria-hidden="true"
+                            />
+                          )}
                           HST
                         </button>
                         <div className="w-16 text-right font-semibold text-[var(--foreground)]">

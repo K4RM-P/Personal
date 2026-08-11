@@ -224,6 +224,90 @@ export function SettingsScreen() {
     }
   }
 
+  const handleUploadLogo = async () => {
+    setError(null)
+    setSettingsSaved(null)
+    try {
+      const result = await window.api.settings.uploadLogo()
+      if (result) {
+        setStoreInfo((s) => ({ ...s, logoDataUrl: result.logoDataUrl }))
+        setSettingsSaved('Logo uploaded and saved.')
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to upload logo.')
+    }
+  }
+
+  const handleRemoveLogo = async () => {
+    setError(null)
+    try {
+      await window.api.settings.removeLogo()
+      setStoreInfo((s) => ({ ...s, logoDataUrl: undefined }))
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to remove logo.')
+    }
+  }
+
+  const handleUploadReceiptTemplate = async () => {
+    setError(null)
+    setSettingsSaved(null)
+    try {
+      const result = await window.api.settings.uploadReceiptTemplate()
+      if (result) {
+        setStoreInfo((s) => ({
+          ...s,
+          customReceiptTemplateHtml: result.customReceiptTemplateHtml,
+          useCustomReceiptTemplate: result.useCustomReceiptTemplate
+        }))
+        setSettingsSaved('Custom receipt template uploaded and enabled.')
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to upload receipt template.')
+    }
+  }
+
+  const handleClearReceiptTemplate = async () => {
+    setError(null)
+    try {
+      await window.api.settings.clearReceiptTemplate()
+      setStoreInfo((s) => ({ ...s, customReceiptTemplateHtml: undefined, useCustomReceiptTemplate: false }))
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to clear receipt template.')
+    }
+  }
+
+  const handleToggleCustomTemplate = async (enabled: boolean) => {
+    setError(null)
+    const previous = storeInfo.useCustomReceiptTemplate
+    setStoreInfo((s) => ({ ...s, useCustomReceiptTemplate: enabled }))
+    try {
+      await window.api.settings.setUseCustomReceiptTemplate(enabled)
+    } catch (err: unknown) {
+      setStoreInfo((s) => ({ ...s, useCustomReceiptTemplate: previous }))
+      setError(err instanceof Error ? err.message : 'Failed to update receipt template setting.')
+    }
+  }
+
+  const handleViewReceipt = async () => {
+    setError(null)
+    try {
+      await window.api.receipt.preview()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to open receipt preview.')
+    }
+  }
+
+  const handleExportReceipt = async () => {
+    setError(null)
+    setSettingsSaved(null)
+    try {
+      const result = await window.api.receipt.export()
+      if (result) setSettingsSaved(`Receipt exported to ${result.path}`)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to export receipt.')
+    }
+  }
+
   const handleTestNetworkPrinter = async () => {
     if (!printerConfig.ipAddress) {
       setTestResult({ ok: false, message: 'Enter a printer IP address first.' })
@@ -326,6 +410,137 @@ export function SettingsScreen() {
               onChange={(e) => setStoreInfo((s) => ({ ...s, phone: e.target.value }))}
               className="input"
             />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
+              Pharmacy License Number
+            </label>
+            <input
+              type="text"
+              value={storeInfo.licenseNumber ?? ''}
+              onChange={(e) => setStoreInfo((s) => ({ ...s, licenseNumber: e.target.value }))}
+              className="input"
+              placeholder="e.g. ON-12345"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Email</label>
+            <input
+              type="email"
+              value={storeInfo.email ?? ''}
+              onChange={(e) => setStoreInfo((s) => ({ ...s, email: e.target.value }))}
+              className="input"
+              placeholder="pharmacy@example.com"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
+              Receipt Logo
+            </label>
+            <div className="flex items-center gap-3">
+              {storeInfo.logoDataUrl ? (
+                <img
+                  src={storeInfo.logoDataUrl}
+                  alt="Receipt logo preview"
+                  className="h-12 w-auto max-w-[160px] rounded-[var(--radius)] border border-[var(--border)] bg-white object-contain p-1"
+                />
+              ) : (
+                <div className="flex h-12 w-24 items-center justify-center rounded-[var(--radius)] border border-dashed border-[var(--border)] text-[10px] text-[var(--muted-foreground)]">
+                  No logo
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => void handleUploadLogo()}
+                className="min-h-9 rounded-[var(--radius)] border border-[var(--border)] px-3 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted)]"
+              >
+                Upload Logo
+              </button>
+              {storeInfo.logoDataUrl && (
+                <button
+                  type="button"
+                  onClick={() => void handleRemoveLogo()}
+                  className="min-h-9 rounded-[var(--radius)] border border-[var(--border)] px-3 text-xs font-medium text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--destructive)]"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+              PNG, JPG, GIF, or WebP, up to 2MB. Appears at the top of every receipt.
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Receipt Template & Export */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Receipt Template</CardTitle>
+          <CardDescription>
+            Upload a custom HTML receipt template, or preview/export the receipt as it will
+            print today.
+          </CardDescription>
+        </CardHeader>
+        <div className="space-y-4 mt-4">
+          <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] p-3">
+            <div>
+              <p className="text-sm font-medium text-[var(--foreground)]">
+                Use custom receipt template
+              </p>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                {storeInfo.customReceiptTemplateHtml
+                  ? 'A custom template has been uploaded.'
+                  : 'Upload an HTML template below to enable this.'}
+              </p>
+            </div>
+            <Switch
+              checked={Boolean(storeInfo.useCustomReceiptTemplate)}
+              onCheckedChange={handleToggleCustomTemplate}
+              disabled={!storeInfo.customReceiptTemplateHtml}
+              aria-label="Use custom receipt template"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleUploadReceiptTemplate()}
+              className="min-h-9 rounded-[var(--radius)] border border-[var(--border)] px-3 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted)]"
+            >
+              Upload Custom Template (.html)
+            </button>
+            {storeInfo.customReceiptTemplateHtml && (
+              <button
+                type="button"
+                onClick={() => void handleClearReceiptTemplate()}
+                className="min-h-9 rounded-[var(--radius)] border border-[var(--border)] px-3 text-xs font-medium text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--destructive)]"
+              >
+                Remove Custom Template
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-[var(--muted-foreground)]">
+            Templates use <code>{'{{storeName}}'}</code>, <code>{'{{logo}}'}</code>,{' '}
+            <code>{'{{items}}'}</code>, <code>{'{{total}}'}</code>, and similar placeholders —
+            see the app documentation for the full token list.
+          </p>
+
+          <div className="flex flex-wrap items-center gap-2 border-t border-[var(--border)] pt-4">
+            <button
+              type="button"
+              onClick={() => void handleViewReceipt()}
+              className="min-h-9 rounded-[var(--radius)] border border-[var(--border)] px-3 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted)]"
+            >
+              View Current Receipt
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleExportReceipt()}
+              className="min-h-9 rounded-[var(--radius)] border border-[var(--border)] px-3 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted)]"
+            >
+              Export Receipt (PDF/HTML)
+            </button>
           </div>
         </div>
       </Card>

@@ -5,6 +5,11 @@ const DEFAULTS = {
   'store.name': 'PharmaPOS Rx Pharmacy',
   'store.address': '123 Health Ave, Suite 100, Cityville',
   'store.phone': '(555) 019-2831',
+  'store.licenseNumber': '',
+  'store.email': '',
+  'store.logoDataUrl': '',
+  'store.useCustomReceiptTemplate': 'false',
+  'store.customReceiptTemplateHtml': '',
   'printer.type': 'PDF',
   'printer.networkIp': '',
   'printer.networkPort': '9100',
@@ -48,10 +53,26 @@ async function setSetting(db: PrismaClient, key: string, value: string): Promise
 }
 
 export async function getStoreInfo(db: PrismaClient): Promise<StoreInfo> {
+  const [name, address, phone, licenseNumber, email, logoDataUrl, useCustom, customHtml] =
+    await Promise.all([
+      getSetting(db, 'store.name'),
+      getSetting(db, 'store.address'),
+      getSetting(db, 'store.phone'),
+      getSetting(db, 'store.licenseNumber'),
+      getSetting(db, 'store.email'),
+      getSetting(db, 'store.logoDataUrl'),
+      getSetting(db, 'store.useCustomReceiptTemplate'),
+      getSetting(db, 'store.customReceiptTemplateHtml')
+    ])
   return {
-    name: await getSetting(db, 'store.name'),
-    address: await getSetting(db, 'store.address'),
-    phone: await getSetting(db, 'store.phone')
+    name,
+    address,
+    phone,
+    licenseNumber: licenseNumber || undefined,
+    email: email || undefined,
+    logoDataUrl: logoDataUrl || undefined,
+    useCustomReceiptTemplate: useCustom === 'true',
+    customReceiptTemplateHtml: customHtml || undefined
   }
 }
 
@@ -59,7 +80,36 @@ export async function saveStoreInfo(db: PrismaClient, info: StoreInfo): Promise<
   await setSetting(db, 'store.name', info.name)
   await setSetting(db, 'store.address', info.address)
   await setSetting(db, 'store.phone', info.phone)
+  await setSetting(db, 'store.licenseNumber', info.licenseNumber ?? '')
+  await setSetting(db, 'store.email', info.email ?? '')
   return getStoreInfo(db)
+}
+
+/** Persisted independently of the text fields above so an in-progress, unsaved edit to
+ * name/address/etc. isn't clobbered when a logo/template upload round-trips through the DB. */
+export async function saveStoreLogo(db: PrismaClient, logoDataUrl: string): Promise<void> {
+  await setSetting(db, 'store.logoDataUrl', logoDataUrl)
+}
+
+export async function clearStoreLogo(db: PrismaClient): Promise<void> {
+  await setSetting(db, 'store.logoDataUrl', '')
+}
+
+export async function saveCustomReceiptTemplate(db: PrismaClient, html: string): Promise<void> {
+  await setSetting(db, 'store.customReceiptTemplateHtml', html)
+  await setSetting(db, 'store.useCustomReceiptTemplate', 'true')
+}
+
+export async function clearCustomReceiptTemplate(db: PrismaClient): Promise<void> {
+  await setSetting(db, 'store.customReceiptTemplateHtml', '')
+  await setSetting(db, 'store.useCustomReceiptTemplate', 'false')
+}
+
+export async function setUseCustomReceiptTemplate(
+  db: PrismaClient,
+  enabled: boolean
+): Promise<void> {
+  await setSetting(db, 'store.useCustomReceiptTemplate', String(enabled))
 }
 
 export async function getPrinterConfig(db: PrismaClient): Promise<PrinterConfig> {

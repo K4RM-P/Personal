@@ -21,15 +21,8 @@ function escapeHtml(value: string): string {
     .replace(/"/g, '&quot;')
 }
 
-/**
- * Renders a structured transaction into HTML suitable for PDF or system printing.
- */
-export function buildReceiptHtml(options: ReceiptTemplateOptions): string {
-  const { transaction } = options
-  const store = options.storeInfo ?? DEFAULT_STORE_INFO
-  const dateStr = new Date(transaction.createdAt).toLocaleString()
-
-  const lineItems = transaction.items
+function buildLineItemsHtml(transaction: TransactionWithItems): string {
+  return transaction.items
     .map((item) => {
       const lineRawCents = item.unitPriceCents * item.quantity
       const discountCents = item.discountCents ?? 0
@@ -50,10 +43,41 @@ export function buildReceiptHtml(options: ReceiptTemplateOptions): string {
       </tr>${discountRow}`
     })
     .join('')
+}
 
-  const rxFooter = options.rxFooter
-    ? `<div class="footer rx">${escapeHtml(options.rxFooter)}</div>`
+function buildLogoHtml(store: StoreInfo): string {
+  if (!store.logoDataUrl) return ''
+  return `<div class="center"><img src="${store.logoDataUrl}" alt="${escapeHtml(store.name)} logo" class="logo" /></div>`
+}
+
+/**
+ * Renders a structured transaction into HTML suitable for PDF or system printing. Uses the
+ * manager-uploaded custom template (if enabled) instead of the built-in layout.
+ */
+export function buildReceiptHtml(options: ReceiptTemplateOptions): string {
+  const { transaction } = options
+  const store = options.storeInfo ?? DEFAULT_STORE_INFO
+
+  if (store.useCustomReceiptTemplate && store.customReceiptTemplateHtml) {
+    return buildCustomReceiptHtml(transaction, store, options.rxFooter)
+  }
+
+  return buildDefaultReceiptHtml(transaction, store, options.rxFooter)
+}
+
+function buildDefaultReceiptHtml(
+  transaction: TransactionWithItems,
+  store: StoreInfo,
+  rxFooterText?: string
+): string {
+  const dateStr = new Date(transaction.createdAt).toLocaleString()
+  const lineItems = buildLineItemsHtml(transaction)
+  const logo = buildLogoHtml(store)
+  const licenseLine = store.licenseNumber
+    ? `<div class="center">License #${escapeHtml(store.licenseNumber)}</div>`
     : ''
+  const emailLine = store.email ? `<div class="center">${escapeHtml(store.email)}</div>` : ''
+  const rxFooter = rxFooterText ? `<div class="footer rx">${escapeHtml(rxFooterText)}</div>` : ''
 
   return `<!DOCTYPE html>
 <html>
@@ -64,6 +88,7 @@ export function buildReceiptHtml(options: ReceiptTemplateOptions): string {
     .center { text-align: center; }
     .bold { font-weight: bold; }
     .divider { border-top: 1px dashed #333; margin: 8px 0; }
+    .logo img { max-width: 200px; max-height: 100px; margin-bottom: 6px; }
     table { width: 100%; border-collapse: collapse; }
     td { padding: 2px 0; vertical-align: top; }
     td.qty { text-align: center; width: 30px; }
@@ -78,9 +103,12 @@ export function buildReceiptHtml(options: ReceiptTemplateOptions): string {
   </style>
 </head>
 <body>
+  ${logo}
   <div class="center bold">${escapeHtml(store.name)}</div>
   <div class="center">${escapeHtml(store.address)}</div>
   <div class="center">${escapeHtml(store.phone)}</div>
+  ${licenseLine}
+  ${emailLine}
   <div class="divider"></div>
   <div>Receipt: #${escapeHtml(transaction.receiptNumber)}</div>
   <div>Date: ${escapeHtml(dateStr)}</div>
@@ -104,4 +132,58 @@ export function buildReceiptHtml(options: ReceiptTemplateOptions): string {
   ${rxFooter}
 </body>
 </html>`
+}
+
+/** Tokens available to manager-uploaded custom receipt templates, as `{{token}}`. */
+export const RECEIPT_TEMPLATE_TOKENS = [
+  'storeName',
+  'storeAddress',
+  'storePhone',
+  'storeLicense',
+  'storeEmail',
+  'logo',
+  'receiptNumber',
+  'date',
+  'tenderType',
+  'items',
+  'subtotal',
+  'billDiscount',
+  'tax',
+  'total',
+  'tendered',
+  'change',
+  'footer'
+] as const
+
+function buildCustomReceiptHtml(
+  transaction: TransactionWithItems,
+  store: StoreInfo,
+  rxFooterText?: string
+): string {
+  const dateStr = new Date(transaction.createdAt).toLocaleString()
+  const tokens: Record<(typeof RECEIPT_TEMPLATE_TOKENS)[number], string> = {
+    storeName: escapeHtml(store.name),
+    storeAddress: escapeHtml(store.address),
+    storePhone: escapeHtml(store.phone),
+    storeLicense: store.licenseNumber ? escapeHtml(store.licenseNumber) : '',
+    storeEmail: store.email ? escapeHtml(store.email) : '',
+    logo: buildLogoHtml(store),
+    receiptNumber: escapeHtml(transaction.receiptNumber),
+    date: escapeHtml(dateStr),
+    tenderType: escapeHtml(transaction.tenderType),
+    items: buildLineItemsHtml(transaction),
+    subtotal: formatCurrency(transaction.subtotalCents),
+    billDiscount: transaction.billDiscountCents ? formatCurrency(transaction.billDiscountCents) : '',
+    tax: formatCurrency(transaction.taxCents),
+    total: formatCurrency(transaction.totalCents),
+    tendered: formatCurrency(transaction.tenderedCents),
+    change: formatCurrency(transaction.changeCents),
+    footer: rxFooterText ? escapeHtml(rxFooterText) : ''
+  }
+
+  return (store.customReceiptTemplateHtml ?? '').replace(/{{\s*(\w+)\s*}}/g, (match, key: string) =>
+    Object.prototype.hasOwnProperty.call(tokens, key)
+      ? tokens[key as (typeof RECEIPT_TEMPLATE_TOKENS)[number]]
+      : match
+  )
 }

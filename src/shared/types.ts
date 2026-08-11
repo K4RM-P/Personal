@@ -146,6 +146,27 @@ export interface StoreInfo {
   name: string
   address: string
   phone: string
+  licenseNumber?: string
+  email?: string
+  /** Data URL (base64) of the manager-uploaded receipt logo. */
+  logoDataUrl?: string
+  /** When true, receipts render via `customReceiptTemplateHtml` instead of the built-in layout. */
+  useCustomReceiptTemplate?: boolean
+  /** Manager-uploaded HTML template with `{{token}}` placeholders (see receiptTemplate.ts). */
+  customReceiptTemplateHtml?: string
+}
+
+export interface UploadLogoResult {
+  logoDataUrl: string
+}
+
+export interface UploadReceiptTemplateResult {
+  customReceiptTemplateHtml: string
+  useCustomReceiptTemplate: boolean
+}
+
+export interface ExportReceiptResult {
+  path: string
 }
 
 export type PrinterType = 'NETWORK' | 'SYSTEM' | 'PDF'

@@ -43,6 +43,8 @@ export const IPC = {
   RECEIPT_PRINT: 'receipt:print',
   RECEIPT_TEST_NETWORK: 'receipt:testNetwork',
   RECEIPT_LIST_PRINTERS: 'receipt:listPrinters',
+  RECEIPT_PREVIEW: 'receipt:preview',
+  RECEIPT_EXPORT: 'receipt:export',
 
   // Payment Channels (Stage 5)
   PAYMENT_CHARGE: 'payment:charge',
@@ -74,6 +76,11 @@ export const IPC = {
   SETTINGS_SAVE_PRINTER: 'settings:savePrinter',
   SETTINGS_GET_STORE: 'settings:getStore',
   SETTINGS_SAVE_STORE: 'settings:saveStore',
+  SETTINGS_UPLOAD_LOGO: 'settings:uploadLogo',
+  SETTINGS_REMOVE_LOGO: 'settings:removeLogo',
+  SETTINGS_UPLOAD_RECEIPT_TEMPLATE: 'settings:uploadReceiptTemplate',
+  SETTINGS_CLEAR_RECEIPT_TEMPLATE: 'settings:clearReceiptTemplate',
+  SETTINGS_SET_USE_CUSTOM_RECEIPT_TEMPLATE: 'settings:setUseCustomReceiptTemplate',
   SETTINGS_GET_PAYMENT: 'settings:getPayment',
   SETTINGS_SAVE_PAYMENT: 'settings:savePayment',
   SETTINGS_GET_CHECKOUT: 'settings:getCheckout',
