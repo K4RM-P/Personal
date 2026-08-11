@@ -585,12 +585,32 @@ export function ProductsScreen(): React.JSX.Element {
                   key={tier.id}
                   className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3 text-xs"
                 >
-                  <div>
-                    <span className="font-semibold text-[var(--foreground)]">Tier {idx + 1}: </span>
-                    <span className="tabular-nums text-[var(--foreground)]">
-                      {formatCurrency(tier.minCostCents)}
-                      {tier.maxCostCents !== null ? ` – ${formatCurrency(tier.maxCostCents)}` : '+'}
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-[var(--foreground)]">Tier {idx + 1}:</span>
+                    <label htmlFor={`tier-min-${tier.id}`} className="sr-only">
+                      Minimum cost
+                    </label>
+                    <input
+                      id={`tier-min-${tier.id}`}
+                      type="number"
+                      step="0.01"
+                      value={(tier.minCostCents / 100).toFixed(2)}
+                      onChange={(e) => handleTierMinChange(idx, e.target.value)}
+                      className="input min-h-9 w-24 text-right tabular-nums"
+                    />
+                    <span className="text-[var(--muted-foreground)]">–</span>
+                    <label htmlFor={`tier-max-${tier.id}`} className="sr-only">
+                      Maximum cost (blank for no upper bound)
+                    </label>
+                    <input
+                      id={`tier-max-${tier.id}`}
+                      type="number"
+                      step="0.01"
+                      placeholder="No max"
+                      value={tier.maxCostCents !== null ? (tier.maxCostCents / 100).toFixed(2) : ''}
+                      onChange={(e) => handleTierMaxChange(idx, e.target.value)}
+                      className="input min-h-9 w-24 text-right tabular-nums"
+                    />
                   </div>
                   <div className="flex items-center gap-2">
                     <label
