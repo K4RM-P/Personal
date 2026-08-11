@@ -85,7 +85,7 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps): R
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
       <header className="relative flex h-16 shrink-0 items-center gap-4 border-b border-[var(--border)] bg-[#f8fafb] px-4 md:px-6">
         <div className="flex shrink-0 items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius)] bg-[var(--primary)] font-bold text-[var(--primary-foreground)]">
+          <div className="flex icon-9 items-center justify-center rounded-[var(--radius)] bg-[var(--primary)] font-bold text-[var(--primary-foreground)]">
             Rx
           </div>
           <div className="hidden sm:block">
@@ -107,7 +107,7 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps): R
                 aria-current={isActive ? 'page' : undefined}
                 className={navButtonClass(isActive, false)}
               >
-                <Icon className="h-5 w-5 shrink-0" />
+                <Icon className="icon-5 shrink-0" />
                 <span>{item.label}</span>
               </button>
             )
@@ -125,7 +125,7 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps): R
             onClick={() => void handleLogoutClick()}
             className="flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--foreground)] transition-colors duration-150 hover:bg-[var(--muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
           >
-            <LogOut className="h-4 w-4" /> Log out
+            <LogOut className="icon-4" /> Log out
           </button>
         </div>
 
@@ -134,7 +134,7 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps): R
           aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
           className="ml-auto flex h-11 w-11 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] text-[var(--foreground)] md:hidden"
         >
-          {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          {mobileMenuOpen ? <X className="icon-5" /> : <Menu className="icon-5" />}
         </button>
 
         {mobileMenuOpen && (
@@ -150,7 +150,7 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps): R
                     aria-current={isActive ? 'page' : undefined}
                     className={navButtonClass(isActive, true)}
                   >
-                    <Icon className="h-5 w-5 shrink-0" />
+                    <Icon className="icon-5 shrink-0" />
                     <span>{item.label}</span>
                   </button>
                 )
@@ -167,7 +167,7 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps): R
                 onClick={() => void handleLogoutClick()}
                 className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted)]"
               >
-                <LogOut className="h-4 w-4" /> Log out
+                <LogOut className="icon-4" /> Log out
               </button>
             </div>
           </div>

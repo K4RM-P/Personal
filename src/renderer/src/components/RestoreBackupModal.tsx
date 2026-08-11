@@ -110,7 +110,7 @@ export function RestoreBackupModal({ onClose }: RestoreBackupModalProps): React.
                       name="restore-backup"
                       checked={selected?.backupDir === b.backupDir}
                       onChange={() => setSelected(b)}
-                      className="h-4 w-4 shrink-0"
+                      className="icon-4 shrink-0"
                     />
                     <span className="flex-1 font-medium">
                       {new Date(b.timestamp).toLocaleString()}

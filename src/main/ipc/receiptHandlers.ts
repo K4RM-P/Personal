@@ -14,7 +14,9 @@ import {
   saveCardSurchargePercent,
   saveAllowShortPayToTab,
   getIdleTimeoutMinutes,
-  saveIdleTimeoutMinutes
+  saveIdleTimeoutMinutes,
+  getDisplayDensityLevel,
+  saveDisplayDensityLevel
 } from '../db/queries/settingsQueries'
 import { requireManager } from '../auth/session'
 import type {
@@ -75,4 +77,10 @@ export function registerReceiptHandlers(db: PrismaClient): void {
     await saveIdleTimeoutMinutes(db, minutes)
     return minutes
   })
+
+  // Display density — device-level, visible/settable by any role.
+  ipcMain.handle(IPC.SETTINGS_GET_DISPLAY_DENSITY, () => getDisplayDensityLevel(db))
+  ipcMain.handle(IPC.SETTINGS_SAVE_DISPLAY_DENSITY, (_e, level: number) =>
+    saveDisplayDensityLevel(db, level)
+  )
 }

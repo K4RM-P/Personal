@@ -250,7 +250,11 @@ const api = {
       ipcRenderer.invoke(IPC.SETTINGS_SAVE_CHECKOUT, input),
     getIdleTimeoutMinutes: (): Promise<number> => ipcRenderer.invoke(IPC.SETTINGS_GET_IDLE_TIMEOUT),
     saveIdleTimeoutMinutes: (minutes: number): Promise<number> =>
-      ipcRenderer.invoke(IPC.SETTINGS_SAVE_IDLE_TIMEOUT, minutes)
+      ipcRenderer.invoke(IPC.SETTINGS_SAVE_IDLE_TIMEOUT, minutes),
+    getDisplayDensity: (): Promise<number> =>
+      ipcRenderer.invoke(IPC.SETTINGS_GET_DISPLAY_DENSITY),
+    saveDisplayDensity: (level: number): Promise<number> =>
+      ipcRenderer.invoke(IPC.SETTINGS_SAVE_DISPLAY_DENSITY, level)
   },
   compliance: {
     searchRx: (query: string): Promise<PrescriptionRecord[]> =>

@@ -46,7 +46,7 @@ export function UsersScreen(): React.JSX.Element {
           onClick={() => setShowAdd(true)}
           className="flex min-h-11 items-center gap-2 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)]"
         >
-          <Plus className="h-4 w-4" /> Add New User
+          <Plus className="icon-4" /> Add New User
         </button>
       </div>
 
@@ -81,7 +81,7 @@ export function UsersScreen(): React.JSX.Element {
                       aria-label={`Edit ${u.fullName}`}
                       className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--muted)]"
                     >
-                      <Pencil className="h-4 w-4" />
+                      <Pencil className="icon-4" />
                     </button>
                     <button
                       onClick={() => setDeleting(u)}
@@ -89,7 +89,7 @@ export function UsersScreen(): React.JSX.Element {
                       aria-label={`Delete ${u.fullName}`}
                       className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] text-[var(--error)] hover:bg-[var(--error-bg)]"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="icon-4" />
                     </button>
                   </div>
                 </td>
@@ -138,7 +138,7 @@ function PasswordField({
         aria-label={show ? 'Hide password' : 'Show password'}
         className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
       >
-        {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        {show ? <EyeOff className="icon-4" /> : <Eye className="icon-4" />}
       </button>
     </div>
   )

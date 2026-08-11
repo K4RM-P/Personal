@@ -8,7 +8,7 @@ import { RefundsScreen } from './RefundsScreen'
 import { formatCurrency } from '@shared/formatCurrency'
 import type { Product, Customer, TransactionWithItems, ChargeResult } from '@shared/types'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
-import { Lock, RotateCcw, ShoppingCart, ArrowUpRight, ArrowDownRight, Banknote, Send, CreditCard, HeartHandshake, ChevronLeft, Pill, PackagePlus, Percent, Trash2 } from 'lucide-react'
+import { Lock, RotateCcw, ShoppingCart, ArrowUpRight, ArrowDownRight, Banknote, Send, CreditCard, HeartHandshake, ChevronLeft, Pill, PackagePlus, Trash2, MoreVertical, Plus } from 'lucide-react'
 
 type ScanFeedback = { type: 'success' | 'error'; message: string } | null
 type PaymentMethod = 'CASH' | 'E_TRANSFER' | 'CARD' | 'PHARMACY_CREDIT' | null
@@ -47,6 +47,8 @@ export function CheckoutScreen(): React.JSX.Element {
   const [showRefunds, setShowRefunds] = React.useState(false)
   const [showPayModal, setShowPayModal] = React.useState(false)
   const [customProductMode, setCustomProductMode] = React.useState<'RX' | 'NONRX' | null>(null)
+  const [showHeaderMenu, setShowHeaderMenu] = React.useState(false)
+  const [showAddMenu, setShowAddMenu] = React.useState(false)
   const [customProductError, setCustomProductError] = React.useState<string | null>(null)
 
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod>(null)
@@ -138,7 +140,6 @@ export function CheckoutScreen(): React.JSX.Element {
       }
       return [...prev, { product, quantity: 1, unitPriceCents: product.priceCents }]
     })
-    setScanFeedback({ type: 'success', message: `Added ${product.name}` })
     setSearchQuery('')
     setProducts([])
   }
@@ -215,7 +216,6 @@ export function CheckoutScreen(): React.JSX.Element {
           }
           return [...prev, { product, quantity: 1, unitPriceCents: product.priceCents }]
         })
-        setScanFeedback({ type: 'success', message: `Added ${product.name}` })
       } catch (err) {
         setScanFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Scan failed' })
       }
@@ -576,17 +576,75 @@ export function CheckoutScreen(): React.JSX.Element {
     <div className="mx-auto max-w-7xl space-y-4 p-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-[var(--foreground)]">Checkout</h1>
-        <button
-          onClick={() => setShowRefunds(true)}
-          className="flex items-center gap-2 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--card)]"
-        >
-          <RotateCcw className="h-4 w-4" /> Refunds
-        </button>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowHeaderMenu((v) => !v)}
+            aria-label="More actions"
+            aria-haspopup="true"
+            aria-expanded={showHeaderMenu}
+            className="flex h-9 w-9 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)] hover:bg-[var(--card)]"
+          >
+            <MoreVertical className="icon-4" />
+          </button>
+          {showHeaderMenu && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowHeaderMenu(false)} />
+              <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">
+                <button
+                  onClick={() => { setShowRefunds(true); setShowHeaderMenu(false) }}
+                  className="flex min-h-9 w-full items-center gap-2 px-3 text-left text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted)]"
+                >
+                  <RotateCcw className="icon-4" /> Refunds
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Scan feedback */}
+      {/* Scan feedback — errors only; a successful add is already visible in the cart. */}
       {scanFeedback && <Alert variant={scanFeedback.type}>{scanFeedback.message}</Alert>}
 
+      <div className="flex items-start gap-4">
+      {/* Parked Sales — sits to the left of the main column instead of stacking
+          above the cart, so it doesn't push checkout content down the page. */}
+      {parkedCarts.length > 0 && (
+        <div className="w-56 shrink-0 space-y-2">
+          <Card className="border-[var(--warning)]/30 bg-[var(--warning-bg)]">
+            <h3 className="mb-2 text-sm font-semibold text-[var(--warning)]">Parked ({parkedCarts.length})</h3>
+            <div className="space-y-2">
+              {parkedCarts.map((parked) => (
+                <div key={parked.id} className="rounded-[var(--radius)] border border-[var(--border)] bg-white p-2 text-xs">
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-[var(--foreground)]">{parked.name}</div>
+                    {parked.customer && (
+                      <div className="truncate text-[var(--muted-foreground)]">{parked.customer.firstName} {parked.customer.lastName}</div>
+                    )}
+                  </div>
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <button
+                      onClick={() => handleResumeParkedSale(parked.id)}
+                      className="min-h-8 flex-1 rounded-[var(--radius)] bg-[var(--warning)] px-2 py-1 font-medium text-[var(--primary-foreground)]"
+                    >
+                      Resume
+                    </button>
+                    <button
+                      onClick={() => handleDeleteParkedSale(parked.id)}
+                      aria-label="Delete parked sale"
+                      className="flex min-h-8 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] px-2 py-1 font-medium text-[var(--error)] hover:bg-[var(--error-bg)]"
+                    >
+                      <Trash2 className="icon-3_5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      <div className="min-w-0 flex-1 space-y-4">
       {/* Product search — compact single row. A single match auto-adds to the
           cart (same as a barcode scan); multiple matches drop into a small
           overlay dropdown that never pushes page content down or scrolls
@@ -608,7 +666,7 @@ export function CheckoutScreen(): React.JSX.Element {
                   <button
                     key={product.id}
                     onClick={() => addProductToCart(product)}
-                    className="flex min-h-11 w-full items-center justify-between gap-3 border-b border-[var(--border)] px-3 text-left text-sm last:border-0 hover:bg-[var(--muted)]"
+                    className="flex min-h-9 w-full items-center justify-between gap-2 border-b border-[var(--border)] px-2.5 text-left text-sm last:border-0 hover:bg-[var(--muted)]"
                   >
                     <span className="min-w-0 flex-1 truncate">
                       <span className="font-medium text-[var(--foreground)]">{product.name}</span>
@@ -625,69 +683,50 @@ export function CheckoutScreen(): React.JSX.Element {
               </div>
             )}
           </div>
-          <button
-            type="button"
-            title="Add RX Item"
-            aria-label="Add RX Item"
-            onClick={() => setCustomProductMode('RX')}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] border border-[var(--warning)] bg-[var(--warning-bg)] text-[var(--warning)]"
-          >
-            <Pill className="h-5 w-5" />
-          </button>
-          <button
-            type="button"
-            title="Add Non-RX Item"
-            aria-label="Add Non-RX Item"
-            onClick={() => setCustomProductMode('NONRX')}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]"
-          >
-            <PackagePlus className="h-5 w-5" />
-          </button>
+          {/* Single "+" menu replaces the separate RX / Non-RX buttons to save header width. */}
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              title="Add custom item"
+              aria-label="Add custom item"
+              aria-haspopup="true"
+              aria-expanded={showAddMenu}
+              onClick={() => setShowAddMenu((v) => !v)}
+              className="flex h-11 w-11 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]"
+            >
+              <Plus className="icon-5" />
+            </button>
+            {showAddMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowAddMenu(false)} />
+                <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">
+                  <button
+                    onClick={() => { setCustomProductMode('RX'); setShowAddMenu(false) }}
+                    className="flex min-h-9 w-full items-center gap-2 px-3 text-left text-sm font-medium text-[var(--warning)] hover:bg-[var(--muted)]"
+                  >
+                    <Pill className="icon-4" /> Add RX Item
+                  </button>
+                  <button
+                    onClick={() => { setCustomProductMode('NONRX'); setShowAddMenu(false) }}
+                    className="flex min-h-9 w-full items-center gap-2 px-3 text-left text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted)]"
+                  >
+                    <PackagePlus className="icon-4" /> Add Non-RX Item
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </Card>
 
-      {/* Parked Sales */}
-      {parkedCarts.length > 0 && (
-        <Card className="border-[var(--warning)]/30 bg-[var(--warning-bg)]">
-          <h3 className="mb-2 text-sm font-semibold text-[var(--warning)]">Parked Sales ({parkedCarts.length})</h3>
-          <div className="space-y-2">
-            {parkedCarts.map((parked) => (
-              <div key={parked.id} className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-white p-2 text-xs">
-                <div>
-                  <span className="font-medium text-[var(--foreground)]">{parked.name}</span>
-                  {parked.customer && (
-                    <div className="text-[var(--muted-foreground)]">{parked.customer.firstName} {parked.customer.lastName}</div>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleResumeParkedSale(parked.id)}
-                    className="min-h-8 rounded-[var(--radius)] bg-[var(--warning)] px-2 py-1 font-medium text-[var(--primary-foreground)]"
-                  >
-                    Resume Sale
-                  </button>
-                  <button
-                    onClick={() => handleDeleteParkedSale(parked.id)}
-                    aria-label="Delete parked sale"
-                    className="flex min-h-8 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] px-2 py-1 font-medium text-[var(--error)] hover:bg-[var(--error-bg)]"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
       {/* Cart — full width */}
-      <Card>
-        <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
-          <h3 className="font-semibold text-[var(--foreground)]">Current Cart</h3>
+      <Card className="p-3">
+        <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
+          <h3 className="text-sm font-semibold text-[var(--foreground)]">Current Cart</h3>
           <span className="text-xs text-[var(--muted-foreground)]">{cart.length} line items</span>
         </div>
 
-        <div className="mt-3 max-h-[320px] space-y-2 overflow-y-auto pr-1">
+        <div className="mt-2 max-h-[320px] space-y-1.5 overflow-y-auto pr-1">
           {cart.length === 0 ? (
             <EmptyState icon={ShoppingCart} title="Cart is empty" description="Search or scan to add items." className="p-4" />
           ) : (
@@ -697,7 +736,7 @@ export function CheckoutScreen(): React.JSX.Element {
               const lineTotalCents = lineRawCents - lineDiscountCents
               const itemHstOn = item.hstApplied !== false
               return (
-                <div key={item.product.id} className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3 text-sm">
+                <div key={item.product.id} className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-2 text-sm">
                   <div className="min-w-0">
                     <div className="truncate font-medium text-[var(--foreground)]" title={item.product.name}>{item.product.name}</div>
                     <div className="text-xs text-[var(--muted-foreground)]">
@@ -705,20 +744,20 @@ export function CheckoutScreen(): React.JSX.Element {
                       {lineDiscountCents > 0 && <span className="text-[var(--success)]"> · discount {formatCurrency(lineDiscountCents)}</span>}
                     </div>
                   </div>
-                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                    <div className="flex min-h-11 items-center rounded-[var(--radius)] border border-[var(--border)]">
-                      <button onClick={() => handleQuantityChange(item.product.id, -1)} className="min-w-11 px-2 py-2 text-[var(--foreground)]">−</button>
-                      <span className="px-2 text-[var(--foreground)]">{item.quantity}</span>
-                      <button onClick={() => handleQuantityChange(item.product.id, 1)} className="min-w-11 px-2 py-2 text-[var(--foreground)]">+</button>
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                    <div className="flex min-h-8 items-center rounded-[var(--radius)] border border-[var(--border)]">
+                      <button onClick={() => handleQuantityChange(item.product.id, -1)} className="min-w-8 px-1.5 py-1 text-[var(--foreground)]">−</button>
+                      <span className="px-1.5 text-[var(--foreground)]">{item.quantity}</span>
+                      <button onClick={() => handleQuantityChange(item.product.id, 1)} className="min-w-8 px-1.5 py-1 text-[var(--foreground)]">+</button>
                     </div>
                     <button
                       onClick={() => setDiscountItemTarget(item.product.id)}
-                      className={`min-h-11 rounded-[var(--radius)] border px-2.5 text-xs font-semibold ${lineDiscountCents > 0 ? 'border-[var(--success)] text-[var(--success)]' : 'border-[var(--border)] text-[var(--muted-foreground)]'}`}
+                      className={`min-h-8 rounded-[var(--radius)] border px-2 text-xs font-semibold ${lineDiscountCents > 0 ? 'border-[var(--success)] text-[var(--success)]' : 'border-[var(--border)] text-[var(--muted-foreground)]'}`}
                     >
-                      {lineDiscountCents > 0 ? 'Edit' : 'Discount'}
+                      {lineDiscountCents > 0 ? 'Edit' : 'Disc.'}
                     </button>
                     <label
-                      className={`flex min-h-11 items-center gap-1.5 rounded-[var(--radius)] border px-2.5 text-xs font-semibold ${itemHstOn ? 'border-[var(--border)] text-[var(--foreground)]' : 'border-[var(--warning)] text-[var(--warning)]'} ${item.hstLocked ? 'opacity-60' : ''}`}
+                      className={`flex min-h-8 items-center gap-1 rounded-[var(--radius)] border px-2 text-xs font-semibold ${itemHstOn ? 'border-[var(--border)] text-[var(--foreground)]' : 'border-[var(--warning)] text-[var(--warning)]'} ${item.hstLocked ? 'opacity-60' : ''}`}
                       title={item.hstLocked ? 'RX items cannot be charged HST' : 'Charge HST on this item'}
                     >
                       <input
@@ -726,11 +765,11 @@ export function CheckoutScreen(): React.JSX.Element {
                         checked={itemHstOn}
                         disabled={item.hstLocked}
                         onChange={() => handleToggleItemHst(item.product.id)}
-                        className="h-3.5 w-3.5"
+                        className="icon-3_5"
                       />
                       HST
                     </label>
-                    <div className="w-20 text-right">
+                    <div className="w-16 text-right">
                       {lineDiscountCents > 0 && (
                         <div className="text-[10px] text-[var(--muted-foreground)] line-through">{formatCurrency(lineRawCents)}</div>
                       )}
@@ -788,9 +827,8 @@ export function CheckoutScreen(): React.JSX.Element {
               disabled={cart.length === 0}
               title={effectiveBillDiscountCents > 0 ? 'Edit whole-bill discount' : 'Whole Bill Discount'}
               aria-label={effectiveBillDiscountCents > 0 ? 'Edit whole-bill discount' : 'Whole Bill Discount'}
-              className={`flex h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-[var(--radius)] border text-[10px] font-semibold disabled:opacity-50 ${effectiveBillDiscountCents > 0 ? 'border-[var(--success)] bg-[var(--success-bg)] text-[var(--success)]' : 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]'}`}
+              className={`flex h-14 flex-1 items-center justify-center rounded-[var(--radius)] border text-xs font-semibold disabled:opacity-50 ${effectiveBillDiscountCents > 0 ? 'border-[var(--success)] bg-[var(--success-bg)] text-[var(--success)]' : 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]'}`}
             >
-              <Percent className="h-4 w-4" />
               Disc.
             </button>
             <button
@@ -803,6 +841,8 @@ export function CheckoutScreen(): React.JSX.Element {
           </div>
         </div>
       </Card>
+      </div>
+      </div>
 
       {/* PAY popup — not dismissable by outside click; explicit Cancel only before a method is picked */}
       {showPayModal && (
@@ -820,7 +860,7 @@ export function CheckoutScreen(): React.JSX.Element {
                   disabled={cart.length === 0}
                   className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Banknote className="h-5 w-5 shrink-0" />
+                  <Banknote className="icon-5 shrink-0" />
                   CASH
                 </button>
                 <button
@@ -828,7 +868,7 @@ export function CheckoutScreen(): React.JSX.Element {
                   disabled={cart.length === 0}
                   className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Send className="h-5 w-5 shrink-0" />
+                  <Send className="icon-5 shrink-0" />
                   E-TRANSFER
                 </button>
                 <button
@@ -836,7 +876,7 @@ export function CheckoutScreen(): React.JSX.Element {
                   disabled={cart.length === 0}
                   className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <CreditCard className="h-5 w-5 shrink-0" />
+                  <CreditCard className="icon-5 shrink-0" />
                   CARD (Debit/Credit)
                 </button>
                 <button
@@ -844,7 +884,7 @@ export function CheckoutScreen(): React.JSX.Element {
                   disabled={cart.length === 0}
                   className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <HeartHandshake className="h-5 w-5 shrink-0" />
+                  <HeartHandshake className="icon-5 shrink-0" />
                   PHARMACY CREDIT
                 </button>
                 <button
@@ -852,7 +892,7 @@ export function CheckoutScreen(): React.JSX.Element {
                   disabled={cart.length === 0}
                   className="col-span-2 flex min-h-11 items-center justify-center gap-1.5 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-xs font-medium text-[var(--foreground)] transition-colors duration-150 hover:bg-[var(--card)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Lock className="h-3.5 w-3.5" />
+                  <Lock className="icon-3_5" />
                   Hold / Park sale
                 </button>
                 <button
@@ -865,7 +905,7 @@ export function CheckoutScreen(): React.JSX.Element {
             ) : (
               <div className="mt-3 space-y-3 text-xs">
                 <button onClick={resetPaymentMethod} className="flex min-h-9 items-center gap-1 rounded-[var(--radius)] px-1 text-[var(--primary)] hover:bg-[var(--muted)]">
-                  <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="icon-4" />
                   Back to payment methods
                 </button>
 
@@ -1050,7 +1090,7 @@ export function CheckoutScreen(): React.JSX.Element {
                           </button>
                         </div>
                         <div className={`flex items-center gap-1.5 text-xs font-semibold ${customerBalance >= 0 ? 'text-[var(--success)]' : 'text-[var(--owed)]'}`}>
-                          {customerBalance >= 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+                          {customerBalance >= 0 ? <ArrowUpRight className="icon-4" /> : <ArrowDownRight className="icon-4" />}
                           <span>{customerBalance >= 0 ? 'Credit available' : 'Customer owes'}: {formatCurrency(Math.abs(customerBalance))}</span>
                         </div>
                         <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3 text-sm">

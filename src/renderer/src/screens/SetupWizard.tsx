@@ -68,7 +68,7 @@ export function SetupWizard(): React.JSX.Element {
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
                 className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
               >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {showPassword ? <EyeOff className="icon-4" /> : <Eye className="icon-4" />}
               </button>
             </div>
           </div>
