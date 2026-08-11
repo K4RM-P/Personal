@@ -8,6 +8,7 @@ import { RefundsScreen } from './RefundsScreen'
 import { formatCurrency } from '@shared/formatCurrency'
 import type { Product, Customer, TransactionWithItems, ChargeResult } from '@shared/types'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
+import { buildCustomerDisplayState } from '../lib/customerDisplayState'
 import {
   Lock,
   RotateCcw,
@@ -161,6 +162,72 @@ export function CheckoutScreen(): React.JSX.Element {
     }
     void loadSettings()
   }, [])
+
+  // ---- Customer-facing display (second screen) ----------------------------
+  // Read-only mirror. Everything here is best-effort: a failure must never
+  // affect the sale (spec §11), hence the try/catch and optional chaining.
+  const [customerDisplayInfo, setCustomerDisplayInfo] = React.useState({
+    pharmacyName: '',
+    pharmacyEmail: ''
+  })
+
+  React.useEffect(() => {
+    const load = async (): Promise<void> => {
+      try {
+        const s = await window.api?.customerDisplay?.getSettings()
+        if (s) setCustomerDisplayInfo({ pharmacyName: s.pharmacyName, pharmacyEmail: s.eTransferEmail })
+      } catch {
+        // Second screen is an enhancement; ignore.
+      }
+    }
+    void load()
+  }, [])
+
+  const lastPushedRef = React.useRef<string>('')
+  React.useEffect(() => {
+    const state = buildCustomerDisplayState({
+      saleCompleted: activeReceipt !== null,
+      pharmacyName: customerDisplayInfo.pharmacyName,
+      pharmacyEmail: customerDisplayInfo.pharmacyEmail,
+      paymentMethod,
+      payModalOpen: showPayModal,
+      lineItems: cart.map((item) => ({
+        name: item.product.name,
+        qty: item.quantity,
+        lineTotalCents: item.unitPriceCents * item.quantity - (item.discountCents ?? 0),
+        discountCents: item.discountCents ?? undefined
+      })),
+      subtotalCents,
+      billDiscountCents: effectiveBillDiscountCents,
+      taxCents,
+      // effectiveTotal is surcharge-inclusive — the exact amount charged.
+      totalCents: effectiveTotal,
+      tenderedCents,
+      changeCents,
+      customerBalanceCents: customerBalance
+    })
+    const serialized = JSON.stringify(state)
+    if (serialized === lastPushedRef.current) return
+    lastPushedRef.current = serialized
+    try {
+      window.api?.customerDisplay?.push(state)
+    } catch {
+      // Never let the second screen break checkout.
+    }
+  }, [
+    activeReceipt,
+    cart,
+    customerBalance,
+    customerDisplayInfo,
+    changeCents,
+    effectiveBillDiscountCents,
+    effectiveTotal,
+    paymentMethod,
+    showPayModal,
+    subtotalCents,
+    taxCents,
+    tenderedCents
+  ])
 
   React.useEffect(() => {
     if (!window.api?.product) return
