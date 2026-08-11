@@ -3,7 +3,7 @@ import { PackageSearch, Sparkles, Lock, Search, Loader2, Trash2 } from 'lucide-r
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
 import { Alert } from '../components/ui/Alert'
 import { EmptyState } from '../components/ui/EmptyState'
-import { PricingTier, BulkImportProductInput } from '@shared/types'
+import { PricingTier, BulkImportProductInput, Product } from '@shared/types'
 import { formatCurrency } from '@shared/formatCurrency'
 import { calculateRetailPriceCents, TierChangePreviewItem } from '@shared/pricingEngine'
 import { parseImportPreviewCsv } from '../lib/checkoutUi'
@@ -39,6 +39,7 @@ const TABS: { id: ProductTab; label: string }[] = [
 
 export function ProductsScreen(): React.JSX.Element {
   const [tiers, setTiers] = React.useState<PricingTier[]>([])
+  const [products, setProducts] = React.useState<Product[]>([])
   const [catalogItems, setCatalogItems] = React.useState<CatalogRow[]>([])
   const [activeTab, setActiveTab] = React.useState<ProductTab>('catalog')
   const [catalogSearch, setCatalogSearch] = React.useState('')
@@ -84,6 +85,10 @@ export function ProductsScreen(): React.JSX.Element {
         // First page only — never the whole catalogue. Typing narrows it server-side.
         const catalog = await window.api.catalog.search('', null, 100)
         setCatalogItems(catalog as CatalogRow[])
+      }
+      if (window.api?.product) {
+        const productList = await window.api.product.getAll()
+        setProducts(productList)
       }
     } catch (err) {
       console.error('Failed to load data:', err)
@@ -161,6 +166,30 @@ export function ProductsScreen(): React.JSX.Element {
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to save product'
+      setFormMessage({ type: 'error', text: message })
+    }
+  }
+
+  const handleEditProduct = (product: Product): void => {
+    setEditingProductId(product.id)
+    setSku(product.sku)
+    setName(product.name)
+    setCostDollars((product.costCents / 100).toFixed(2))
+    setIsPinned(product.isPinned)
+    setPriceDollars(product.isPinned ? (product.priceCents / 100).toFixed(2) : '')
+    setBarcode(product.barcode ?? '')
+    setFormMessage(null)
+  }
+
+  const handleDeleteProduct = async (id: number): Promise<void> => {
+    try {
+      if (window.api?.product) {
+        await window.api.product.delete(id)
+        if (editingProductId === id) resetForm()
+        loadData()
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to delete product'
       setFormMessage({ type: 'error', text: message })
     }
   }
@@ -482,7 +511,84 @@ export function ProductsScreen(): React.JSX.Element {
           </div>
 
           {/* Catalogue Table (8 Cols) */}
-          <div className="col-span-8">
+          <div className="col-span-8 space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Custom Products ({products.length})</CardTitle>
+                <CardDescription>
+                  Products you&apos;ve added manually, separate from the McKesson catalogue below.
+                  Click a row to edit.
+                </CardDescription>
+              </CardHeader>
+              {products.length === 0 ? (
+                <EmptyState
+                  icon={PackageSearch}
+                  title="No custom products yet"
+                  description="Add one using the form to the left."
+                />
+              ) : (
+                <div className="max-h-72 overflow-y-auto pr-1">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-[var(--card)]">
+                      <tr className="border-b border-[var(--border)] text-left text-[var(--muted-foreground)]">
+                        <th className="py-2 pr-2 font-medium">SKU</th>
+                        <th className="py-2 pr-2 font-medium">Name</th>
+                        <th className="py-2 pr-2 text-right font-medium">Cost</th>
+                        <th className="py-2 pr-2 text-right font-medium">Retail Price</th>
+                        <th className="py-2 pr-2 font-medium">Barcode</th>
+                        <th className="py-2 text-right font-medium"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {products.map((product) => (
+                        <tr
+                          key={product.id}
+                          onClick={() => handleEditProduct(product)}
+                          className={`cursor-pointer border-b border-[var(--border)] last:border-0 hover:bg-[var(--muted)] ${
+                            editingProductId === product.id ? 'bg-[var(--muted)]' : ''
+                          }`}
+                        >
+                          <td className="py-2 pr-2 font-mono text-[var(--foreground)]">
+                            {product.sku}
+                          </td>
+                          <td className="py-2 pr-2 text-[var(--foreground)]">
+                            {product.name}
+                            {product.isPinned && (
+                              <Lock
+                                className="icon-3_5 ml-1 inline shrink-0 text-[var(--muted-foreground)]"
+                                aria-hidden="true"
+                              />
+                            )}
+                          </td>
+                          <td className="py-2 pr-2 text-right tabular-nums text-[var(--foreground)]">
+                            {formatCurrency(product.costCents)}
+                          </td>
+                          <td className="py-2 pr-2 text-right tabular-nums font-semibold text-[var(--primary)]">
+                            {formatCurrency(product.priceCents)}
+                          </td>
+                          <td className="py-2 pr-2 font-mono text-[var(--muted-foreground)]">
+                            {product.barcode || '—'}
+                          </td>
+                          <td className="py-2 text-right">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteProduct(product.id)
+                              }}
+                              aria-label={`Delete ${product.name}`}
+                              className="min-h-9 min-w-9 rounded-[var(--radius)] text-[var(--muted-foreground)] hover:bg-[var(--card)] hover:text-[var(--destructive)]"
+                            >
+                              <Trash2 className="icon-4" aria-hidden="true" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
             <Card>
               <CardHeader>
                 <CardTitle>
