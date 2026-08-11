@@ -36,7 +36,9 @@ function Balance({ value }: { value: number }): React.JSX.Element {
     >
       <Icon className="icon-5 shrink-0" />
       <span>
-        {credit ? `Credit available: ${formatCurrency(value)}` : `Customer owes: ${formatCurrency(value)}`}
+        {credit
+          ? `Credit available: ${formatCurrency(value)}`
+          : `Customer owes: ${formatCurrency(value)}`}
       </span>
     </div>
   )
@@ -246,23 +248,23 @@ export function CustomersScreen(): React.JSX.Element {
             )}
             {!searching &&
               results.map((customer) => (
-              <button
-                key={customer.id}
-                onClick={() => void choose(customer.id)}
-                className={`w-full rounded-[var(--radius)] border p-3 text-left transition-colors duration-150 ${
-                  selected?.id === customer.id
-                    ? 'border-[var(--primary)] bg-[var(--muted)]'
-                    : 'border-[var(--border)] bg-[var(--background)] hover:bg-[var(--muted)]'
-                }`}
-              >
-                <div className="font-semibold text-[var(--foreground)]">
-                  {customer.firstName} {customer.lastName}
-                </div>
-                <div className="mt-0.5 text-xs text-[var(--muted-foreground)]">
-                  {customer.phone} · {customer.address}
-                </div>
-              </button>
-            ))}
+                <button
+                  key={customer.id}
+                  onClick={() => void choose(customer.id)}
+                  className={`w-full rounded-[var(--radius)] border p-3 text-left transition-colors duration-150 ${
+                    selected?.id === customer.id
+                      ? 'border-[var(--primary)] bg-[var(--muted)]'
+                      : 'border-[var(--border)] bg-[var(--background)] hover:bg-[var(--muted)]'
+                  }`}
+                >
+                  <div className="font-semibold text-[var(--foreground)]">
+                    {customer.firstName} {customer.lastName}
+                  </div>
+                  <div className="mt-0.5 text-xs text-[var(--muted-foreground)]">
+                    {customer.phone} · {customer.address}
+                  </div>
+                </button>
+              ))}
             {!searching && !results.length && (
               <EmptyState
                 icon={UsersIcon}

@@ -76,41 +76,55 @@ export function UsersScreen(): React.JSX.Element {
                 </td>
               </tr>
             )}
-            {!loading && users.map((u) => (
-              <tr key={u.id} className="border-b border-[var(--border)] last:border-0 text-[var(--foreground)]">
-                <td className="py-3 pr-4 font-medium">
-                  {u.fullName}
-                  {currentUser?.id === u.id && <span className="ml-2 text-xs text-[var(--muted-foreground)]">(you)</span>}
-                </td>
-                <td className="py-3 pr-4">{u.role === 'MANAGER' ? 'Manager' : 'Cashier'}</td>
-                <td className="py-3 pr-4 text-[var(--muted-foreground)]">{new Date(u.createdAt).toLocaleDateString()}</td>
-                <td className="py-3 pr-4 text-[var(--muted-foreground)]">{u.lastLogin ? new Date(u.lastLogin).toLocaleString() : 'Never'}</td>
-                <td className="py-3 pr-4">
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      onClick={() => setEditing(u)}
-                      title="Edit"
-                      aria-label={`Edit ${u.fullName}`}
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--muted)]"
-                    >
-                      <Pencil className="icon-4" />
-                    </button>
-                    <button
-                      onClick={() => setDeleting(u)}
-                      title="Delete"
-                      aria-label={`Delete ${u.fullName}`}
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] text-[var(--error)] hover:bg-[var(--error-bg)]"
-                    >
-                      <Trash2 className="icon-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {!loading &&
+              users.map((u) => (
+                <tr
+                  key={u.id}
+                  className="border-b border-[var(--border)] last:border-0 text-[var(--foreground)]"
+                >
+                  <td className="py-3 pr-4 font-medium">
+                    {u.fullName}
+                    {currentUser?.id === u.id && (
+                      <span className="ml-2 text-xs text-[var(--muted-foreground)]">(you)</span>
+                    )}
+                  </td>
+                  <td className="py-3 pr-4">{u.role === 'MANAGER' ? 'Manager' : 'Cashier'}</td>
+                  <td className="py-3 pr-4 text-[var(--muted-foreground)]">
+                    {new Date(u.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className="py-3 pr-4 text-[var(--muted-foreground)]">
+                    {u.lastLogin ? new Date(u.lastLogin).toLocaleString() : 'Never'}
+                  </td>
+                  <td className="py-3 pr-4">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => setEditing(u)}
+                        title="Edit"
+                        aria-label={`Edit ${u.fullName}`}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--muted)]"
+                      >
+                        <Pencil className="icon-4" />
+                      </button>
+                      <button
+                        onClick={() => setDeleting(u)}
+                        title="Delete"
+                        aria-label={`Delete ${u.fullName}`}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] text-[var(--error)] hover:bg-[var(--error-bg)]"
+                      >
+                        <Trash2 className="icon-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
             {!loading && users.length === 0 && !loadError && (
               <tr>
                 <td colSpan={5} className="py-2">
-                  <EmptyState icon={UsersIcon} title="No users yet" description="Add a staff account to get started." />
+                  <EmptyState
+                    icon={UsersIcon}
+                    title="No users yet"
+                    description="Add a staff account to get started."
+                  />
                 </td>
               </tr>
             )}
@@ -118,9 +132,36 @@ export function UsersScreen(): React.JSX.Element {
         </table>
       </Card>
 
-      {showAdd && <AddUserModal onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); void refresh() }} />}
-      {editing && <EditUserModal user={editing} isSelf={editing.id === currentUser?.id} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void refresh() }} />}
-      {deleting && <DeleteUserDialog user={deleting} onClose={() => setDeleting(null)} onDeleted={() => { setDeleting(null); void refresh() }} />}
+      {showAdd && (
+        <AddUserModal
+          onClose={() => setShowAdd(false)}
+          onSaved={() => {
+            setShowAdd(false)
+            void refresh()
+          }}
+        />
+      )}
+      {editing && (
+        <EditUserModal
+          user={editing}
+          isSelf={editing.id === currentUser?.id}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null)
+            void refresh()
+          }}
+        />
+      )}
+      {deleting && (
+        <DeleteUserDialog
+          user={deleting}
+          onClose={() => setDeleting(null)}
+          onDeleted={() => {
+            setDeleting(null)
+            void refresh()
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -142,13 +183,13 @@ function PasswordField({
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`${inputCls} pr-10`}
+        className={`${inputCls} pr-11`}
       />
       <button
         type="button"
         onClick={() => setShow((v) => !v)}
         aria-label={show ? 'Hide password' : 'Show password'}
-        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+        className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-inset"
       >
         {show ? <EyeOff className="icon-4" /> : <Eye className="icon-4" />}
       </button>
@@ -179,12 +220,20 @@ function Modal({
         if (e.target === e.currentTarget) onClose?.()
       }}
     >
-      <Card className="w-[440px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-3">{children}</Card>
+      <Card className="w-[440px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-3">
+        {children}
+      </Card>
     </div>
   )
 }
 
-function AddUserModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }): React.JSX.Element {
+function AddUserModal({
+  onClose,
+  onSaved
+}: {
+  onClose: () => void
+  onSaved: () => void
+}): React.JSX.Element {
   const [fullName, setFullName] = React.useState('')
   const [role, setRole] = React.useState<UserRole>('CASHIER')
   const [password, setPassword] = React.useState('')
@@ -214,22 +263,57 @@ function AddUserModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         <CardDescription>Create a staff account.</CardDescription>
       </CardHeader>
       {error && <Alert variant="error">{error}</Alert>}
-      <input placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} className={inputCls} />
-      <select value={role} onChange={(e) => setRole(e.target.value as UserRole)} className={inputCls}>
+      <input
+        placeholder="Full name"
+        value={fullName}
+        onChange={(e) => setFullName(e.target.value)}
+        className={inputCls}
+      />
+      <select
+        value={role}
+        onChange={(e) => setRole(e.target.value as UserRole)}
+        className={inputCls}
+      >
         <option value="CASHIER">Cashier</option>
         <option value="MANAGER">Manager</option>
       </select>
-      <PasswordField value={password} onChange={setPassword} placeholder="Password (min 8 characters)" />
+      <PasswordField
+        value={password}
+        onChange={setPassword}
+        placeholder="Password (min 8 characters)"
+      />
       <PasswordField value={confirm} onChange={setConfirm} placeholder="Confirm password" />
       <div className="grid grid-cols-2 gap-2 pt-1">
-        <button onClick={onClose} disabled={busy} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)] disabled:opacity-50">Cancel</button>
-        <button onClick={() => void submit()} disabled={busy} className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50">{busy ? 'Saving…' : 'Create User'}</button>
+        <button
+          onClick={onClose}
+          disabled={busy}
+          className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)] disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => void submit()}
+          disabled={busy}
+          className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+        >
+          {busy ? 'Saving…' : 'Create User'}
+        </button>
       </div>
     </Modal>
   )
 }
 
-function EditUserModal({ user, isSelf, onClose, onSaved }: { user: AuthUser; isSelf: boolean; onClose: () => void; onSaved: () => void }): React.JSX.Element {
+function EditUserModal({
+  user,
+  isSelf,
+  onClose,
+  onSaved
+}: {
+  user: AuthUser
+  isSelf: boolean
+  onClose: () => void
+  onSaved: () => void
+}): React.JSX.Element {
   const [role, setRole] = React.useState<UserRole>(user.role)
   const [password, setPassword] = React.useState('')
   const [confirm, setConfirm] = React.useState('')
@@ -238,7 +322,8 @@ function EditUserModal({ user, isSelf, onClose, onSaved }: { user: AuthUser; isS
 
   const submit = async (): Promise<void> => {
     setError(null)
-    if (password !== '' && password.length < 8) return setError('Password must be at least 8 characters.')
+    if (password !== '' && password.length < 8)
+      return setError('Password must be at least 8 characters.')
     if (password !== '' && password !== confirm) return setError('Passwords do not match.')
     setBusy(true)
     try {
@@ -258,28 +343,65 @@ function EditUserModal({ user, isSelf, onClose, onSaved }: { user: AuthUser; isS
       </CardHeader>
       {error && <Alert variant="error">{error}</Alert>}
       <div>
-        <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Full name (username — not editable)</label>
+        <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
+          Full name (username — not editable)
+        </label>
         <input value={user.fullName} disabled className={`${inputCls} opacity-60`} />
       </div>
       <div>
         <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Role</label>
-        <select value={role} onChange={(e) => setRole(e.target.value as UserRole)} disabled={isSelf} className={`${inputCls} ${isSelf ? 'opacity-60' : ''}`}>
+        <select
+          value={role}
+          onChange={(e) => setRole(e.target.value as UserRole)}
+          disabled={isSelf}
+          className={`${inputCls} ${isSelf ? 'opacity-60' : ''}`}
+        >
           <option value="CASHIER">Cashier</option>
           <option value="MANAGER">Manager</option>
         </select>
-        {isSelf && <p className="mt-1 text-xs text-[var(--muted-foreground)]">You cannot change your own role.</p>}
+        {isSelf && (
+          <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+            You cannot change your own role.
+          </p>
+        )}
       </div>
-      <PasswordField value={password} onChange={setPassword} placeholder="New password (leave blank to keep current)" />
-      {password !== '' && <PasswordField value={confirm} onChange={setConfirm} placeholder="Confirm new password" />}
+      <PasswordField
+        value={password}
+        onChange={setPassword}
+        placeholder="New password (leave blank to keep current)"
+      />
+      {password !== '' && (
+        <PasswordField value={confirm} onChange={setConfirm} placeholder="Confirm new password" />
+      )}
       <div className="grid grid-cols-2 gap-2 pt-1">
-        <button onClick={onClose} disabled={busy} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)] disabled:opacity-50">Cancel</button>
-        <button onClick={() => void submit()} disabled={busy} className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50">{busy ? 'Saving…' : 'Save Changes'}</button>
+        <button
+          onClick={onClose}
+          disabled={busy}
+          className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)] disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => void submit()}
+          disabled={busy}
+          className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+        >
+          {busy ? 'Saving…' : 'Save Changes'}
+        </button>
       </div>
     </Modal>
   )
 }
 
-function DeleteUserDialog({ user, onClose, onDeleted }: { user: AuthUser; onClose: () => void; onDeleted: () => void }): React.JSX.Element {
+function DeleteUserDialog({
+  user,
+  onClose,
+  onDeleted
+}: {
+  user: AuthUser
+  onClose: () => void
+  onDeleted: () => void
+}): React.JSX.Element {
   const [error, setError] = React.useState<string | null>(null)
   const [busy, setBusy] = React.useState(false)
 
@@ -298,12 +420,28 @@ function DeleteUserDialog({ user, onClose, onDeleted }: { user: AuthUser; onClos
   return (
     <Modal onClose={() => !busy && onClose()}>
       <CardTitle>Delete user</CardTitle>
-      <p className="text-sm text-[var(--foreground)]">Are you sure you want to delete {user.fullName}? This action cannot be undone.</p>
-      <p className="text-xs text-[var(--muted-foreground)]">Their sales history and other records stay attributed to them for audit purposes.</p>
+      <p className="text-sm text-[var(--foreground)]">
+        Are you sure you want to delete {user.fullName}? This action cannot be undone.
+      </p>
+      <p className="text-xs text-[var(--muted-foreground)]">
+        Their sales history and other records stay attributed to them for audit purposes.
+      </p>
       {error && <Alert variant="error">{error}</Alert>}
       <div className="grid grid-cols-2 gap-2 pt-1">
-        <button onClick={onClose} disabled={busy} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)] disabled:opacity-50">Cancel</button>
-        <button onClick={() => void confirmDelete()} disabled={busy} className="min-h-11 rounded-[var(--radius)] bg-[var(--error)] px-3 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Deleting…' : 'Delete'}</button>
+        <button
+          onClick={onClose}
+          disabled={busy}
+          className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)] disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => void confirmDelete()}
+          disabled={busy}
+          className="min-h-11 rounded-[var(--radius)] bg-[var(--error)] px-3 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {busy ? 'Deleting…' : 'Delete'}
+        </button>
       </div>
     </Modal>
   )

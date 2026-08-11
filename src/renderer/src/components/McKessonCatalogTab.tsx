@@ -4,10 +4,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from './ui/Card'
 import { Alert } from './ui/Alert'
 import { EmptyState } from './ui/EmptyState'
 import { formatCurrency } from '@shared/formatCurrency'
-import type {
-  AutoImportResult,
-  CatalogImportProgress
-} from '@shared/catalogTypes'
+import type { AutoImportResult, CatalogImportProgress } from '@shared/catalogTypes'
 
 type Phase = 'idle' | 'importing' | 'done' | 'failed'
 
@@ -118,8 +115,8 @@ export function McKessonCatalogTab(): React.JSX.Element {
           <CardTitle>McKesson Catalogue Upload</CardTitle>
           <CardDescription>
             Upload a WEBCAT file to import the latest McKesson catalogue. All items are
-            automatically added to your catalogue. Existing products are updated
-            with the latest pricing and availability.
+            automatically added to your catalogue. Existing products are updated with the latest
+            pricing and availability.
           </CardDescription>
         </CardHeader>
         <button
@@ -131,7 +128,9 @@ export function McKessonCatalogTab(): React.JSX.Element {
           <span className="text-sm font-semibold text-[var(--foreground)]">
             {phase === 'importing' ? 'Importing…' : 'Click to choose a WEBCAT file'}
           </span>
-          <span className="text-xs text-[var(--muted-foreground)]">Existing products are updated automatically</span>
+          <span className="text-xs text-[var(--muted-foreground)]">
+            Existing products are updated automatically
+          </span>
         </button>
       </Card>
 
@@ -143,9 +142,12 @@ export function McKessonCatalogTab(): React.JSX.Element {
           </CardHeader>
           <div className="space-y-3 text-xs">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-[var(--foreground)]">{phaseLabel(progress.phase)}</span>
+              <span className="font-semibold text-[var(--foreground)]">
+                {phaseLabel(progress.phase)}
+              </span>
               <span className="tabular-nums text-[var(--muted-foreground)]">
-                {progress.linesRead.toLocaleString()} / {progress.totalLines.toLocaleString()} lines ({progress.percent}%)
+                {progress.linesRead.toLocaleString()} / {progress.totalLines.toLocaleString()} lines
+                ({progress.percent}%)
               </span>
             </div>
             <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--muted)]">
@@ -167,10 +169,13 @@ export function McKessonCatalogTab(): React.JSX.Element {
           <CardHeader>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="icon-5 shrink-0 text-[var(--success)]" aria-hidden="true" />
-              <CardTitle className="text-[var(--success)]">Catalogue imported successfully</CardTitle>
+              <CardTitle className="text-[var(--success)]">
+                Catalogue imported successfully
+              </CardTitle>
             </div>
             <CardDescription>
-              {result.filename} &mdash; {result.catalogProductsTotal.toLocaleString()} products in catalogue
+              {result.filename} &mdash; {result.catalogProductsTotal.toLocaleString()} products in
+              catalogue
               {result.repricedCount > 0 && ` • ${result.repricedCount} repriced`}
               {result.discontinuedCount > 0 && ` • ${result.discontinuedCount} discontinued`}
               {result.errors > 0 && ` • ${result.errors} errors`}
@@ -195,12 +200,25 @@ export function McKessonCatalogTab(): React.JSX.Element {
                   </thead>
                   <tbody>
                     {result.newItems.map((item) => (
-                      <tr key={item.productId} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--muted)]">
-                        <td className="py-2 pr-2 font-mono text-[var(--muted-foreground)]">{item.itemNumber}</td>
-                        <td className="py-2 pr-2 font-medium text-[var(--foreground)]">{item.name}</td>
-                        <td className="py-2 pr-2 text-right tabular-nums text-[var(--foreground)]">{formatCurrency(item.costCents)}</td>
-                        <td className="py-2 pr-2 text-right tabular-nums font-semibold text-[var(--primary)]">{formatCurrency(item.priceCents)}</td>
-                        <td className="py-2 text-right font-mono text-[var(--muted-foreground)]">{item.barcode || '—'}</td>
+                      <tr
+                        key={item.productId}
+                        className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--muted)]"
+                      >
+                        <td className="py-2 pr-2 font-mono text-[var(--muted-foreground)]">
+                          {item.itemNumber}
+                        </td>
+                        <td className="py-2 pr-2 font-medium text-[var(--foreground)]">
+                          {item.name}
+                        </td>
+                        <td className="py-2 pr-2 text-right tabular-nums text-[var(--foreground)]">
+                          {formatCurrency(item.costCents)}
+                        </td>
+                        <td className="py-2 pr-2 text-right tabular-nums font-semibold text-[var(--primary)]">
+                          {formatCurrency(item.priceCents)}
+                        </td>
+                        <td className="py-2 text-right font-mono text-[var(--muted-foreground)]">
+                          {item.barcode || '—'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

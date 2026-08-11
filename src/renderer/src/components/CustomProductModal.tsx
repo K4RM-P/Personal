@@ -11,7 +11,11 @@ interface CustomProductModalProps {
 }
 
 /** Popup for adding a non-catalogue line item: RX (locked, no HST) or Non-RX (custom name/price). */
-export function CustomProductModal({ mode, onApply, onCancel }: CustomProductModalProps): React.JSX.Element {
+export function CustomProductModal({
+  mode,
+  onApply,
+  onCancel
+}: CustomProductModalProps): React.JSX.Element {
   const [rxNumber, setRxNumber] = React.useState('')
   const [itemName, setItemName] = React.useState('')
   const [priceInput, setPriceInput] = React.useState('')
@@ -46,7 +50,9 @@ export function CustomProductModal({ mode, onApply, onCancel }: CustomProductMod
             {mode === 'RX' ? 'Add RX Item' : 'Add Non-RX Item'}
           </CardTitle>
           <div className="text-xs text-[var(--muted-foreground)]">
-            {mode === 'RX' ? 'Prescription items are never charged HST.' : 'Custom item not in the product catalogue.'}
+            {mode === 'RX'
+              ? 'Prescription items are never charged HST.'
+              : 'Custom item not in the product catalogue.'}
           </div>
         </div>
 

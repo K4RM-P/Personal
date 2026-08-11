@@ -8,13 +8,42 @@ import { RefundsScreen } from './RefundsScreen'
 import { formatCurrency } from '@shared/formatCurrency'
 import type { Product, Customer, TransactionWithItems, ChargeResult } from '@shared/types'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
-import { Lock, RotateCcw, ShoppingCart, ArrowUpRight, ArrowDownRight, Banknote, Send, CreditCard, HeartHandshake, ChevronLeft, Pill, PackagePlus, Trash2, MoreVertical, Plus } from 'lucide-react'
+import {
+  Lock,
+  RotateCcw,
+  ShoppingCart,
+  ArrowUpRight,
+  ArrowDownRight,
+  Banknote,
+  Send,
+  CreditCard,
+  HeartHandshake,
+  ChevronLeft,
+  Pill,
+  PackagePlus,
+  Trash2,
+  MoreVertical,
+  Plus
+} from 'lucide-react'
 
 type ScanFeedback = { type: 'success' | 'error'; message: string } | null
 type PaymentMethod = 'CASH' | 'E_TRANSFER' | 'CARD' | 'PHARMACY_CREDIT' | null
 type CardType = 'DEBIT' | 'CREDIT' | null
-type CartItem = { product: Product; quantity: number; unitPriceCents: number; discountCents?: number; discountReason?: string; hstApplied?: boolean; hstLocked?: boolean }
-type ParkedCart = { id: string; name: string; items: CartItem[]; customer?: { id: number; firstName: string; lastName: string } | null }
+type CartItem = {
+  product: Product
+  quantity: number
+  unitPriceCents: number
+  discountCents?: number
+  discountReason?: string
+  hstApplied?: boolean
+  hstLocked?: boolean
+}
+type ParkedCart = {
+  id: string
+  name: string
+  items: CartItem[]
+  customer?: { id: number; firstName: string; lastName: string } | null
+}
 
 export function CheckoutScreen(): React.JSX.Element {
   const [products, setProducts] = React.useState<Product[]>([])
@@ -40,9 +69,14 @@ export function CheckoutScreen(): React.JSX.Element {
   const [showParkModal, setShowParkModal] = React.useState(false)
   const [parkCustomerQuery, setParkCustomerQuery] = React.useState('')
   const [parkCustomerResults, setParkCustomerResults] = React.useState<Customer[]>([])
-  const [paymentState, setPaymentState] = React.useState<'idle' | 'awaiting' | 'processing' | 'approved' | 'declined' | 'timeout'>('idle')
+  const [paymentState, setPaymentState] = React.useState<
+    'idle' | 'awaiting' | 'processing' | 'approved' | 'declined' | 'timeout'
+  >('idle')
   const [paymentMessage, setPaymentMessage] = React.useState<string | null>(null)
-  const [manualPrompt, setManualPrompt] = React.useState<{ amountCents: number; orderRef: string } | null>(null)
+  const [manualPrompt, setManualPrompt] = React.useState<{
+    amountCents: number
+    orderRef: string
+  } | null>(null)
   const [manualRef, setManualRef] = React.useState('')
   const [showRefunds, setShowRefunds] = React.useState(false)
   const [showPayModal, setShowPayModal] = React.useState(false)
@@ -63,7 +97,13 @@ export function CheckoutScreen(): React.JSX.Element {
   })
 
   const [showAddCustomer, setShowAddCustomer] = React.useState(false)
-  const [newCustomer, setNewCustomer] = React.useState({ firstName: '', lastName: '', phone: '', address: '', email: '' })
+  const [newCustomer, setNewCustomer] = React.useState({
+    firstName: '',
+    lastName: '',
+    phone: '',
+    address: '',
+    email: ''
+  })
   const [customerCreationError, setCustomerCreationError] = React.useState<string | null>(null)
   const [creatingCustomer, setCreatingCustomer] = React.useState(false)
 
@@ -90,11 +130,14 @@ export function CheckoutScreen(): React.JSX.Element {
     return sum + (lineRawCents - lineDiscountCents)
   }, 0)
   const taxableAfterBillDiscountCents =
-    subtotalCents > 0 ? taxableSubtotalCents - (effectiveBillDiscountCents * taxableSubtotalCents) / subtotalCents : 0
+    subtotalCents > 0
+      ? taxableSubtotalCents - (effectiveBillDiscountCents * taxableSubtotalCents) / subtotalCents
+      : 0
   const taxCents = Math.round((taxableAfterBillDiscountCents * taxRatePercent) / 100)
-  const surchargeCents = cardType === 'CREDIT' && applySurcharge
-    ? Math.floor(preTaxCents * checkoutSettings.cardSurchargePercent / 100)
-    : 0
+  const surchargeCents =
+    cardType === 'CREDIT' && applySurcharge
+      ? Math.floor((preTaxCents * checkoutSettings.cardSurchargePercent) / 100)
+      : 0
   const effectiveTotal = preTaxCents + taxCents + surchargeCents
   const changeCents = Math.max(0, tenderedCents - effectiveTotal)
   const shortCents = Math.max(0, effectiveTotal - tenderedCents)
@@ -192,36 +235,34 @@ export function CheckoutScreen(): React.JSX.Element {
     return () => clearTimeout(timer)
   }, [parkCustomerQuery, showParkModal])
 
-  const handleBarcode = React.useCallback(
-    async (barcode: string): Promise<void> => {
-      setScanFeedback(null)
-      try {
-        if (!window.api?.product) {
-          setScanFeedback({ type: 'error', message: 'API not available' })
-          return
-        }
-        const product = await window.api.product.getByBarcode(barcode)
-        if (!product) {
-          setScanFeedback({ type: 'error', message: `No product found for barcode ${barcode}` })
-          return
-        }
-        setCart((prev) => {
-          const existing = prev.find((item) => item.product.id === product.id)
-          if (existing) {
-            return prev.map((item) =>
-              item.product.id === product.id
-                ? { ...item, quantity: item.quantity + 1 }
-                : item
-            )
-          }
-          return [...prev, { product, quantity: 1, unitPriceCents: product.priceCents }]
-        })
-      } catch (err) {
-        setScanFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Scan failed' })
+  const handleBarcode = React.useCallback(async (barcode: string): Promise<void> => {
+    setScanFeedback(null)
+    try {
+      if (!window.api?.product) {
+        setScanFeedback({ type: 'error', message: 'API not available' })
+        return
       }
-    },
-    []
-  )
+      const product = await window.api.product.getByBarcode(barcode)
+      if (!product) {
+        setScanFeedback({ type: 'error', message: `No product found for barcode ${barcode}` })
+        return
+      }
+      setCart((prev) => {
+        const existing = prev.find((item) => item.product.id === product.id)
+        if (existing) {
+          return prev.map((item) =>
+            item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+          )
+        }
+        return [...prev, { product, quantity: 1, unitPriceCents: product.priceCents }]
+      })
+    } catch (err) {
+      setScanFeedback({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Scan failed'
+      })
+    }
+  }, [])
 
   useBarcodeScanner({ onScan: handleBarcode, pauseRefs: [searchRef, tenderRef] })
 
@@ -243,7 +284,16 @@ export function CheckoutScreen(): React.JSX.Element {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [customProductMode, discountItemTarget, showBillDiscountModal, manualPrompt, showAddCustomer, showParkModal, paymentMethod, showRefunds])
+  }, [
+    customProductMode,
+    discountItemTarget,
+    showBillDiscountModal,
+    manualPrompt,
+    showAddCustomer,
+    showParkModal,
+    paymentMethod,
+    showRefunds
+  ])
 
   const handleToggleItemHst = (productId: number): void => {
     setCart((prev) =>
@@ -255,7 +305,10 @@ export function CheckoutScreen(): React.JSX.Element {
     )
   }
 
-  const handleAddCustomProduct = async (mode: 'RX' | 'NONRX', data: { name: string; priceCents: number }): Promise<void> => {
+  const handleAddCustomProduct = async (
+    mode: 'RX' | 'NONRX',
+    data: { name: string; priceCents: number }
+  ): Promise<void> => {
     setCustomProductError(null)
     try {
       if (!window.api?.product) {
@@ -287,16 +340,17 @@ export function CheckoutScreen(): React.JSX.Element {
   }
 
   const handleQuantityChange = (productId: number, delta: number): void => {
-    setCart((prev) =>
-      prev
-        .map((item) => {
-          if (item.product.id === productId) {
-            const newQty = item.quantity + delta
-            return newQty > 0 ? { ...item, quantity: newQty } : null
-          }
-          return item
-        })
-        .filter(Boolean) as typeof cart
+    setCart(
+      (prev) =>
+        prev
+          .map((item) => {
+            if (item.product.id === productId) {
+              const newQty = item.quantity + delta
+              return newQty > 0 ? { ...item, quantity: newQty } : null
+            }
+            return item
+          })
+          .filter(Boolean) as typeof cart
     )
   }
 
@@ -352,7 +406,10 @@ export function CheckoutScreen(): React.JSX.Element {
       setBillDiscountReason(undefined)
       setShowPayModal(false)
     } catch (err) {
-      setScanFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Transaction failed' })
+      setScanFeedback({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Transaction failed'
+      })
     } finally {
       setCardProcessing(false)
     }
@@ -361,10 +418,19 @@ export function CheckoutScreen(): React.JSX.Element {
   const handleCashCheckout = (): void => {
     if (cart.length === 0) return
     if (tenderedCents < effectiveTotal && !attachedCustomer) {
-      setScanFeedback({ type: 'error', message: 'Not enough cash. Attach a customer to put the shortfall on their tab.' })
+      setScanFeedback({
+        type: 'error',
+        message: 'Not enough cash. Attach a customer to put the shortfall on their tab.'
+      })
       return
     }
-    if (tenderedCents + (attachedCustomer ? Math.max(0, attachedCustomer.ledgerEntries?.[0]?.balanceCents ?? 0) : 0) < effectiveTotal) {
+    if (
+      tenderedCents +
+        (attachedCustomer
+          ? Math.max(0, attachedCustomer.ledgerEntries?.[0]?.balanceCents ?? 0)
+          : 0) <
+      effectiveTotal
+    ) {
       setScanFeedback({ type: 'error', message: 'Tendered amount is less than the total due.' })
       return
     }
@@ -378,7 +444,9 @@ export function CheckoutScreen(): React.JSX.Element {
   const applyChargeResult = (result: ChargeResult): void => {
     if (result.status === 'approved') {
       setPaymentState('approved')
-      setPaymentMessage(`Card approved${result.cardLast4 ? ` (card •••• ${result.cardLast4})` : ''}`)
+      setPaymentMessage(
+        `Card approved${result.cardLast4 ? ` (card •••• ${result.cardLast4})` : ''}`
+      )
       void completeSale('CARD', undefined, undefined, surchargeCents, undefined, {
         processorTransactionId: result.transactionId,
         cardLast4: result.cardLast4
@@ -449,7 +517,10 @@ export function CheckoutScreen(): React.JSX.Element {
       return
     }
     if (customerBalance < effectiveTotal && !checkoutSettings.allowShortPayToTab) {
-      setScanFeedback({ type: 'error', message: 'Balance insufficient for full Pharmacy Credit payment. Add another tender.' })
+      setScanFeedback({
+        type: 'error',
+        message: 'Balance insufficient for full Pharmacy Credit payment. Add another tender.'
+      })
       return
     }
     void completeSale('PHARMACY_CREDIT', effectiveTotal)
@@ -471,7 +542,9 @@ export function CheckoutScreen(): React.JSX.Element {
         id: parkId,
         name,
         items: [...cart],
-        customer: customer ? { id: customer.id, firstName: customer.firstName, lastName: customer.lastName } : null
+        customer: customer
+          ? { id: customer.id, firstName: customer.firstName, lastName: customer.lastName }
+          : null
       }
     ])
     setCart([])
@@ -509,7 +582,9 @@ export function CheckoutScreen(): React.JSX.Element {
       // Read the authoritative balance from the Prisma credit ledger (same store
       // that sales charge and the backend Pharmacy Credit guard read), not the
       // Setting-table ledger — those two stores can diverge.
-      const detail = (await window.api.customer.get(customer.id)) as Customer & { currentBalanceCents?: number }
+      const detail = (await window.api.customer.get(customer.id)) as Customer & {
+        currentBalanceCents?: number
+      }
       const balanceCents = detail.currentBalanceCents ?? 0
       setAttachedCustomer({ ...customer, ledgerEntries: [{ balanceCents }] })
       setCustomerSearchQuery('')
@@ -520,7 +595,12 @@ export function CheckoutScreen(): React.JSX.Element {
   }
 
   const handleCreateCustomer = async (): Promise<void> => {
-    if (!newCustomer.firstName.trim() || !newCustomer.lastName.trim() || !newCustomer.phone.trim() || !newCustomer.address.trim()) {
+    if (
+      !newCustomer.firstName.trim() ||
+      !newCustomer.lastName.trim() ||
+      !newCustomer.phone.trim() ||
+      !newCustomer.address.trim()
+    ) {
       setCustomerCreationError('First name, last name, phone, and address are required.')
       return
     }
@@ -612,7 +692,10 @@ export function CheckoutScreen(): React.JSX.Element {
               <div className="fixed inset-0 z-10" onClick={() => setShowHeaderMenu(false)} />
               <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">
                 <button
-                  onClick={() => { setShowRefunds(true); setShowHeaderMenu(false) }}
+                  onClick={() => {
+                    setShowRefunds(true)
+                    setShowHeaderMenu(false)
+                  }}
                   className="flex min-h-9 w-full items-center gap-2 px-3 text-left text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted)]"
                 >
                   <RotateCcw className="icon-4" /> Refunds
@@ -627,241 +710,311 @@ export function CheckoutScreen(): React.JSX.Element {
       {scanFeedback && <Alert variant={scanFeedback.type}>{scanFeedback.message}</Alert>}
 
       <div className="flex items-start gap-4">
-      {/* Parked Sales — sits to the left of the main column instead of stacking
+        {/* Parked Sales — sits to the left of the main column instead of stacking
           above the cart, so it doesn't push checkout content down the page. */}
-      {parkedCarts.length > 0 && (
-        <div className="w-56 shrink-0 space-y-2">
-          <Card className="border-[var(--warning)]/30 bg-[var(--warning-bg)]">
-            <h3 className="mb-2 text-sm font-semibold text-[var(--warning)]">Parked ({parkedCarts.length})</h3>
-            <div className="space-y-2">
-              {parkedCarts.map((parked) => (
-                <div key={parked.id} className="rounded-[var(--radius)] border border-[var(--border)] bg-white p-2 text-xs">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium text-[var(--foreground)]">{parked.name}</div>
-                    {parked.customer && (
-                      <div className="truncate text-[var(--muted-foreground)]">{parked.customer.firstName} {parked.customer.lastName}</div>
-                    )}
+        {parkedCarts.length > 0 && (
+          <div className="w-56 shrink-0 space-y-2">
+            <Card className="border-[var(--warning)]/30 bg-[var(--warning-bg)]">
+              <h3 className="mb-2 text-sm font-semibold text-[var(--warning)]">
+                Parked ({parkedCarts.length})
+              </h3>
+              <div className="space-y-2">
+                {parkedCarts.map((parked) => (
+                  <div
+                    key={parked.id}
+                    className="rounded-[var(--radius)] border border-[var(--border)] bg-white p-2 text-xs"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-[var(--foreground)]">
+                        {parked.name}
+                      </div>
+                      {parked.customer && (
+                        <div className="truncate text-[var(--muted-foreground)]">
+                          {parked.customer.firstName} {parked.customer.lastName}
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-2 flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleResumeParkedSale(parked.id)}
+                        className="min-h-8 flex-1 rounded-[var(--radius)] bg-[var(--warning)] px-2 py-1 font-medium text-[var(--primary-foreground)]"
+                      >
+                        Resume
+                      </button>
+                      <button
+                        onClick={() => handleDeleteParkedSale(parked.id)}
+                        aria-label="Delete parked sale"
+                        className="flex min-h-8 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] px-2 py-1 font-medium text-[var(--error)] hover:bg-[var(--error-bg)]"
+                      >
+                        <Trash2 className="icon-3_5" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="mt-2 flex items-center gap-1.5">
-                    <button
-                      onClick={() => handleResumeParkedSale(parked.id)}
-                      className="min-h-8 flex-1 rounded-[var(--radius)] bg-[var(--warning)] px-2 py-1 font-medium text-[var(--primary-foreground)]"
-                    >
-                      Resume
-                    </button>
-                    <button
-                      onClick={() => handleDeleteParkedSale(parked.id)}
-                      aria-label="Delete parked sale"
-                      className="flex min-h-8 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] px-2 py-1 font-medium text-[var(--error)] hover:bg-[var(--error-bg)]"
-                    >
-                      <Trash2 className="icon-3_5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-      )}
+                ))}
+              </div>
+            </Card>
+          </div>
+        )}
 
-      <div className="min-w-0 flex-1 space-y-4">
-      {/* Product search — compact single row. A single match auto-adds to the
+        <div className="min-w-0 flex-1 space-y-4">
+          {/* Product search — compact single row. A single match auto-adds to the
           cart (same as a barcode scan); multiple matches drop into a small
           overlay dropdown that never pushes page content down or scrolls
           the page itself — only the dropdown's own list scrolls if it's
           taller than ~4 rows. */}
-      <Card className="relative overflow-visible">
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <input
-              type="text"
-              placeholder="Search products by SKU, name, or barcode"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-4 text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
-            />
-            {searchQuery.trim() !== '' && filteredProducts.length > 0 && (
-              <div className="absolute z-20 mt-1 max-h-[190px] w-full overflow-y-auto rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">
-                {filteredProducts.map((product) => (
-                  <button
-                    key={product.id}
-                    onClick={() => addProductToCart(product)}
-                    className="flex min-h-9 w-full items-center justify-between gap-2 border-b border-[var(--border)] px-2.5 text-left text-sm last:border-0 hover:bg-[var(--muted)]"
-                  >
-                    <span className="min-w-0 flex-1 truncate">
-                      <span className="font-medium text-[var(--foreground)]">{product.name}</span>
-                      <span className="ml-2 text-xs text-[var(--muted-foreground)]">{product.sku}</span>
-                    </span>
-                    <span className="shrink-0 font-semibold text-[var(--primary)]">{formatCurrency(product.priceCents)}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            {searchQuery.trim() !== '' && filteredProducts.length === 0 && (
-              <div className="absolute z-20 mt-1 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white p-3 text-center text-xs text-[var(--muted-foreground)] shadow-sm">
-                No results for &quot;{searchQuery}&quot;
-              </div>
-            )}
-          </div>
-          {/* Single "+" menu replaces the separate RX / Non-RX buttons to save header width. */}
-          <div className="relative shrink-0">
-            <button
-              type="button"
-              title="Add custom item"
-              aria-label="Add custom item"
-              aria-haspopup="true"
-              aria-expanded={showAddMenu}
-              onClick={() => setShowAddMenu((v) => !v)}
-              className="flex h-11 w-11 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]"
-            >
-              <Plus className="icon-5" />
-            </button>
-            {showAddMenu && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setShowAddMenu(false)} />
-                <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">
-                  <button
-                    onClick={() => { setCustomProductMode('RX'); setShowAddMenu(false) }}
-                    className="flex min-h-9 w-full items-center gap-2 px-3 text-left text-sm font-medium text-[var(--warning)] hover:bg-[var(--muted)]"
-                  >
-                    <Pill className="icon-4" /> Add RX Item
-                  </button>
-                  <button
-                    onClick={() => { setCustomProductMode('NONRX'); setShowAddMenu(false) }}
-                    className="flex min-h-9 w-full items-center gap-2 px-3 text-left text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted)]"
-                  >
-                    <PackagePlus className="icon-4" /> Add Non-RX Item
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </Card>
-
-      {/* Cart — full width */}
-      <Card className="p-3">
-        <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
-          <h3 className="text-sm font-semibold text-[var(--foreground)]">Current Cart</h3>
-          <span className="text-xs text-[var(--muted-foreground)]">{cart.length} line items</span>
-        </div>
-
-        <div className="mt-2 max-h-[320px] space-y-1.5 overflow-y-auto pr-1">
-          {cart.length === 0 ? (
-            <EmptyState icon={ShoppingCart} title="Cart is empty" description="Search or scan to add items." className="p-4" />
-          ) : (
-            cart.map((item) => {
-              const lineRawCents = item.unitPriceCents * item.quantity
-              const lineDiscountCents = item.discountCents ?? 0
-              const lineTotalCents = lineRawCents - lineDiscountCents
-              const itemHstOn = item.hstApplied !== false
-              return (
-                <div key={item.product.id} className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-2 text-sm">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium text-[var(--foreground)]" title={item.product.name}>{item.product.name}</div>
-                    <div className="text-xs text-[var(--muted-foreground)]">
-                      {formatCurrency(item.unitPriceCents)} × {item.quantity}
-                      {lineDiscountCents > 0 && <span className="text-[var(--success)]"> · discount {formatCurrency(lineDiscountCents)}</span>}
-                    </div>
+          <Card className="relative overflow-visible">
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  placeholder="Search products by SKU, name, or barcode"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-4 text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
+                />
+                {searchQuery.trim() !== '' && filteredProducts.length > 0 && (
+                  <div className="absolute z-20 mt-1 max-h-[190px] w-full overflow-y-auto rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">
+                    {filteredProducts.map((product) => (
+                      <button
+                        key={product.id}
+                        onClick={() => addProductToCart(product)}
+                        className="flex min-h-9 w-full items-center justify-between gap-2 border-b border-[var(--border)] px-2.5 text-left text-sm last:border-0 hover:bg-[var(--muted)]"
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          <span className="font-medium text-[var(--foreground)]">
+                            {product.name}
+                          </span>
+                          <span className="ml-2 text-xs text-[var(--muted-foreground)]">
+                            {product.sku}
+                          </span>
+                        </span>
+                        <span className="shrink-0 font-semibold text-[var(--primary)]">
+                          {formatCurrency(product.priceCents)}
+                        </span>
+                      </button>
+                    ))}
                   </div>
-                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-                    <div className="flex min-h-8 items-center rounded-[var(--radius)] border border-[var(--border)]">
-                      <button onClick={() => handleQuantityChange(item.product.id, -1)} className="min-w-8 px-1.5 py-1 text-[var(--foreground)]">−</button>
-                      <span className="px-1.5 text-[var(--foreground)]">{item.quantity}</span>
-                      <button onClick={() => handleQuantityChange(item.product.id, 1)} className="min-w-8 px-1.5 py-1 text-[var(--foreground)]">+</button>
-                    </div>
-                    <button
-                      onClick={() => setDiscountItemTarget(item.product.id)}
-                      className={`min-h-8 rounded-[var(--radius)] border px-2 text-xs font-semibold ${lineDiscountCents > 0 ? 'border-[var(--success)] text-[var(--success)]' : 'border-[var(--border)] text-[var(--muted-foreground)]'}`}
-                    >
-                      {lineDiscountCents > 0 ? 'Edit' : 'Disc.'}
-                    </button>
-                    <label
-                      className={`flex min-h-8 items-center gap-1 rounded-[var(--radius)] border px-2 text-xs font-semibold ${itemHstOn ? 'border-[var(--border)] text-[var(--foreground)]' : 'border-[var(--warning)] text-[var(--warning)]'} ${item.hstLocked ? 'opacity-60' : ''}`}
-                      title={item.hstLocked ? 'RX items cannot be charged HST' : 'Charge HST on this item'}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={itemHstOn}
-                        disabled={item.hstLocked}
-                        onChange={() => handleToggleItemHst(item.product.id)}
-                        className="icon-3_5"
-                      />
-                      HST
-                    </label>
-                    <div className="w-16 text-right">
-                      {lineDiscountCents > 0 && (
-                        <div className="text-[10px] text-[var(--muted-foreground)] line-through">{formatCurrency(lineRawCents)}</div>
-                      )}
-                      <span className="font-semibold text-[var(--foreground)]">{formatCurrency(lineTotalCents)}</span>
-                    </div>
+                )}
+                {searchQuery.trim() !== '' && filteredProducts.length === 0 && (
+                  <div className="absolute z-20 mt-1 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white p-3 text-center text-xs text-[var(--muted-foreground)] shadow-sm">
+                    No results for &quot;{searchQuery}&quot;
                   </div>
-                </div>
-              )
-            })
-          )}
-        </div>
-
-        <div className="mt-3 space-y-2 border-t border-[var(--border)] pt-3">
-          <div className="flex justify-between text-sm text-[var(--muted-foreground)]">
-            <span>Subtotal</span>
-            <span>{formatCurrency(subtotalCents)}</span>
-          </div>
-          {itemDiscountTotalCents > 0 && (
-            <div className="flex justify-between text-sm text-[var(--success)]">
-              <span>Item discounts</span>
-              <span>-{formatCurrency(itemDiscountTotalCents)}</span>
-            </div>
-          )}
-          {effectiveBillDiscountCents > 0 && (
-            <div className="flex items-center justify-between text-sm text-[var(--success)]">
-              <span>Bill discount</span>
-              <span className="flex items-center gap-2">
-                -{formatCurrency(effectiveBillDiscountCents)}
+                )}
+              </div>
+              {/* Single "+" menu replaces the separate RX / Non-RX buttons to save header width. */}
+              <div className="relative shrink-0">
                 <button
-                  onClick={() => { setBillDiscountCents(0); setBillDiscountReason(undefined) }}
-                  className="text-[10px] text-[var(--muted-foreground)] underline"
+                  type="button"
+                  title="Add custom item"
+                  aria-label="Add custom item"
+                  aria-haspopup="true"
+                  aria-expanded={showAddMenu}
+                  onClick={() => setShowAddMenu((v) => !v)}
+                  className="flex h-11 w-11 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]"
                 >
-                  remove
+                  <Plus className="icon-5" />
                 </button>
+                {showAddMenu && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setShowAddMenu(false)} />
+                    <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">
+                      <button
+                        onClick={() => {
+                          setCustomProductMode('RX')
+                          setShowAddMenu(false)
+                        }}
+                        className="flex min-h-9 w-full items-center gap-2 px-3 text-left text-sm font-medium text-[var(--warning)] hover:bg-[var(--muted)]"
+                      >
+                        <Pill className="icon-4" /> Add RX Item
+                      </button>
+                      <button
+                        onClick={() => {
+                          setCustomProductMode('NONRX')
+                          setShowAddMenu(false)
+                        }}
+                        className="flex min-h-9 w-full items-center gap-2 px-3 text-left text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted)]"
+                      >
+                        <PackagePlus className="icon-4" /> Add Non-RX Item
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          {/* Cart — full width */}
+          <Card className="p-3">
+            <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
+              <h3 className="text-sm font-semibold text-[var(--foreground)]">Current Cart</h3>
+              <span className="text-xs text-[var(--muted-foreground)]">
+                {cart.length} line items
               </span>
             </div>
-          )}
-          <div className="flex items-center justify-between text-sm text-[var(--muted-foreground)]">
-            <span>HST ({taxRatePercent}%)</span>
-            <span>{formatCurrency(taxCents)}</span>
-          </div>
-          {surchargeCents > 0 && (
-            <div className="flex items-center justify-between text-sm text-[var(--warning)]">
-              <span>Credit card fee ({checkoutSettings.cardSurchargePercent}%)</span>
-              <span>{formatCurrency(surchargeCents)}</span>
+
+            <div className="mt-2 max-h-[320px] space-y-1.5 overflow-y-auto pr-1">
+              {cart.length === 0 ? (
+                <EmptyState
+                  icon={ShoppingCart}
+                  title="Cart is empty"
+                  description="Search or scan to add items."
+                  className="p-4"
+                />
+              ) : (
+                cart.map((item) => {
+                  const lineRawCents = item.unitPriceCents * item.quantity
+                  const lineDiscountCents = item.discountCents ?? 0
+                  const lineTotalCents = lineRawCents - lineDiscountCents
+                  const itemHstOn = item.hstApplied !== false
+                  return (
+                    <div
+                      key={item.product.id}
+                      className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-2 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <div
+                          className="truncate font-medium text-[var(--foreground)]"
+                          title={item.product.name}
+                        >
+                          {item.product.name}
+                        </div>
+                        <div className="text-xs text-[var(--muted-foreground)]">
+                          {formatCurrency(item.unitPriceCents)} × {item.quantity}
+                          {lineDiscountCents > 0 && (
+                            <span className="text-[var(--success)]">
+                              {' '}
+                              · discount {formatCurrency(lineDiscountCents)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                        <div className="flex min-h-8 items-center rounded-[var(--radius)] border border-[var(--border)]">
+                          <button
+                            onClick={() => handleQuantityChange(item.product.id, -1)}
+                            className="min-w-8 px-1.5 py-1 text-[var(--foreground)]"
+                          >
+                            −
+                          </button>
+                          <span className="px-1.5 text-[var(--foreground)]">{item.quantity}</span>
+                          <button
+                            onClick={() => handleQuantityChange(item.product.id, 1)}
+                            className="min-w-8 px-1.5 py-1 text-[var(--foreground)]"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => setDiscountItemTarget(item.product.id)}
+                          className={`min-h-8 rounded-[var(--radius)] border px-2 text-xs font-semibold ${lineDiscountCents > 0 ? 'border-[var(--success)] text-[var(--success)]' : 'border-[var(--border)] text-[var(--muted-foreground)]'}`}
+                        >
+                          {lineDiscountCents > 0 ? 'Edit' : 'Disc.'}
+                        </button>
+                        <label
+                          className={`flex min-h-8 items-center gap-1 rounded-[var(--radius)] border px-2 text-xs font-semibold ${itemHstOn ? 'border-[var(--border)] text-[var(--foreground)]' : 'border-[var(--warning)] text-[var(--warning)]'} ${item.hstLocked ? 'opacity-60' : ''}`}
+                          title={
+                            item.hstLocked
+                              ? 'RX items cannot be charged HST'
+                              : 'Charge HST on this item'
+                          }
+                        >
+                          <input
+                            type="checkbox"
+                            checked={itemHstOn}
+                            disabled={item.hstLocked}
+                            onChange={() => handleToggleItemHst(item.product.id)}
+                            className="icon-3_5"
+                          />
+                          HST
+                        </label>
+                        <div className="w-16 text-right">
+                          {lineDiscountCents > 0 && (
+                            <div className="text-[10px] text-[var(--muted-foreground)] line-through">
+                              {formatCurrency(lineRawCents)}
+                            </div>
+                          )}
+                          <span className="font-semibold text-[var(--foreground)]">
+                            {formatCurrency(lineTotalCents)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
             </div>
-          )}
-          <div className="flex justify-between border-t border-[var(--border)] pt-2 text-base font-semibold text-[var(--foreground)]">
-            <span>Total due</span>
-            <span className="text-[var(--primary)]">{formatCurrency(effectiveTotal)}</span>
-          </div>
-          <div className="flex items-stretch gap-2">
-            <button
-              onClick={() => setShowBillDiscountModal(true)}
-              disabled={cart.length === 0}
-              title={effectiveBillDiscountCents > 0 ? 'Edit whole-bill discount' : 'Whole Bill Discount'}
-              aria-label={effectiveBillDiscountCents > 0 ? 'Edit whole-bill discount' : 'Whole Bill Discount'}
-              className={`flex h-14 flex-1 items-center justify-center rounded-[var(--radius)] border text-xs font-semibold disabled:opacity-50 ${effectiveBillDiscountCents > 0 ? 'border-[var(--success)] bg-[var(--success-bg)] text-[var(--success)]' : 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]'}`}
-            >
-              Disc.
-            </button>
-            <button
-              onClick={() => setShowPayModal(true)}
-              disabled={cart.length === 0}
-              className="h-14 flex-1 rounded-[var(--radius)] bg-[var(--primary)] text-lg font-bold tracking-wide text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              PAY
-            </button>
-          </div>
+
+            <div className="mt-3 space-y-2 border-t border-[var(--border)] pt-3">
+              <div className="flex justify-between text-sm text-[var(--muted-foreground)]">
+                <span>Subtotal</span>
+                <span>{formatCurrency(subtotalCents)}</span>
+              </div>
+              {itemDiscountTotalCents > 0 && (
+                <div className="flex justify-between text-sm text-[var(--success)]">
+                  <span>Item discounts</span>
+                  <span>-{formatCurrency(itemDiscountTotalCents)}</span>
+                </div>
+              )}
+              {effectiveBillDiscountCents > 0 && (
+                <div className="flex items-center justify-between text-sm text-[var(--success)]">
+                  <span>Bill discount</span>
+                  <span className="flex items-center gap-2">
+                    -{formatCurrency(effectiveBillDiscountCents)}
+                    <button
+                      onClick={() => {
+                        setBillDiscountCents(0)
+                        setBillDiscountReason(undefined)
+                      }}
+                      className="text-[10px] text-[var(--muted-foreground)] underline"
+                    >
+                      remove
+                    </button>
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between text-sm text-[var(--muted-foreground)]">
+                <span>HST ({taxRatePercent}%)</span>
+                <span>{formatCurrency(taxCents)}</span>
+              </div>
+              {surchargeCents > 0 && (
+                <div className="flex items-center justify-between text-sm text-[var(--warning)]">
+                  <span>Credit card fee ({checkoutSettings.cardSurchargePercent}%)</span>
+                  <span>{formatCurrency(surchargeCents)}</span>
+                </div>
+              )}
+              <div className="flex justify-between border-t border-[var(--border)] pt-2 text-base font-semibold text-[var(--foreground)]">
+                <span>Total due</span>
+                <span className="text-[var(--primary)]">{formatCurrency(effectiveTotal)}</span>
+              </div>
+              <div className="flex items-stretch gap-2">
+                <button
+                  onClick={() => setShowBillDiscountModal(true)}
+                  disabled={cart.length === 0}
+                  title={
+                    effectiveBillDiscountCents > 0
+                      ? 'Edit whole-bill discount'
+                      : 'Whole Bill Discount'
+                  }
+                  aria-label={
+                    effectiveBillDiscountCents > 0
+                      ? 'Edit whole-bill discount'
+                      : 'Whole Bill Discount'
+                  }
+                  className={`flex h-14 flex-1 items-center justify-center rounded-[var(--radius)] border text-xs font-semibold disabled:opacity-50 ${effectiveBillDiscountCents > 0 ? 'border-[var(--success)] bg-[var(--success-bg)] text-[var(--success)]' : 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]'}`}
+                >
+                  Disc.
+                </button>
+                <button
+                  onClick={() => setShowPayModal(true)}
+                  disabled={cart.length === 0}
+                  className="h-14 flex-1 rounded-[var(--radius)] bg-[var(--primary)] text-lg font-bold tracking-wide text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  PAY
+                </button>
+              </div>
+            </div>
+          </Card>
         </div>
-      </Card>
-      </div>
       </div>
 
       {/* PAY popup — not dismissable by outside click; explicit Cancel only before a method is picked */}
@@ -924,7 +1077,10 @@ export function CheckoutScreen(): React.JSX.Element {
               </div>
             ) : (
               <div className="mt-3 space-y-3 text-xs">
-                <button onClick={resetPaymentMethod} className="flex min-h-9 items-center gap-1 rounded-[var(--radius)] px-1 text-[var(--primary)] hover:bg-[var(--muted)]">
+                <button
+                  onClick={resetPaymentMethod}
+                  className="flex min-h-9 items-center gap-1 rounded-[var(--radius)] px-1 text-[var(--primary)] hover:bg-[var(--muted)]"
+                >
                   <ChevronLeft className="icon-4" />
                   Back to payment methods
                 </button>
@@ -933,7 +1089,9 @@ export function CheckoutScreen(): React.JSX.Element {
                 {paymentMethod === 'CASH' && (
                   <div className="space-y-3">
                     <div>
-                      <label className="mb-1 block font-semibold text-[var(--foreground)]">Cash received</label>
+                      <label className="mb-1 block font-semibold text-[var(--foreground)]">
+                        Cash received
+                      </label>
                       <input
                         ref={tenderRef}
                         type="number"
@@ -954,14 +1112,17 @@ export function CheckoutScreen(): React.JSX.Element {
                         onClick={() => void completeSale('CASH', 0, tenderedCents - effectiveTotal)}
                         className="w-full min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-white px-2 text-xs font-semibold text-[var(--foreground)]"
                       >
-                        Deposit {formatCurrency(tenderedCents - effectiveTotal)} overpayment to credit
+                        Deposit {formatCurrency(tenderedCents - effectiveTotal)} overpayment to
+                        credit
                       </button>
                     )}
 
                     {tenderedCents > 0 && tenderedCents < effectiveTotal && attachedCustomer && (
                       <button
                         onClick={() => void completeSale('CASH', shortCents)}
-                        disabled={customerBalance < shortCents && !checkoutSettings.allowShortPayToTab}
+                        disabled={
+                          customerBalance < shortCents && !checkoutSettings.allowShortPayToTab
+                        }
                         className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-2 text-xs font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
                       >
                         Put {formatCurrency(shortCents)} on {attachedCustomer.firstName}&apos;s tab
@@ -982,11 +1143,17 @@ export function CheckoutScreen(): React.JSX.Element {
                 {paymentMethod === 'E_TRANSFER' && (
                   <div className="space-y-3">
                     <div className="text-center">
-                      <div className="text-xs text-[var(--muted-foreground)]">Amount due via E-Transfer</div>
-                      <div className="text-3xl font-bold text-[var(--primary)]">{formatCurrency(effectiveTotal)}</div>
+                      <div className="text-xs text-[var(--muted-foreground)]">
+                        Amount due via E-Transfer
+                      </div>
+                      <div className="text-3xl font-bold text-[var(--primary)]">
+                        {formatCurrency(effectiveTotal)}
+                      </div>
                     </div>
                     <div>
-                      <label className="mb-1 block text-[var(--muted-foreground)]">Customer email for E-Transfer (optional)</label>
+                      <label className="mb-1 block text-[var(--muted-foreground)]">
+                        Customer email for E-Transfer (optional)
+                      </label>
                       <input
                         type="email"
                         value={eTransferEmail}
@@ -996,7 +1163,11 @@ export function CheckoutScreen(): React.JSX.Element {
                       />
                     </div>
                     <label className="flex items-center gap-2 text-sm text-[var(--foreground)]">
-                      <input type="checkbox" checked={eTransferConfirmed} onChange={(e) => setETransferConfirmed(e.target.checked)} />
+                      <input
+                        type="checkbox"
+                        checked={eTransferConfirmed}
+                        onChange={(e) => setETransferConfirmed(e.target.checked)}
+                      />
                       I have received the E-Transfer confirmation
                     </label>
                     <button
@@ -1039,7 +1210,10 @@ export function CheckoutScreen(): React.JSX.Element {
                         </label>
                         {applySurcharge && (
                           <div className="mt-2">
-                            Original: {formatCurrency(subtotalCents + taxCents)} + {checkoutSettings.cardSurchargePercent}% credit fee: {formatCurrency(surchargeCents)} = Total: {formatCurrency(effectiveTotal)}
+                            Original: {formatCurrency(subtotalCents + taxCents)} +{' '}
+                            {checkoutSettings.cardSurchargePercent}% credit fee:{' '}
+                            {formatCurrency(surchargeCents)} = Total:{' '}
+                            {formatCurrency(effectiveTotal)}
                           </div>
                         )}
                       </div>
@@ -1060,13 +1234,17 @@ export function CheckoutScreen(): React.JSX.Element {
                   <div className="space-y-3">
                     {!attachedCustomer ? (
                       <div>
-                        <label className="mb-1 block font-semibold text-[var(--foreground)]">Attach a customer for Pharmacy Credit</label>
+                        <label className="mb-1 block font-semibold text-[var(--foreground)]">
+                          Attach a customer for Pharmacy Credit
+                        </label>
                         <div className="relative">
                           <input
                             ref={searchRef}
                             value={customerSearchQuery}
                             onChange={(e) => setCustomerSearchQuery(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter') void handleCustomerSearch() }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') void handleCustomerSearch()
+                            }}
                             placeholder="Search name or phone, then Enter"
                             className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm"
                           />
@@ -1078,46 +1256,71 @@ export function CheckoutScreen(): React.JSX.Element {
                                   onClick={() => void attachCustomer(customer)}
                                   className="block min-h-11 w-full border-b border-[var(--border)] px-3 text-left text-sm last:border-0"
                                 >
-                                  <b>{customer.firstName} {customer.lastName}</b> · {customer.phone}
+                                  <b>
+                                    {customer.firstName} {customer.lastName}
+                                  </b>{' '}
+                                  · {customer.phone}
                                 </button>
                               ))}
                             </div>
                           )}
                           {/* No results → offer to add a new customer */}
-                          {customerSearchQuery.trim() !== '' && customerSearchResults.length === 0 && (
-                            <div className="relative z-20 mt-1 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white p-3 text-center text-sm shadow-sm">
-                              <div className="mb-2 text-[var(--muted-foreground)]">Customer not found</div>
-                              <button
-                                onClick={() => {
-                                  setShowAddCustomer(true)
-                                }}
-                                className="min-h-11 w-full rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
-                              >
-                                + Add new customer
-                              </button>
-                            </div>
-                          )}
+                          {customerSearchQuery.trim() !== '' &&
+                            customerSearchResults.length === 0 && (
+                              <div className="relative z-20 mt-1 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white p-3 text-center text-sm shadow-sm">
+                                <div className="mb-2 text-[var(--muted-foreground)]">
+                                  Customer not found
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setShowAddCustomer(true)
+                                  }}
+                                  className="min-h-11 w-full rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
+                                >
+                                  + Add new customer
+                                </button>
+                              </div>
+                            )}
                         </div>
                       </div>
                     ) : (
                       <>
                         <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--muted)] px-3 py-2 text-sm">
                           <span className="font-semibold">
-                            {attachedCustomer.firstName} {attachedCustomer.lastName} · {attachedCustomer.phone}
+                            {attachedCustomer.firstName} {attachedCustomer.lastName} ·{' '}
+                            {attachedCustomer.phone}
                           </span>
-                          <button onClick={() => { setAttachedCustomer(null); setTenderedDollars('') }} className="text-[var(--primary)]">
+                          <button
+                            onClick={() => {
+                              setAttachedCustomer(null)
+                              setTenderedDollars('')
+                            }}
+                            className="text-[var(--primary)]"
+                          >
                             Remove
                           </button>
                         </div>
-                        <div className={`flex items-center gap-1.5 text-xs font-semibold ${customerBalance >= 0 ? 'text-[var(--success)]' : 'text-[var(--owed)]'}`}>
-                          {customerBalance >= 0 ? <ArrowUpRight className="icon-4" /> : <ArrowDownRight className="icon-4" />}
-                          <span>{customerBalance >= 0 ? 'Credit available' : 'Customer owes'}: {formatCurrency(Math.abs(customerBalance))}</span>
+                        <div
+                          className={`flex items-center gap-1.5 text-xs font-semibold ${customerBalance >= 0 ? 'text-[var(--success)]' : 'text-[var(--owed)]'}`}
+                        >
+                          {customerBalance >= 0 ? (
+                            <ArrowUpRight className="icon-4" />
+                          ) : (
+                            <ArrowDownRight className="icon-4" />
+                          )}
+                          <span>
+                            {customerBalance >= 0 ? 'Credit available' : 'Customer owes'}:{' '}
+                            {formatCurrency(Math.abs(customerBalance))}
+                          </span>
                         </div>
                         <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3 text-sm">
-                          Available: {formatCurrency(customerBalance)} | Applying: {formatCurrency(effectiveTotal)}
+                          Available: {formatCurrency(customerBalance)} | Applying:{' '}
+                          {formatCurrency(effectiveTotal)}
                         </div>
                         {customerBalance < effectiveTotal && (
-                          <Alert variant={checkoutSettings.allowShortPayToTab ? 'warning' : 'error'}>
+                          <Alert
+                            variant={checkoutSettings.allowShortPayToTab ? 'warning' : 'error'}
+                          >
                             {checkoutSettings.allowShortPayToTab
                               ? `Balance is short by ${formatCurrency(effectiveTotal - customerBalance)}; this will push the tab negative.`
                               : 'Balance insufficient; short-pay to tab is disabled. Add another tender.'}
@@ -1125,7 +1328,11 @@ export function CheckoutScreen(): React.JSX.Element {
                         )}
                         <button
                           onClick={handlePharmacyCreditCheckout}
-                          disabled={cardProcessing || (customerBalance < effectiveTotal && !checkoutSettings.allowShortPayToTab)}
+                          disabled={
+                            cardProcessing ||
+                            (customerBalance < effectiveTotal &&
+                              !checkoutSettings.allowShortPayToTab)
+                          }
                           className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
                         >
                           Pay with Pharmacy Credit
@@ -1165,7 +1372,9 @@ export function CheckoutScreen(): React.JSX.Element {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <Card className="w-[420px] max-w-full bg-[var(--card)] p-6 space-y-3">
             <div>
-              <CardTitle className="text-[var(--foreground)]">Attach a customer? (optional)</CardTitle>
+              <CardTitle className="text-[var(--foreground)]">
+                Attach a customer? (optional)
+              </CardTitle>
               <CardDescription className="text-[var(--muted-foreground)]">
                 Search to link this parked sale to a customer, or skip.
               </CardDescription>
@@ -1186,18 +1395,27 @@ export function CheckoutScreen(): React.JSX.Element {
                       onClick={() => confirmParkSale(customer)}
                       className="block min-h-11 w-full border-b border-[var(--border)] px-3 text-left text-sm last:border-0 hover:bg-[var(--muted)]"
                     >
-                      <b>{customer.firstName} {customer.lastName}</b> · {customer.phone}
+                      <b>
+                        {customer.firstName} {customer.lastName}
+                      </b>{' '}
+                      · {customer.phone}
                     </button>
                   ))}
                 </div>
               )}
               {parkCustomerQuery.trim() !== '' && parkCustomerResults.length === 0 && (
-                <div className="mt-1 text-xs text-[var(--muted-foreground)]">No matching customers.</div>
+                <div className="mt-1 text-xs text-[var(--muted-foreground)]">
+                  No matching customers.
+                </div>
               )}
             </div>
             <div className="grid grid-cols-2 gap-2 pt-1">
               <button
-                onClick={() => { setShowParkModal(false); setParkCustomerQuery(''); setParkCustomerResults([]) }}
+                onClick={() => {
+                  setShowParkModal(false)
+                  setParkCustomerQuery('')
+                  setParkCustomerResults([])
+                }}
                 className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)]"
               >
                 Cancel
@@ -1221,29 +1439,64 @@ export function CheckoutScreen(): React.JSX.Element {
             {customerCreationError && <Alert variant="error">{customerCreationError}</Alert>}
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">First name</label>
-                <input autoFocus value={newCustomer.firstName} onChange={(e) => setNewCustomer((p) => ({ ...p, firstName: e.target.value }))} className="input" />
+                <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                  First name
+                </label>
+                <input
+                  autoFocus
+                  value={newCustomer.firstName}
+                  onChange={(e) => setNewCustomer((p) => ({ ...p, firstName: e.target.value }))}
+                  className="input"
+                />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Last name</label>
-                <input value={newCustomer.lastName} onChange={(e) => setNewCustomer((p) => ({ ...p, lastName: e.target.value }))} className="input" />
+                <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                  Last name
+                </label>
+                <input
+                  value={newCustomer.lastName}
+                  onChange={(e) => setNewCustomer((p) => ({ ...p, lastName: e.target.value }))}
+                  className="input"
+                />
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Phone (required)</label>
-              <input value={newCustomer.phone} onChange={(e) => setNewCustomer((p) => ({ ...p, phone: e.target.value }))} className="input" />
+              <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                Phone (required)
+              </label>
+              <input
+                value={newCustomer.phone}
+                onChange={(e) => setNewCustomer((p) => ({ ...p, phone: e.target.value }))}
+                className="input"
+              />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Address</label>
-              <input value={newCustomer.address} onChange={(e) => setNewCustomer((p) => ({ ...p, address: e.target.value }))} className="input" />
+              <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                Address
+              </label>
+              <input
+                value={newCustomer.address}
+                onChange={(e) => setNewCustomer((p) => ({ ...p, address: e.target.value }))}
+                className="input"
+              />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Email (optional)</label>
-              <input type="email" value={newCustomer.email} onChange={(e) => setNewCustomer((p) => ({ ...p, email: e.target.value }))} className="input" />
+              <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                Email (optional)
+              </label>
+              <input
+                type="email"
+                value={newCustomer.email}
+                onChange={(e) => setNewCustomer((p) => ({ ...p, email: e.target.value }))}
+                className="input"
+              />
             </div>
             <div className="grid grid-cols-2 gap-2 pt-1">
               <button
-                onClick={() => { setShowAddCustomer(false); setCustomerCreationError(null) }}
+                onClick={() => {
+                  setShowAddCustomer(false)
+                  setCustomerCreationError(null)
+                }}
                 disabled={creatingCustomer}
                 className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)] disabled:opacity-50"
               >
@@ -1273,10 +1526,14 @@ export function CheckoutScreen(): React.JSX.Element {
             </div>
             <div className="text-center py-2">
               <div className="text-xs text-[var(--muted-foreground)]">Amount to charge</div>
-              <div className="text-3xl font-bold text-[var(--primary)]">{formatCurrency(manualPrompt.amountCents)}</div>
+              <div className="text-3xl font-bold text-[var(--primary)]">
+                {formatCurrency(manualPrompt.amountCents)}
+              </div>
             </div>
             <div>
-              <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Terminal reference # (optional)</label>
+              <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
+                Terminal reference # (optional)
+              </label>
               <input
                 type="text"
                 placeholder="e.g. receipt / approval number"
@@ -1286,10 +1543,28 @@ export function CheckoutScreen(): React.JSX.Element {
               />
             </div>
             <div className="grid grid-cols-2 gap-2 pt-1">
-              <button onClick={() => confirmManualPayment('declined')} disabled={cardProcessing} className="rounded-[var(--radius)] bg-[var(--error-bg)] px-3 py-2 text-sm font-medium text-[var(--error)] disabled:opacity-50">Declined</button>
-              <button onClick={() => confirmManualPayment('approved')} disabled={cardProcessing} className="rounded-[var(--radius)] bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50">Approved</button>
+              <button
+                onClick={() => confirmManualPayment('declined')}
+                disabled={cardProcessing}
+                className="rounded-[var(--radius)] bg-[var(--error-bg)] px-3 py-2 text-sm font-medium text-[var(--error)] disabled:opacity-50"
+              >
+                Declined
+              </button>
+              <button
+                onClick={() => confirmManualPayment('approved')}
+                disabled={cardProcessing}
+                className="rounded-[var(--radius)] bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+              >
+                Approved
+              </button>
             </div>
-            <button onClick={() => setManualPrompt(null)} disabled={cardProcessing} className="w-full text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)] disabled:opacity-50">Cancel</button>
+            <button
+              onClick={() => setManualPrompt(null)}
+              disabled={cardProcessing}
+              className="w-full text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)] disabled:opacity-50"
+            >
+              Cancel
+            </button>
           </Card>
         </div>
       )}
@@ -1299,36 +1574,62 @@ export function CheckoutScreen(): React.JSX.Element {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <Card className="w-[440px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-4">
             <div>
-              <CardTitle className="text-[var(--foreground)]">Sale complete — {activeReceipt.receiptNumber}</CardTitle>
+              <CardTitle className="text-[var(--foreground)]">
+                Sale complete — {activeReceipt.receiptNumber}
+              </CardTitle>
               <CardDescription className="text-[var(--muted-foreground)]">
-                Total {formatCurrency(activeReceipt.totalCents)} · Paid via {activeReceipt.tenderType.replace('_', '-')}
+                Total {formatCurrency(activeReceipt.totalCents)} · Paid via{' '}
+                {activeReceipt.tenderType.replace('_', '-')}
               </CardDescription>
             </div>
 
-            {printStatus && <Alert variant={receiptError ? 'error' : 'success'}>{printStatus}</Alert>}
+            {printStatus && (
+              <Alert variant={receiptError ? 'error' : 'success'}>{printStatus}</Alert>
+            )}
 
             {!receiptError ? (
               <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => void handlePrintReceipt()} className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]">
+                <button
+                  onClick={() => void handlePrintReceipt()}
+                  className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
+                >
                   Print Receipt
                 </button>
-                <button onClick={dismissReceipt} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)]">
+                <button
+                  onClick={dismissReceipt}
+                  className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)]"
+                >
                   Skip
                 </button>
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-2">
-                <button onClick={() => void handlePrintReceipt()} className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]">
+                <button
+                  onClick={() => void handlePrintReceipt()}
+                  className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
+                >
                   Retry
                 </button>
                 {receiptPdfUrl ? (
-                  <a href={receiptPdfUrl} download={`receipt-${activeReceipt.receiptNumber}.pdf`} className="min-h-11 flex items-center justify-center rounded-[var(--radius)] border border-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary)]">
+                  <a
+                    href={receiptPdfUrl}
+                    download={`receipt-${activeReceipt.receiptNumber}.pdf`}
+                    className="min-h-11 flex items-center justify-center rounded-[var(--radius)] border border-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary)]"
+                  >
                     PDF
                   </a>
                 ) : (
-                  <button disabled className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--muted-foreground)] opacity-50">PDF</button>
+                  <button
+                    disabled
+                    className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--muted-foreground)] opacity-50"
+                  >
+                    PDF
+                  </button>
                 )}
-                <button onClick={dismissReceipt} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)]">
+                <button
+                  onClick={dismissReceipt}
+                  className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)]"
+                >
                   Skip
                 </button>
               </div>
@@ -1338,27 +1639,32 @@ export function CheckoutScreen(): React.JSX.Element {
       )}
 
       {/* Per-item discount */}
-      {discountItemTarget !== null && (() => {
-        const item = cart.find((i) => i.product.id === discountItemTarget)
-        if (!item) return null
-        const lineTotalCents = item.unitPriceCents * item.quantity
-        return (
-          <DiscountModal
-            title={`Discount: ${item.product.name} (qty ${item.quantity})`}
-            baseLabel={`Line total: ${formatCurrency(lineTotalCents)}`}
-            baseCents={lineTotalCents}
-            initialDiscountCents={item.discountCents ?? 0}
-            initialReason={item.discountReason}
-            onApply={(discountCents, reason) => {
-              setCart((prev) =>
-                prev.map((i) => (i.product.id === discountItemTarget ? { ...i, discountCents, discountReason: reason } : i))
-              )
-              setDiscountItemTarget(null)
-            }}
-            onCancel={() => setDiscountItemTarget(null)}
-          />
-        )
-      })()}
+      {discountItemTarget !== null &&
+        (() => {
+          const item = cart.find((i) => i.product.id === discountItemTarget)
+          if (!item) return null
+          const lineTotalCents = item.unitPriceCents * item.quantity
+          return (
+            <DiscountModal
+              title={`Discount: ${item.product.name} (qty ${item.quantity})`}
+              baseLabel={`Line total: ${formatCurrency(lineTotalCents)}`}
+              baseCents={lineTotalCents}
+              initialDiscountCents={item.discountCents ?? 0}
+              initialReason={item.discountReason}
+              onApply={(discountCents, reason) => {
+                setCart((prev) =>
+                  prev.map((i) =>
+                    i.product.id === discountItemTarget
+                      ? { ...i, discountCents, discountReason: reason }
+                      : i
+                  )
+                )
+                setDiscountItemTarget(null)
+              }}
+              onCancel={() => setDiscountItemTarget(null)}
+            />
+          )
+        })()}
 
       {/* Whole-bill discount */}
       {showBillDiscountModal && (
@@ -1383,7 +1689,10 @@ export function CheckoutScreen(): React.JSX.Element {
         <CustomProductModal
           mode={customProductMode}
           onApply={(data) => void handleAddCustomProduct(customProductMode, data)}
-          onCancel={() => { setCustomProductMode(null); setCustomProductError(null) }}
+          onCancel={() => {
+            setCustomProductMode(null)
+            setCustomProductError(null)
+          }}
         />
       )}
       {customProductError && (
@@ -1391,7 +1700,6 @@ export function CheckoutScreen(): React.JSX.Element {
           <Alert variant="error">{customProductError}</Alert>
         </div>
       )}
-
     </div>
   )
 }

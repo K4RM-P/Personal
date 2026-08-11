@@ -44,7 +44,9 @@ export function RefundSalesScreen({ manager, onExit }: RefundSalesScreenProps): 
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-[var(--foreground)]">Refund Past Sales</h1>
-            <p className="text-sm text-[var(--muted-foreground)]">Authenticated as {manager.fullName}</p>
+            <p className="text-sm text-[var(--muted-foreground)]">
+              Authenticated as {manager.fullName}
+            </p>
           </div>
           <button
             onClick={onExit}
@@ -67,23 +69,33 @@ export function RefundSalesScreen({ manager, onExit }: RefundSalesScreenProps): 
 
         <Card>
           <CardTitle className="text-[var(--foreground)]">Sales</CardTitle>
-          <CardDescription>{loading ? 'Searching…' : `${sales.length} sale${sales.length === 1 ? '' : 's'}`}</CardDescription>
+          <CardDescription>
+            {loading ? 'Searching…' : `${sales.length} sale${sales.length === 1 ? '' : 's'}`}
+          </CardDescription>
           <div className="mt-3 space-y-2">
             {sales.length === 0 && !loading && (
               <EmptyState
                 icon={Receipt}
                 title={query.trim() ? `No sales found for "${query}"` : 'No sales yet'}
-                description={query.trim() ? 'Check the receipt number and try again.' : 'Completed sales will appear here.'}
+                description={
+                  query.trim()
+                    ? 'Check the receipt number and try again.'
+                    : 'Completed sales will appear here.'
+                }
               />
             )}
             {sales.map((sale) => {
               const isRefundable = sale.status !== 'VOIDED' && sale.refundedCents < sale.totalCents
               return (
-                <div key={sale.id} className="flex min-h-11 items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3 text-sm">
+                <div
+                  key={sale.id}
+                  className="flex min-h-11 items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3 text-sm"
+                >
                   <div>
                     <div className="font-bold text-[var(--foreground)]">{sale.receiptNumber}</div>
                     <div className="text-xs text-[var(--muted-foreground)]">
-                      {new Date(sale.createdAt).toLocaleString()} • {sale.customerName ?? '—'} • {sale.tenderType}
+                      {new Date(sale.createdAt).toLocaleString()} • {sale.customerName ?? '—'} •{' '}
+                      {sale.tenderType}
                       {' • '}
                       <span
                         className={
@@ -96,15 +108,22 @@ export function RefundSalesScreen({ manager, onExit }: RefundSalesScreenProps): 
                       >
                         {sale.status}
                       </span>
-                      {sale.refundedCents > 0 && ` • refunded ${formatCurrency(sale.refundedCents)}`}
+                      {sale.refundedCents > 0 &&
+                        ` • refunded ${formatCurrency(sale.refundedCents)}`}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-bold text-[var(--primary)]">{formatCurrency(sale.totalCents)}</span>
+                    <span className="font-bold text-[var(--primary)]">
+                      {formatCurrency(sale.totalCents)}
+                    </span>
                     <button
                       onClick={() => setActiveSaleId(sale.id)}
                       disabled={!isRefundable}
-                      title={!isRefundable ? 'This sale has already been fully refunded or was voided.' : undefined}
+                      title={
+                        !isRefundable
+                          ? 'This sale has already been fully refunded or was voided.'
+                          : undefined
+                      }
                       className="min-h-9 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-xs font-semibold text-[var(--primary-foreground)] disabled:opacity-40"
                     >
                       Refund

@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /*
  * Display density — two independent variable systems (see docs/superpowers
@@ -181,7 +181,9 @@ button.btn-primary {
   padding: calc(0.5rem * var(--pos-density-scale)) calc(0.75rem * var(--pos-density-scale));
   font-size: calc(0.875rem * var(--pos-density-scale));
   color: var(--foreground);
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .input::placeholder {
@@ -199,4 +201,20 @@ button.btn-primary {
   background: var(--muted);
   color: var(--muted-foreground);
   opacity: 0.7;
+}
+
+/* Baseline visible keyboard-focus ring for every interactive element that
+   doesn't set its own focus-visible treatment — the hardware/offline
+   fallback in the guide (Part 6) requires the whole app stay usable via
+   keyboard alone, which means focus must always be visible, not just on
+   elements a given screen pass happened to touch. */
+button:focus-visible,
+[role='button']:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.35);
 }

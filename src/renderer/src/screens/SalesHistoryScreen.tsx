@@ -46,7 +46,10 @@ export function SalesHistoryScreen(): React.JSX.Element {
     try {
       const range = isManager
         ? { fromDate: startOfDay(fromDate).toISOString(), toDate: endOfDay(toDate).toISOString() }
-        : { fromDate: new Date(Date.now() - TWENTY_FOUR_HOURS_MS).toISOString(), toDate: new Date().toISOString() }
+        : {
+            fromDate: new Date(Date.now() - TWENTY_FOUR_HOURS_MS).toISOString(),
+            toDate: new Date().toISOString()
+          }
       setSales(await window.api.refund.searchSales(query || undefined, range))
     } catch (err) {
       console.error('Failed to load sales history:', err)
@@ -60,12 +63,16 @@ export function SalesHistoryScreen(): React.JSX.Element {
     return () => clearTimeout(timer)
   }, [load])
 
-  const totalCents = sales.filter((s) => s.status !== 'VOIDED').reduce((sum, s) => sum + s.totalCents, 0)
+  const totalCents = sales
+    .filter((s) => s.status !== 'VOIDED')
+    .reduce((sum, s) => sum + s.totalCents, 0)
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--foreground)]">{isManager ? 'Past Sales' : "Today's Sales"}</h1>
+        <h1 className="text-2xl font-bold text-[var(--foreground)]">
+          {isManager ? 'Past Sales' : "Today's Sales"}
+        </h1>
         <p className="text-sm text-[var(--muted-foreground)]">
           {sales.length} transactions • {formatCurrency(totalCents)} in sales
           {!isManager && ' • last 24 hours only'}
@@ -100,7 +107,9 @@ export function SalesHistoryScreen(): React.JSX.Element {
             </>
           )}
           <div className="flex-1 min-w-[200px]">
-            <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Search by Sale # (receipt number)</label>
+            <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
+              Search by Sale # (receipt number)
+            </label>
             <input
               type="text"
               value={query}
@@ -180,7 +189,9 @@ export function SalesHistoryScreen(): React.JSX.Element {
                           <StatusIcon className="icon-3_5 shrink-0" aria-hidden="true" />
                           {sale.status}
                         </span>
-                        {sale.refundedCents > 0 && <span>• refunded {formatCurrency(sale.refundedCents)}</span>}
+                        {sale.refundedCents > 0 && (
+                          <span>• refunded {formatCurrency(sale.refundedCents)}</span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">

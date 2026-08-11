@@ -14,9 +14,20 @@ export interface EmptyStateProps {
  * a blank void. Keep it compact: this fills operational screens, not a
  * marketing page, so no oversized centered icon eating vertical space.
  */
-export function EmptyState({ icon: Icon, title, description, action, className }: EmptyStateProps): React.JSX.Element {
+export function EmptyState({
+  icon: Icon,
+  title,
+  description,
+  action,
+  className
+}: EmptyStateProps): React.JSX.Element {
   return (
-    <div className={cn('flex flex-col items-center gap-2 rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-6 text-center', className)}>
+    <div
+      className={cn(
+        'flex flex-col items-center gap-2 rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-6 text-center',
+        className
+      )}
+    >
       <Icon className="icon-6 text-[var(--muted-foreground)]" aria-hidden="true" />
       <p className="text-sm font-medium text-[var(--foreground)]">{title}</p>
       {description && <p className="text-xs text-[var(--muted-foreground)]">{description}</p>}

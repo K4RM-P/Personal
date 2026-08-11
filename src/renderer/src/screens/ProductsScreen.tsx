@@ -52,7 +52,10 @@ export function ProductsScreen(): React.JSX.Element {
   const [barcode, setBarcode] = React.useState('')
   const [isPinned, setIsPinned] = React.useState(false)
   const [editingProductId, setEditingProductId] = React.useState<number | null>(null)
-  const [formMessage, setFormMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [formMessage, setFormMessage] = React.useState<{
+    type: 'success' | 'error'
+    text: string
+  } | null>(null)
 
   // Tier Edit & Preview State
   const [editableTiers, setEditableTiers] = React.useState<PricingTier[]>([])
@@ -64,7 +67,10 @@ export function ProductsScreen(): React.JSX.Element {
   const [csvText, setCsvText] = React.useState('')
   const [importCount, setImportCount] = React.useState<number | null>(null)
   const [importError, setImportError] = React.useState<string | null>(null)
-  const [tierMessage, setTierMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [tierMessage, setTierMessage] = React.useState<{
+    type: 'success' | 'error'
+    text: string
+  } | null>(null)
   const importPreview = React.useMemo(() => parseImportPreviewCsv(csvText), [csvText])
 
   const loadData = async (): Promise<void> => {
@@ -172,7 +178,9 @@ export function ProductsScreen(): React.JSX.Element {
 
   // Tier Table Handlers
   const handleTierMarkupChange = (index: number, newMarkup: number): void => {
-    const updated = editableTiers.map((t, idx) => (idx === index ? { ...t, markupPercent: newMarkup } : t))
+    const updated = editableTiers.map((t, idx) =>
+      idx === index ? { ...t, markupPercent: newMarkup } : t
+    )
     setEditableTiers(updated)
     // Impact is computed server-side against all 50k+ products; debounce so a
     // burst of keystrokes fires one query, and only a bounded sample crosses IPC.
@@ -193,7 +201,10 @@ export function ProductsScreen(): React.JSX.Element {
     try {
       if (window.api?.pricingTier) {
         await window.api.pricingTier.saveAll(editableTiers)
-        setTierMessage({ type: 'success', text: 'Pricing tiers saved — live retail prices updated across the catalog.' })
+        setTierMessage({
+          type: 'success',
+          text: 'Pricing tiers saved — live retail prices updated across the catalog.'
+        })
         loadData()
         setPreviewImpact([])
         setPreviewAffectedCount(0)
@@ -241,10 +252,18 @@ export function ProductsScreen(): React.JSX.Element {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)]">Products & Pricing Tiers</h1>
-          <p className="text-sm text-[var(--muted-foreground)]">Product catalog CRUD, Tiered Markup Pricing Engine, and CSV import.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)]">
+            Products & Pricing Tiers
+          </h1>
+          <p className="text-sm text-[var(--muted-foreground)]">
+            Product catalog CRUD, Tiered Markup Pricing Engine, and CSV import.
+          </p>
         </div>
-        <div role="tablist" aria-label="Products sections" className="flex gap-1 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-1">
+        <div
+          role="tablist"
+          aria-label="Products sections"
+          className="flex gap-1 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-1"
+        >
           {TABS.map((tab) => (
             <button
               key={tab.id}
@@ -279,7 +298,10 @@ export function ProductsScreen(): React.JSX.Element {
               )}
               <form onSubmit={handleSaveProduct} className="space-y-3">
                 <div>
-                  <label htmlFor="product-sku" className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                  <label
+                    htmlFor="product-sku"
+                    className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]"
+                  >
                     SKU Code*
                   </label>
                   <input
@@ -293,7 +315,10 @@ export function ProductsScreen(): React.JSX.Element {
                   />
                 </div>
                 <div>
-                  <label htmlFor="product-name" className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                  <label
+                    htmlFor="product-name"
+                    className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]"
+                  >
                     Product Name*
                   </label>
                   <input
@@ -307,7 +332,10 @@ export function ProductsScreen(): React.JSX.Element {
                   />
                 </div>
                 <div>
-                  <label htmlFor="product-cost" className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                  <label
+                    htmlFor="product-cost"
+                    className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]"
+                  >
                     Supplier Cost ($)*
                   </label>
                   <input
@@ -322,7 +350,10 @@ export function ProductsScreen(): React.JSX.Element {
                   />
                 </div>
                 <div>
-                  <label htmlFor="product-barcode" className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                  <label
+                    htmlFor="product-barcode"
+                    className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]"
+                  >
                     Barcode / UPC
                   </label>
                   <input
@@ -351,7 +382,10 @@ export function ProductsScreen(): React.JSX.Element {
 
                 {isPinned ? (
                   <div>
-                    <label htmlFor="product-price" className="mb-1 flex items-center gap-1.5 text-xs font-medium text-[var(--muted-foreground)]">
+                    <label
+                      htmlFor="product-price"
+                      className="mb-1 flex items-center gap-1.5 text-xs font-medium text-[var(--muted-foreground)]"
+                    >
                       <Lock className="icon-3_5 shrink-0" aria-hidden="true" />
                       Manual Retail Price ($)
                     </label>
@@ -368,10 +402,15 @@ export function ProductsScreen(): React.JSX.Element {
                 ) : (
                   <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-2.5 text-xs">
                     <span className="flex items-center gap-1.5 font-medium text-[var(--muted-foreground)]">
-                      <Sparkles className="icon-3_5 shrink-0 text-[var(--primary)]" aria-hidden="true" />
+                      <Sparkles
+                        className="icon-3_5 shrink-0 text-[var(--primary)]"
+                        aria-hidden="true"
+                      />
                       Auto-calculated (tier)
                     </span>
-                    <span className="font-semibold tabular-nums text-[var(--foreground)]">{formatCurrency(calculatedPriceCents)}</span>
+                    <span className="font-semibold tabular-nums text-[var(--foreground)]">
+                      {formatCurrency(calculatedPriceCents)}
+                    </span>
                   </div>
                 )}
 
@@ -385,7 +424,10 @@ export function ProductsScreen(): React.JSX.Element {
                       Cancel
                     </button>
                   )}
-                  <button type="submit" className="btn-primary flex-1 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-xs font-semibold text-[var(--primary-foreground)] hover:bg-[var(--primary-hover)]">
+                  <button
+                    type="submit"
+                    className="btn-primary flex-1 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-xs font-semibold text-[var(--primary-foreground)] hover:bg-[var(--primary-hover)]"
+                  >
                     {editingProductId ? 'Update Product' : 'Create Product'}
                   </button>
                 </div>
@@ -400,7 +442,9 @@ export function ProductsScreen(): React.JSX.Element {
                 <CardTitle>
                   McKesson Catalogue ({catalogItems.length.toLocaleString()} items)
                   {catalogSearch && !catalogLoading && (
-                    <span className="ml-2 text-xs font-normal text-[var(--muted-foreground)]">(filtered from full catalogue)</span>
+                    <span className="ml-2 text-xs font-normal text-[var(--muted-foreground)]">
+                      (filtered from full catalogue)
+                    </span>
                   )}
                 </CardTitle>
                 <CardDescription>
@@ -411,7 +455,10 @@ export function ProductsScreen(): React.JSX.Element {
               </CardHeader>
               <div className="space-y-3">
                 <div className="relative">
-                  <Search className="icon-4 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" aria-hidden="true" />
+                  <Search
+                    className="icon-4 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]"
+                    aria-hidden="true"
+                  />
                   <input
                     type="text"
                     placeholder="Search catalogue by any field: code, description, UPC, vendor, form, strength..."
@@ -429,8 +476,16 @@ export function ProductsScreen(): React.JSX.Element {
                   ) : displayCatalog.length === 0 ? (
                     <EmptyState
                       icon={PackageSearch}
-                      title={catalogSearch ? 'No catalogue items match your search' : 'No catalogue items yet'}
-                      description={catalogSearch ? 'Try a different code, description, or UPC.' : 'Upload a McKesson WEBCAT file to populate the catalogue.'}
+                      title={
+                        catalogSearch
+                          ? 'No catalogue items match your search'
+                          : 'No catalogue items yet'
+                      }
+                      description={
+                        catalogSearch
+                          ? 'Try a different code, description, or UPC.'
+                          : 'Upload a McKesson WEBCAT file to populate the catalogue.'
+                      }
                     />
                   ) : (
                     <div className="overflow-x-auto">
@@ -450,18 +505,37 @@ export function ProductsScreen(): React.JSX.Element {
                         </thead>
                         <tbody>
                           {displayCatalog.map((item) => (
-                            <tr key={item.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--muted)]">
-                              <td className="py-2 pr-2 font-mono text-[var(--foreground)]">{item.itemNumber}</td>
-                              <td className="py-2 pr-2 text-[var(--foreground)]">{item.displayName || item.description}</td>
-                              <td className="py-2 pr-2 text-[var(--muted-foreground)]">{item.effectiveDate || '—'}</td>
-                              <td className="py-2 pr-2 text-[var(--muted-foreground)]">{item.packSize || '—'}</td>
+                            <tr
+                              key={item.id}
+                              className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--muted)]"
+                            >
+                              <td className="py-2 pr-2 font-mono text-[var(--foreground)]">
+                                {item.itemNumber}
+                              </td>
+                              <td className="py-2 pr-2 text-[var(--foreground)]">
+                                {item.displayName || item.description}
+                              </td>
+                              <td className="py-2 pr-2 text-[var(--muted-foreground)]">
+                                {item.effectiveDate || '—'}
+                              </td>
+                              <td className="py-2 pr-2 text-[var(--muted-foreground)]">
+                                {item.packSize || '—'}
+                              </td>
                               <td className="py-2 pr-2 text-[var(--muted-foreground)]">
                                 {[item.dosageForm, item.strength].filter(Boolean).join(' ') || '—'}
                               </td>
-                              <td className="py-2 pr-2 text-[var(--muted-foreground)]">{item.vendorCode || '—'}</td>
-                              <td className="py-2 pr-2 text-right tabular-nums text-[var(--foreground)]">{formatCurrency(item.costPriceCents)}</td>
-                              <td className="py-2 pr-2 text-right tabular-nums font-semibold text-[var(--primary)]">{formatCurrency(item.listPriceCents)}</td>
-                              <td className="py-2 text-right font-mono text-[var(--muted-foreground)]">{item.gtinPrimary || '—'}</td>
+                              <td className="py-2 pr-2 text-[var(--muted-foreground)]">
+                                {item.vendorCode || '—'}
+                              </td>
+                              <td className="py-2 pr-2 text-right tabular-nums text-[var(--foreground)]">
+                                {formatCurrency(item.costPriceCents)}
+                              </td>
+                              <td className="py-2 pr-2 text-right tabular-nums font-semibold text-[var(--primary)]">
+                                {formatCurrency(item.listPriceCents)}
+                              </td>
+                              <td className="py-2 text-right font-mono text-[var(--muted-foreground)]">
+                                {item.gtinPrimary || '—'}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -482,7 +556,8 @@ export function ProductsScreen(): React.JSX.Element {
             <CardHeader>
               <CardTitle>Owner Cost-Based Pricing Tiers Setup</CardTitle>
               <CardDescription>
-                Formula: <code>retail = cost × (1 + markup%)</code> applied exactly with no rounding.
+                Formula: <code>retail = cost × (1 + markup%)</code> applied exactly with no
+                rounding.
               </CardDescription>
             </CardHeader>
 
@@ -500,7 +575,10 @@ export function ProductsScreen(): React.JSX.Element {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <label htmlFor={`tier-markup-${tier.id}`} className="text-[var(--muted-foreground)]">
+                    <label
+                      htmlFor={`tier-markup-${tier.id}`}
+                      className="text-[var(--muted-foreground)]"
+                    >
                       Markup %:
                     </label>
                     <input
@@ -533,8 +611,10 @@ export function ProductsScreen(): React.JSX.Element {
                   Tier Change Impact Preview ({previewAffectedCount} products affected)
                 </CardTitle>
                 <CardDescription>
-                  Preview showing which catalog items will change retail price before saving tier edits.
-                  {previewAffectedCount > previewImpact.length && ` Showing the first ${previewImpact.length} of ${previewAffectedCount}.`}
+                  Preview showing which catalog items will change retail price before saving tier
+                  edits.
+                  {previewAffectedCount > previewImpact.length &&
+                    ` Showing the first ${previewImpact.length} of ${previewAffectedCount}.`}
                 </CardDescription>
               </CardHeader>
               <div className="max-h-60 space-y-2 overflow-y-auto pr-1 text-xs">
@@ -548,9 +628,19 @@ export function ProductsScreen(): React.JSX.Element {
                       <span className="text-[var(--muted-foreground)]">({item.sku})</span>
                     </div>
                     <div className="flex items-center gap-4 tabular-nums">
-                      <span className="text-[var(--muted-foreground)]">Current: {formatCurrency(item.currentPriceCents)}</span>
-                      <span className="font-semibold text-[var(--primary)]">New: {formatCurrency(item.newPriceCents)}</span>
-                      <span className={item.priceDiffCents > 0 ? 'text-[var(--success)]' : 'text-[var(--warning)]'}>
+                      <span className="text-[var(--muted-foreground)]">
+                        Current: {formatCurrency(item.currentPriceCents)}
+                      </span>
+                      <span className="font-semibold text-[var(--primary)]">
+                        New: {formatCurrency(item.newPriceCents)}
+                      </span>
+                      <span
+                        className={
+                          item.priceDiffCents > 0
+                            ? 'text-[var(--success)]'
+                            : 'text-[var(--warning)]'
+                        }
+                      >
                         ({item.priceDiffCents > 0 ? '+' : ''}
                         {formatCurrency(item.priceDiffCents)})
                       </span>
@@ -569,14 +659,17 @@ export function ProductsScreen(): React.JSX.Element {
           <CardHeader>
             <CardTitle>Bulk Product Spreadsheet Import (CSV)</CardTitle>
             <CardDescription>
-              Paste CSV text formatted as <code>SKU,Name,CostInDollars,Barcode(optional)</code>. Retail prices will
-              auto-calculate via the active Tiered Markup Engine.
+              Paste CSV text formatted as <code>SKU,Name,CostInDollars,Barcode(optional)</code>.
+              Retail prices will auto-calculate via the active Tiered Markup Engine.
             </CardDescription>
           </CardHeader>
 
           <div className="space-y-4">
             <div>
-              <label htmlFor="csv-import" className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+              <label
+                htmlFor="csv-import"
+                className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]"
+              >
                 CSV data
               </label>
               <textarea
@@ -607,14 +700,20 @@ export function ProductsScreen(): React.JSX.Element {
                     </div>
                   ))}
                   {importPreview.length > 6 && (
-                    <p className="text-[var(--muted-foreground)]">…and {importPreview.length - 6} more rows.</p>
+                    <p className="text-[var(--muted-foreground)]">
+                      …and {importPreview.length - 6} more rows.
+                    </p>
                   )}
                 </div>
               </div>
             )}
 
             {importError && <Alert variant="error">{importError}</Alert>}
-            {importCount !== null && <Alert variant="success">Successfully imported/upserted {importCount} products.</Alert>}
+            {importCount !== null && (
+              <Alert variant="success">
+                Successfully imported/upserted {importCount} products.
+              </Alert>
+            )}
 
             <div className="flex justify-end">
               <button

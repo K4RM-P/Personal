@@ -15,7 +15,11 @@ interface ManagerAuthModalProps {
  * separate from the signed-in session: a manager confirming here does not log
  * anyone in or out, so the cashier's till session is untouched either way.
  */
-export function ManagerAuthModal({ description, onCancel, onSuccess }: ManagerAuthModalProps): React.JSX.Element {
+export function ManagerAuthModal({
+  description,
+  onCancel,
+  onSuccess
+}: ManagerAuthModalProps): React.JSX.Element {
   const [fullName, setFullName] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [error, setError] = React.useState<string | null>(null)
@@ -56,7 +60,9 @@ export function ManagerAuthModal({ description, onCancel, onSuccess }: ManagerAu
         <div className="flex items-start gap-2">
           <Lock className="icon-5 mt-0.5 shrink-0 text-[var(--warning)]" aria-hidden="true" />
           <div>
-            <CardTitle className="text-[var(--foreground)]">Manager Authentication Required</CardTitle>
+            <CardTitle className="text-[var(--foreground)]">
+              Manager Authentication Required
+            </CardTitle>
             {description && <CardDescription>{description}</CardDescription>}
           </div>
         </div>
@@ -64,23 +70,31 @@ export function ManagerAuthModal({ description, onCancel, onSuccess }: ManagerAu
         {error && <Alert variant="error">{error}</Alert>}
 
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Full Name</label>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">
+            Full Name
+          </label>
           <input
             type="text"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') void submit() }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void submit()
+            }}
             className="input"
             autoFocus
           />
         </div>
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Password</label>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">
+            Password
+          </label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') void submit() }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void submit()
+            }}
             className="input"
           />
         </div>

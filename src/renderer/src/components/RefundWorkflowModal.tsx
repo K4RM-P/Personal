@@ -21,7 +21,11 @@ type CustomerWithBalance = Customer & { currentBalanceCents: number }
  * on mount; every step reads from the same `sale` + `amountCents` state so the
  * amount is computed exactly once per scope choice and never re-derived.
  */
-export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundWorkflowModalProps): React.JSX.Element {
+export function RefundWorkflowModal({
+  transactionId,
+  manager,
+  onClose
+}: RefundWorkflowModalProps): React.JSX.Element {
   const [sale, setSale] = React.useState<SaleRefundDetail | null>(null)
   const [step, setStep] = React.useState<Step>('loading')
   const [loadError, setLoadError] = React.useState<string | null>(null)
@@ -36,7 +40,13 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
   const [customerLinkMode, setCustomerLinkMode] = React.useState<'search' | 'create' | null>(null)
   const [customerSearchQuery, setCustomerSearchQuery] = React.useState('')
   const [customerSearchResults, setCustomerSearchResults] = React.useState<Customer[]>([])
-  const [newCustomer, setNewCustomer] = React.useState({ firstName: '', lastName: '', phone: '', address: '', email: '' })
+  const [newCustomer, setNewCustomer] = React.useState({
+    firstName: '',
+    lastName: '',
+    phone: '',
+    address: '',
+    email: ''
+  })
 
   const [processing, setProcessing] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -80,7 +90,10 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
       return
     }
     const timer = setTimeout(() => {
-      window.api.customer.search(q).then(setCustomerSearchResults).catch(() => setCustomerSearchResults([]))
+      window.api.customer
+        .search(q)
+        .then(setCustomerSearchResults)
+        .catch(() => setCustomerSearchResults([]))
     }, 200)
     return () => clearTimeout(timer)
   }, [customerSearchQuery, customerLinkMode])
@@ -108,7 +121,10 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
     ? sale.items.filter((i) => selectedItemIds.has(i.id)).reduce((sum, i) => sum + i.totalCents, 0)
     : 0
 
-  const processRefund = async (type: RefundType, opts?: { customerEmail?: string; linkCustomerId?: number }): Promise<void> => {
+  const processRefund = async (
+    type: RefundType,
+    opts?: { customerEmail?: string; linkCustomerId?: number }
+  ): Promise<void> => {
     if (!sale) return
     setProcessing(true)
     setError(null)
@@ -146,7 +162,10 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
       <Overlay>
         <Card className="w-[420px] border-[var(--error)] bg-[var(--card)] p-6 space-y-4">
           <Alert variant="error">{loadError}</Alert>
-          <button onClick={() => onClose(false)} className="w-full min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)]">
+          <button
+            onClick={() => onClose(false)}
+            className="w-full min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)]"
+          >
             Close
           </button>
         </Card>
@@ -157,7 +176,9 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
   if (step === 'loading' || !sale) {
     return (
       <Overlay>
-        <Card className="w-[420px] bg-[var(--card)] p-6 text-center text-sm text-[var(--muted-foreground)]">Loading sale…</Card>
+        <Card className="w-[420px] bg-[var(--card)] p-6 text-center text-sm text-[var(--muted-foreground)]">
+          Loading sale…
+        </Card>
       </Overlay>
     )
   }
@@ -168,11 +189,14 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
       <Overlay>
         <Card className="w-[460px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-4">
           <div>
-            <CardTitle className="text-[var(--foreground)]">Refund Sale #{sale.receiptNumber}</CardTitle>
+            <CardTitle className="text-[var(--foreground)]">
+              Refund Sale #{sale.receiptNumber}
+            </CardTitle>
             <CardDescription>
               {sale.customer ? `${sale.customer.firstName} ${sale.customer.lastName} · ` : ''}
               Total {formatCurrency(sale.totalCents)}
-              {sale.refundedCents > 0 && ` · already refunded ${formatCurrency(sale.refundedCents)}`}
+              {sale.refundedCents > 0 &&
+                ` · already refunded ${formatCurrency(sale.refundedCents)}`}
             </CardDescription>
           </div>
           <div className="space-y-2">
@@ -192,7 +216,10 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
               Refund Specific Items
             </button>
           </div>
-          <button onClick={() => onClose(false)} className="min-h-9 w-full rounded-[var(--radius)] text-xs text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]">
+          <button
+            onClick={() => onClose(false)}
+            className="min-h-9 w-full rounded-[var(--radius)] text-xs text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+          >
             Cancel
           </button>
         </Card>
@@ -208,20 +235,35 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
           <CardTitle className="text-[var(--foreground)]">Select items to refund</CardTitle>
           <div className="max-h-[300px] space-y-2 overflow-y-auto">
             {sale.items.map((item) => (
-              <label key={item.id} className="flex min-h-11 items-center justify-between rounded-[var(--radius)] border border-[var(--border)] p-3 text-sm">
+              <label
+                key={item.id}
+                className="flex min-h-11 items-center justify-between rounded-[var(--radius)] border border-[var(--border)] p-3 text-sm"
+              >
                 <span className="flex items-center gap-2.5">
-                  <input type="checkbox" checked={selectedItemIds.has(item.id)} onChange={() => toggleItem(item.id)} className="icon-4 shrink-0" />
-                  {item.product.name} (qty {item.quantity}) @ {formatCurrency(item.unitPriceCents)} ea
+                  <input
+                    type="checkbox"
+                    checked={selectedItemIds.has(item.id)}
+                    onChange={() => toggleItem(item.id)}
+                    className="icon-4 shrink-0"
+                  />
+                  {item.product.name} (qty {item.quantity}) @ {formatCurrency(item.unitPriceCents)}{' '}
+                  ea
                 </span>
-                <span className="font-semibold text-[var(--foreground)]">{formatCurrency(item.totalCents)}</span>
+                <span className="font-semibold text-[var(--foreground)]">
+                  {formatCurrency(item.totalCents)}
+                </span>
               </label>
             ))}
           </div>
           <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3 text-sm font-semibold text-[var(--foreground)]">
-            Refund subtotal: {formatCurrency(selectedItemsSubtotalCents)} ({selectedItemIds.size} checked)
+            Refund subtotal: {formatCurrency(selectedItemsSubtotalCents)} ({selectedItemIds.size}{' '}
+            checked)
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => setStep('scope')} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)]">
+            <button
+              onClick={() => setStep('scope')}
+              className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)]"
+            >
               Back
             </button>
             <button
@@ -246,7 +288,9 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
     return (
       <Overlay>
         <Card className="w-[420px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-4">
-          <CardTitle className="text-[var(--foreground)]">Refund Amount: {formatCurrency(amountCents)}</CardTitle>
+          <CardTitle className="text-[var(--foreground)]">
+            Refund Amount: {formatCurrency(amountCents)}
+          </CardTitle>
           <CardDescription>How should this refund be processed?</CardDescription>
           <div className="grid grid-cols-2 gap-3">
             <button
@@ -259,7 +303,9 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
             <button
               onClick={() => setStep('CARD')}
               disabled={!cardAvailable}
-              title={!cardAvailable ? 'This sale has no card charge on file to reverse.' : undefined}
+              title={
+                !cardAvailable ? 'This sale has no card charge on file to reverse.' : undefined
+              }
               className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-40"
             >
               <CreditCard className="icon-5 shrink-0" />
@@ -299,7 +345,10 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
         <Card className="w-[420px] border-[var(--success)] bg-[var(--card)] p-6 space-y-4">
           <CardTitle className="text-[var(--foreground)]">Refund complete</CardTitle>
           <Alert variant="success">{successMessage}</Alert>
-          <button onClick={() => onClose(true)} className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]">
+          <button
+            onClick={() => onClose(true)}
+            className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
+          >
             Back to sales list
           </button>
         </Card>
@@ -311,7 +360,9 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
   const errorBanner = error && <Alert variant="error">{error}</Alert>
   const reasonField = (
     <div>
-      <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Refund reason (optional)</label>
+      <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
+        Refund reason (optional)
+      </label>
       <input
         type="text"
         value={reason}
@@ -325,12 +376,20 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
     return (
       <Overlay>
         <Card className="w-[420px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-4">
-          <CardTitle className="text-[var(--foreground)]">Cash Refund — {formatCurrency(amountCents)}</CardTitle>
-          <div className="text-sm text-[var(--foreground)]">Give customer {formatCurrency(amountCents)} in cash.</div>
+          <CardTitle className="text-[var(--foreground)]">
+            Cash Refund — {formatCurrency(amountCents)}
+          </CardTitle>
+          <div className="text-sm text-[var(--foreground)]">
+            Give customer {formatCurrency(amountCents)} in cash.
+          </div>
           {errorBanner}
           {reasonField}
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => setStep('method')} disabled={processing} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)] disabled:opacity-50">
+            <button
+              onClick={() => setStep('method')}
+              disabled={processing}
+              className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)] disabled:opacity-50"
+            >
               Cancel
             </button>
             <button
@@ -350,15 +409,25 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
     return (
       <Overlay>
         <Card className="w-[420px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-4">
-          <CardTitle className="text-[var(--foreground)]">Card Refund — {formatCurrency(amountCents)}</CardTitle>
+          <CardTitle className="text-[var(--foreground)]">
+            Card Refund — {formatCurrency(amountCents)}
+          </CardTitle>
           <div className="text-sm text-[var(--foreground)]">
             This will refund to the customer&apos;s original card.
-            {sale.cardLast4 && <div className="mt-1 text-[var(--muted-foreground)]">Original payment: card •••• {sale.cardLast4}</div>}
+            {sale.cardLast4 && (
+              <div className="mt-1 text-[var(--muted-foreground)]">
+                Original payment: card •••• {sale.cardLast4}
+              </div>
+            )}
           </div>
           {errorBanner}
           {reasonField}
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => setStep('method')} disabled={processing} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)] disabled:opacity-50">
+            <button
+              onClick={() => setStep('method')}
+              disabled={processing}
+              className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)] disabled:opacity-50"
+            >
               Cancel
             </button>
             <button
@@ -378,9 +447,13 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
     return (
       <Overlay>
         <Card className="w-[420px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-4">
-          <CardTitle className="text-[var(--foreground)]">E-Transfer Refund — {formatCurrency(amountCents)}</CardTitle>
+          <CardTitle className="text-[var(--foreground)]">
+            E-Transfer Refund — {formatCurrency(amountCents)}
+          </CardTitle>
           <div>
-            <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Customer email (for sending refund instructions)</label>
+            <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
+              Customer email (for sending refund instructions)
+            </label>
             <input
               type="email"
               value={customerEmail}
@@ -391,11 +464,17 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
           {errorBanner}
           {reasonField}
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => setStep('method')} disabled={processing} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)] disabled:opacity-50">
+            <button
+              onClick={() => setStep('method')}
+              disabled={processing}
+              className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)] disabled:opacity-50"
+            >
               Cancel
             </button>
             <button
-              onClick={() => void processRefund('E_TRANSFER', { customerEmail: customerEmail.trim() })}
+              onClick={() =>
+                void processRefund('E_TRANSFER', { customerEmail: customerEmail.trim() })
+              }
               disabled={processing || !customerEmail.trim()}
               className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
             >
@@ -412,20 +491,33 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
   return (
     <Overlay>
       <Card className="w-[440px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-4">
-        <CardTitle className="text-[var(--foreground)]">Deposit to Customer Tab — {formatCurrency(amountCents)}</CardTitle>
+        <CardTitle className="text-[var(--foreground)]">
+          Deposit to Customer Tab — {formatCurrency(amountCents)}
+        </CardTitle>
 
         {!hasCustomer && customerLinkMode === null && (
           <>
-            <Alert variant="warning">This sale is not linked to a customer. Create or link one to deposit the refund.</Alert>
+            <Alert variant="warning">
+              This sale is not linked to a customer. Create or link one to deposit the refund.
+            </Alert>
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => setCustomerLinkMode('create')} className="min-h-11 rounded-[var(--radius)] border border-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary)]">
+              <button
+                onClick={() => setCustomerLinkMode('create')}
+                className="min-h-11 rounded-[var(--radius)] border border-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary)]"
+              >
                 Create New Customer
               </button>
-              <button onClick={() => setCustomerLinkMode('search')} className="min-h-11 rounded-[var(--radius)] border border-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary)]">
+              <button
+                onClick={() => setCustomerLinkMode('search')}
+                className="min-h-11 rounded-[var(--radius)] border border-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary)]"
+              >
                 Link Existing Customer
               </button>
             </div>
-            <button onClick={() => setStep('method')} className="w-full text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
+            <button
+              onClick={() => setStep('method')}
+              className="w-full text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+            >
               Back
             </button>
           </>
@@ -448,11 +540,17 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
                   onClick={() => setLinkedCustomerId(c.id)}
                   className="block w-full rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-left text-sm"
                 >
-                  <b>{c.firstName} {c.lastName}</b> · {c.phone}
+                  <b>
+                    {c.firstName} {c.lastName}
+                  </b>{' '}
+                  · {c.phone}
                 </button>
               ))}
             </div>
-            <button onClick={() => setCustomerLinkMode(null)} className="w-full text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
+            <button
+              onClick={() => setCustomerLinkMode(null)}
+              className="w-full text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+            >
               Back
             </button>
           </div>
@@ -462,29 +560,64 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
           <div className="space-y-2">
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">First name</label>
-                <input autoFocus value={newCustomer.firstName} onChange={(e) => setNewCustomer((p) => ({ ...p, firstName: e.target.value }))} className="input" />
+                <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                  First name
+                </label>
+                <input
+                  autoFocus
+                  value={newCustomer.firstName}
+                  onChange={(e) => setNewCustomer((p) => ({ ...p, firstName: e.target.value }))}
+                  className="input"
+                />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Last name</label>
-                <input value={newCustomer.lastName} onChange={(e) => setNewCustomer((p) => ({ ...p, lastName: e.target.value }))} className="input" />
+                <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                  Last name
+                </label>
+                <input
+                  value={newCustomer.lastName}
+                  onChange={(e) => setNewCustomer((p) => ({ ...p, lastName: e.target.value }))}
+                  className="input"
+                />
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Phone (required)</label>
-              <input value={newCustomer.phone} onChange={(e) => setNewCustomer((p) => ({ ...p, phone: e.target.value }))} className="input" />
+              <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                Phone (required)
+              </label>
+              <input
+                value={newCustomer.phone}
+                onChange={(e) => setNewCustomer((p) => ({ ...p, phone: e.target.value }))}
+                className="input"
+              />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Address</label>
-              <input value={newCustomer.address} onChange={(e) => setNewCustomer((p) => ({ ...p, address: e.target.value }))} className="input" />
+              <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                Address
+              </label>
+              <input
+                value={newCustomer.address}
+                onChange={(e) => setNewCustomer((p) => ({ ...p, address: e.target.value }))}
+                className="input"
+              />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Email (optional)</label>
-              <input type="email" value={newCustomer.email} onChange={(e) => setNewCustomer((p) => ({ ...p, email: e.target.value }))} className="input" />
+              <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                Email (optional)
+              </label>
+              <input
+                type="email"
+                value={newCustomer.email}
+                onChange={(e) => setNewCustomer((p) => ({ ...p, email: e.target.value }))}
+                className="input"
+              />
             </div>
             {errorBanner}
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => setCustomerLinkMode(null)} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)]">
+              <button
+                onClick={() => setCustomerLinkMode(null)}
+                className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)]"
+              >
                 Back
               </button>
               <button
@@ -510,23 +643,42 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
           <>
             <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3 text-sm">
               <div className="text-[var(--foreground)]">
-                Customer: {sale.customer ? `${sale.customer.firstName} ${sale.customer.lastName}` : linkedCustomer ? `${linkedCustomer.firstName} ${linkedCustomer.lastName}` : `#${effectiveCustomerId}`}
+                Customer:{' '}
+                {sale.customer
+                  ? `${sale.customer.firstName} ${sale.customer.lastName}`
+                  : linkedCustomer
+                    ? `${linkedCustomer.firstName} ${linkedCustomer.lastName}`
+                    : `#${effectiveCustomerId}`}
               </div>
               {linkedCustomer && (
                 <>
-                  <div className="text-[var(--muted-foreground)]">Current balance: {formatCurrency(linkedCustomer.currentBalanceCents)}</div>
-                  <div className="text-[var(--muted-foreground)]">After deposit: {formatCurrency(linkedCustomer.currentBalanceCents + amountCents)}</div>
+                  <div className="text-[var(--muted-foreground)]">
+                    Current balance: {formatCurrency(linkedCustomer.currentBalanceCents)}
+                  </div>
+                  <div className="text-[var(--muted-foreground)]">
+                    After deposit:{' '}
+                    {formatCurrency(linkedCustomer.currentBalanceCents + amountCents)}
+                  </div>
                 </>
               )}
             </div>
             {errorBanner}
             {reasonField}
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => setStep('method')} disabled={processing} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)] disabled:opacity-50">
+              <button
+                onClick={() => setStep('method')}
+                disabled={processing}
+                className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)] disabled:opacity-50"
+              >
                 Cancel
               </button>
               <button
-                onClick={() => void processRefund('TAB_CREDIT', linkedCustomerId ? { linkCustomerId: linkedCustomerId } : undefined)}
+                onClick={() =>
+                  void processRefund(
+                    'TAB_CREDIT',
+                    linkedCustomerId ? { linkCustomerId: linkedCustomerId } : undefined
+                  )
+                }
                 disabled={processing}
                 className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
               >
@@ -541,5 +693,9 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
 }
 
 function Overlay({ children }: { children: React.ReactNode }): React.JSX.Element {
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">{children}</div>
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      {children}
+    </div>
+  )
 }

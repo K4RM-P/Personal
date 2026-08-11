@@ -38,8 +38,12 @@ export function RefundsScreen({ onClose }: RefundsScreenProps): React.JSX.Elemen
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <Card className="w-[420px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-4">
         <div>
-          <CardTitle className="text-[var(--foreground)]">Manager authentication required</CardTitle>
-          <CardDescription>A manager must authenticate to search sales and process refunds.</CardDescription>
+          <CardTitle className="text-[var(--foreground)]">
+            Manager authentication required
+          </CardTitle>
+          <CardDescription>
+            A manager must authenticate to search sales and process refunds.
+          </CardDescription>
         </div>
         <div className="grid grid-cols-2 gap-2">
           <button

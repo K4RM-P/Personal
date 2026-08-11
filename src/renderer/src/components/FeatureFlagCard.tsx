@@ -23,7 +23,9 @@ export function FeatureFlagCard({ flag, onToggle }: FeatureFlagCardProps) {
   return (
     <Card className="flex items-center justify-between">
       <div className="space-y-1 pr-4">
-        <CardTitle className="text-base font-semibold text-[var(--foreground)]">{flag.label}</CardTitle>
+        <CardTitle className="text-base font-semibold text-[var(--foreground)]">
+          {flag.label}
+        </CardTitle>
         <CardDescription className="text-sm text-[var(--muted-foreground)]">
           {flag.description || 'No description provided.'}
         </CardDescription>

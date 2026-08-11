@@ -393,7 +393,10 @@ export function SettingsScreen() {
                   {testing ? 'Testing…' : 'Test Network Printer'}
                 </button>
                 {testResult && (
-                  <Alert variant={testResult.ok ? 'success' : 'error'} className="flex-1 min-w-[200px]">
+                  <Alert
+                    variant={testResult.ok ? 'success' : 'error'}
+                    className="flex-1 min-w-[200px]"
+                  >
                     {testResult.message}
                   </Alert>
                 )}

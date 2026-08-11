@@ -28,7 +28,9 @@ export function DiscountModal({
 }: DiscountModalProps): React.JSX.Element {
   const [mode, setMode] = React.useState<DiscountMode>('DOLLAR')
   const [percentInput, setPercentInput] = React.useState(
-    initialDiscountCents > 0 && baseCents > 0 ? String(Math.round((initialDiscountCents / baseCents) * 100)) : ''
+    initialDiscountCents > 0 && baseCents > 0
+      ? String(Math.round((initialDiscountCents / baseCents) * 100))
+      : ''
   )
   const [dollarInput, setDollarInput] = React.useState(
     initialDiscountCents > 0 ? (initialDiscountCents / 100).toFixed(2) : ''
@@ -48,7 +50,8 @@ export function DiscountModal({
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onCancel()
-      else if (e.key === 'Enter' && canApply) onApply(clampedDiscountCents, reason.trim() || undefined)
+      else if (e.key === 'Enter' && canApply)
+        onApply(clampedDiscountCents, reason.trim() || undefined)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)

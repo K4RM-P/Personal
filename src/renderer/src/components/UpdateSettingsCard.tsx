@@ -61,7 +61,9 @@ export function UpdateSettingsCard(): React.JSX.Element {
             'aria-hidden': true
           })}
           <div>
-            <p className={`font-semibold ${stateColor[status.state]}`}>{stateLabel[status.state]}</p>
+            <p className={`font-semibold ${stateColor[status.state]}`}>
+              {stateLabel[status.state]}
+            </p>
             {status.version && (
               <p className="text-[var(--muted-foreground)]">Version {status.version}</p>
             )}

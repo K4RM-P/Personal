@@ -19,7 +19,12 @@ interface ProviderMeta {
 }
 
 const PROVIDERS: ProviderMeta[] = [
-  { value: 'manual', label: 'Manual / External Terminal', category: 'Standalone — no integration', needsKey: false },
+  {
+    value: 'manual',
+    label: 'Manual / External Terminal',
+    category: 'Standalone — no integration',
+    needsKey: false
+  },
   {
     value: 'stripe',
     label: 'Stripe Terminal',
@@ -28,9 +33,30 @@ const PROVIDERS: ProviderMeta[] = [
     keyHint: 'Secret key (sk_test_… / sk_live_…)',
     terminalHint: 'Reader id (optional — auto-discovers a simulated reader in sandbox)'
   },
-  { value: 'square', label: 'Square Terminal', category: 'Cloud SDK reader', needsKey: true, keyHint: 'Access token', terminalHint: 'Device id' },
-  { value: 'clover', label: 'Clover', category: 'Semi-integrated terminal', needsKey: true, keyHint: 'Access token', terminalHint: 'Device / merchant id' },
-  { value: 'moneris', label: 'Moneris', category: 'Semi-integrated PIN pad', needsKey: true, keyHint: 'store_id:api_token', terminalHint: 'Terminal / ECR id' },
+  {
+    value: 'square',
+    label: 'Square Terminal',
+    category: 'Cloud SDK reader',
+    needsKey: true,
+    keyHint: 'Access token',
+    terminalHint: 'Device id'
+  },
+  {
+    value: 'clover',
+    label: 'Clover',
+    category: 'Semi-integrated terminal',
+    needsKey: true,
+    keyHint: 'Access token',
+    terminalHint: 'Device / merchant id'
+  },
+  {
+    value: 'moneris',
+    label: 'Moneris',
+    category: 'Semi-integrated PIN pad',
+    needsKey: true,
+    keyHint: 'store_id:api_token',
+    terminalHint: 'Terminal / ECR id'
+  },
   {
     value: 'globalpayments',
     label: 'Global Payments',
@@ -39,7 +65,12 @@ const PROVIDERS: ProviderMeta[] = [
     keyHint: 'app_id:app_key',
     terminalHint: 'Terminal id'
   },
-  { value: 'mock', label: 'Simulated (testing only)', category: 'Offline — auto-approves', needsKey: false }
+  {
+    value: 'mock',
+    label: 'Simulated (testing only)',
+    category: 'Offline — auto-approves',
+    needsKey: false
+  }
 ]
 
 export function PaymentSettingsCard(): React.JSX.Element {
@@ -87,7 +118,9 @@ export function PaymentSettingsCard(): React.JSX.Element {
       })
       setHasApiKey(view.hasApiKey)
       setApiKey('')
-      setSaved(`Saved. Active mode: ${view.interactionMode === 'manual' ? 'Manual / External' : 'Automatic'}.`)
+      setSaved(
+        `Saved. Active mode: ${view.interactionMode === 'manual' ? 'Manual / External' : 'Automatic'}.`
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save payment settings')
     }
@@ -118,7 +151,8 @@ export function PaymentSettingsCard(): React.JSX.Element {
       <CardHeader>
         <CardTitle>Payment mode</CardTitle>
         <CardDescription>
-          Choose how card payments are handled without changing the checkout flow. The UI stays processor-agnostic and presents the terminal as a workflow state.
+          Choose how card payments are handled without changing the checkout flow. The UI stays
+          processor-agnostic and presents the terminal as a workflow state.
         </CardDescription>
       </CardHeader>
 
@@ -134,7 +168,9 @@ export function PaymentSettingsCard(): React.JSX.Element {
       {wizardOpen && (
         <div className="mt-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-4 space-y-4 text-sm">
           <div>
-            <p className="font-medium text-[var(--foreground)]">1. Do you have a payment terminal already?</p>
+            <p className="font-medium text-[var(--foreground)]">
+              1. Do you have a payment terminal already?
+            </p>
             <div className="flex gap-2 mt-2">
               <button
                 onClick={() => setWizardOpen(true)}
@@ -146,23 +182,35 @@ export function PaymentSettingsCard(): React.JSX.Element {
             </div>
           </div>
           <div>
-            <p className="font-medium text-[var(--foreground)]">2. Is it connected to your network / does it support card-present API integration?</p>
+            <p className="font-medium text-[var(--foreground)]">
+              2. Is it connected to your network / does it support card-present API integration?
+            </p>
             <p className="mt-1 text-xs text-[var(--muted-foreground)]">
-              Not sure? Check the terminal's model number, or ask your card processor whether they offer
-              “integrated / semi-integrated POS support.” If it’s a plain countertop terminal that prints
-              its own receipt and isn’t plugged into this computer or your network, it is <em>not</em> integrated.
+              Not sure? Check the terminal's model number, or ask your card processor whether they
+              offer “integrated / semi-integrated POS support.” If it’s a plain countertop terminal
+              that prints its own receipt and isn’t plugged into this computer or your network, it
+              is <em>not</em> integrated.
             </p>
           </div>
           <div className="grid gap-2">
             <p className="font-medium text-[var(--foreground)]">Recommended for your setup:</p>
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => pickFromWizard('manual')} className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-xs text-[var(--primary-foreground)]">
+              <button
+                onClick={() => pickFromWizard('manual')}
+                className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-xs text-[var(--primary-foreground)]"
+              >
                 No terminal / not integrated → Manual/External
               </button>
-              <button onClick={() => pickFromWizard('stripe')} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 text-xs text-[var(--foreground)]">
+              <button
+                onClick={() => pickFromWizard('stripe')}
+                className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 text-xs text-[var(--foreground)]"
+              >
                 Integrated cloud reader → Stripe/Square
               </button>
-              <button onClick={() => pickFromWizard('moneris')} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 text-xs text-[var(--foreground)]">
+              <button
+                onClick={() => pickFromWizard('moneris')}
+                className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 text-xs text-[var(--foreground)]"
+              >
                 Integrated PIN pad → Moneris/Global Payments
               </button>
             </div>
@@ -173,7 +221,11 @@ export function PaymentSettingsCard(): React.JSX.Element {
       <div className="space-y-4 mt-4">
         <div>
           <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Processor</label>
-          <select value={provider} onChange={(e) => setProvider(e.target.value as PaymentProviderName)} className="input">
+          <select
+            value={provider}
+            onChange={(e) => setProvider(e.target.value as PaymentProviderName)}
+            className="input"
+          >
             {PROVIDERS.map((p) => (
               <option key={p.value} value={p.value}>
                 {p.label} — {p.category}
@@ -184,17 +236,23 @@ export function PaymentSettingsCard(): React.JSX.Element {
 
         {provider === 'manual' && (
           <p className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-xs text-[var(--muted-foreground)]">
-            Manual mode is a deliberate, first-class option. At checkout the cashier keys the total into
-            your standalone terminal, then taps <strong>Approved</strong> or <strong>Declined</strong> here.
-            No API keys needed.
+            Manual mode is a deliberate, first-class option. At checkout the cashier keys the total
+            into your standalone terminal, then taps <strong>Approved</strong> or{' '}
+            <strong>Declined</strong> here. No API keys needed.
           </p>
         )}
 
         {meta.needsKey && (
           <>
             <div>
-              <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Environment</label>
-              <select value={environment} onChange={(e) => setEnvironment(e.target.value as PaymentEnvironment)} className="input">
+              <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
+                Environment
+              </label>
+              <select
+                value={environment}
+                onChange={(e) => setEnvironment(e.target.value as PaymentEnvironment)}
+                className="input"
+              >
                 <option value="sandbox">Sandbox / Test</option>
                 <option value="production">Production / Live</option>
               </select>
@@ -203,7 +261,12 @@ export function PaymentSettingsCard(): React.JSX.Element {
               <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
                 Terminal / Reader id {meta.terminalHint ? `— ${meta.terminalHint}` : ''}
               </label>
-              <input type="text" value={terminalId} onChange={(e) => setTerminalId(e.target.value)} className="input" />
+              <input
+                type="text"
+                value={terminalId}
+                onChange={(e) => setTerminalId(e.target.value)}
+                className="input"
+              />
             </div>
             <div>
               <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
@@ -214,14 +277,18 @@ export function PaymentSettingsCard(): React.JSX.Element {
                   type={showApiKey ? 'text' : 'password'}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  placeholder={hasApiKey ? '•••••••• (stored — leave blank to keep)' : 'Enter to store securely'}
-                  className="input pr-10"
+                  placeholder={
+                    hasApiKey
+                      ? '•••••••• (stored — leave blank to keep)'
+                      : 'Enter to store securely'
+                  }
+                  className="input pr-11"
                 />
                 <button
                   type="button"
                   onClick={() => setShowApiKey((v) => !v)}
                   aria-label={showApiKey ? 'Hide API credentials' : 'Show API credentials'}
-                  className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                  className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-inset"
                 >
                   {showApiKey ? <EyeOff className="icon-4" /> : <Eye className="icon-4" />}
                 </button>
@@ -234,7 +301,10 @@ export function PaymentSettingsCard(): React.JSX.Element {
         )}
 
         <div className="flex items-center gap-3 flex-wrap">
-          <button onClick={handleSave} className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-medium text-[var(--primary-foreground)]">
+          <button
+            onClick={handleSave}
+            className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-medium text-[var(--primary-foreground)]"
+          >
             Save Payment Settings
           </button>
           <button
