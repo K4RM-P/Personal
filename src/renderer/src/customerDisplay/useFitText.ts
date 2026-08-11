@@ -81,7 +81,7 @@ export function useFitText(
       measurer.style.top = '0'
       measurer.style.visibility = 'hidden'
       measurer.style.whiteSpace = 'normal'
-      measurer.style.wordBreak = 'break-word'
+      measurer.style.overflowWrap = 'break-word'
       measurer.style.fontWeight = '700'
       measurer.style.lineHeight = String(FIT_LINE_HEIGHT)
       measurer.style.width = `${availableWidth}px`
