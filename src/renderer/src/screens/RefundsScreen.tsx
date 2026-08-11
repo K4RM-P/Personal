@@ -20,6 +20,16 @@ export function RefundsScreen({ onClose }: RefundsScreenProps): React.JSX.Elemen
   const [showAuth, setShowAuth] = React.useState(false)
 
   const manager = user?.role === 'MANAGER' ? user : authedManager
+
+  React.useEffect(() => {
+    if (manager || showAuth) return
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [manager, showAuth, onClose])
+
   if (manager) {
     return <RefundSalesScreen manager={manager} onExit={onClose} />
   }

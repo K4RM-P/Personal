@@ -85,6 +85,16 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
     return () => clearTimeout(timer)
   }, [customerSearchQuery, customerLinkMode])
 
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape' || processing) return
+      if (step === 'success') onClose(true)
+      else onClose(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [step, processing, onClose])
+
   const toggleItem = (itemId: string): void => {
     setSelectedItemIds((prev) => {
       const next = new Set(prev)
@@ -428,7 +438,7 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
               value={customerSearchQuery}
               onChange={(e) => setCustomerSearchQuery(e.target.value)}
               placeholder="Search name or phone…"
-              className="w-full rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm"
+              className="input"
               autoFocus
             />
             <div className="max-h-[180px] space-y-1 overflow-y-auto">
@@ -451,12 +461,27 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
         {!hasCustomer && customerLinkMode === 'create' && (
           <div className="space-y-2">
             <div className="grid grid-cols-2 gap-2">
-              <input placeholder="First name" value={newCustomer.firstName} onChange={(e) => setNewCustomer((p) => ({ ...p, firstName: e.target.value }))} className="rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm" />
-              <input placeholder="Last name" value={newCustomer.lastName} onChange={(e) => setNewCustomer((p) => ({ ...p, lastName: e.target.value }))} className="rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm" />
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">First name</label>
+                <input autoFocus value={newCustomer.firstName} onChange={(e) => setNewCustomer((p) => ({ ...p, firstName: e.target.value }))} className="input" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Last name</label>
+                <input value={newCustomer.lastName} onChange={(e) => setNewCustomer((p) => ({ ...p, lastName: e.target.value }))} className="input" />
+              </div>
             </div>
-            <input placeholder="Phone (required)" value={newCustomer.phone} onChange={(e) => setNewCustomer((p) => ({ ...p, phone: e.target.value }))} className="w-full rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm" />
-            <input placeholder="Address" value={newCustomer.address} onChange={(e) => setNewCustomer((p) => ({ ...p, address: e.target.value }))} className="w-full rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm" />
-            <input placeholder="Email (optional)" value={newCustomer.email} onChange={(e) => setNewCustomer((p) => ({ ...p, email: e.target.value }))} className="w-full rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm" />
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Phone (required)</label>
+              <input value={newCustomer.phone} onChange={(e) => setNewCustomer((p) => ({ ...p, phone: e.target.value }))} className="input" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Address</label>
+              <input value={newCustomer.address} onChange={(e) => setNewCustomer((p) => ({ ...p, address: e.target.value }))} className="input" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Email (optional)</label>
+              <input type="email" value={newCustomer.email} onChange={(e) => setNewCustomer((p) => ({ ...p, email: e.target.value }))} className="input" />
+            </div>
             {errorBanner}
             <div className="grid grid-cols-2 gap-2">
               <button onClick={() => setCustomerLinkMode(null)} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)]">

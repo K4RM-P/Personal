@@ -43,6 +43,16 @@ export function DiscountModal({
   const exceedsBase = rawDiscountCents > baseCents
   const clampedDiscountCents = Math.max(0, Math.min(rawDiscountCents, baseCents))
   const newTotalCents = baseCents - clampedDiscountCents
+  const canApply = !exceedsBase && clampedDiscountCents > 0
+
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onCancel()
+      else if (e.key === 'Enter' && canApply) onApply(clampedDiscountCents, reason.trim() || undefined)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onCancel, onApply, canApply, clampedDiscountCents, reason])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
@@ -139,7 +149,7 @@ export function DiscountModal({
           <button
             type="button"
             onClick={() => onApply(clampedDiscountCents, reason.trim() || undefined)}
-            disabled={exceedsBase || clampedDiscountCents <= 0}
+            disabled={!canApply}
             className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             Apply Discount
