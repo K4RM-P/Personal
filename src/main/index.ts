@@ -11,6 +11,10 @@ import { applyPendingRestoreIfStaged } from './backup/backupService'
 import { resolveDbFilePath } from './backup/dbPath'
 import { initLogger, log } from './logging/logger'
 import { initAutoUpdater, setUpdateWindow } from './update/autoUpdate'
+import {
+  initCustomerDisplayWindow,
+  teardownCustomerDisplayWindow
+} from './customerDisplayWindow'
 
 // .env (dev-only, gitignored) is the only thing that sets DATABASE_URL, and it's
 // intentionally excluded from the packaged app. Without this fallback, Prisma has
@@ -128,6 +132,14 @@ app.whenReady().then(async () => {
 
   const mainWindow = createWindow()
 
+  // Second, customer-facing kiosk window (no-op when only one display is present).
+  initCustomerDisplayWindow(db)
+  // The kiosk window is a BrowserWindow too, so leaving it open would stop
+  // 'window-all-closed' from ever firing when the cashier closes the POS window.
+  mainWindow.on('closed', () => {
+    teardownCustomerDisplayWindow()
+  })
+
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) {
       const newWindow = createWindow()
@@ -146,6 +158,7 @@ app.whenReady().then(async () => {
 })
 
 app.on('window-all-closed', () => {
+  teardownCustomerDisplayWindow()
   closeDb().finally(() => {
     if (process.platform !== 'darwin') {
       app.quit()
