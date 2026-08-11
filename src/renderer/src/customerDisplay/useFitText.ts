@@ -69,6 +69,12 @@ export function useFitText(
 
     const run = (): void => {
       if (cancelled || !container.clientWidth) return
+      const cs = getComputedStyle(container)
+      const paddingX = parseFloat(cs.paddingLeft || '0') + parseFloat(cs.paddingRight || '0')
+      const paddingY = parseFloat(cs.paddingTop || '0') + parseFloat(cs.paddingBottom || '0')
+      const availableWidth = Math.max(0, container.clientWidth - paddingX)
+      const availableHeight = Math.max(0, container.clientHeight - paddingY)
+
       const measurer = document.createElement('div')
       measurer.style.position = 'absolute'
       measurer.style.left = '-99999px'
@@ -78,7 +84,7 @@ export function useFitText(
       measurer.style.wordBreak = 'break-word'
       measurer.style.fontWeight = '700'
       measurer.style.lineHeight = String(FIT_LINE_HEIGHT)
-      measurer.style.width = `${container.clientWidth}px`
+      measurer.style.width = `${availableWidth}px`
       measurer.textContent = text
       document.body.appendChild(measurer)
       try {
@@ -87,7 +93,7 @@ export function useFitText(
             measurer.style.fontSize = `${size}px`
             return { heightPx: measurer.scrollHeight }
           },
-          container.clientHeight,
+          availableHeight,
           { maxPx, minPx, maxLines, stepPx }
         )
         if (!cancelled) setFontSize(next)
