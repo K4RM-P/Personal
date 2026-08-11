@@ -104,8 +104,8 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps): R
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
       <header className="relative flex h-16 shrink-0 items-center gap-4 border-b border-[var(--border)] bg-[var(--card)] px-4 md:px-6">
         <div className="flex shrink-0 items-center gap-3">
-          <img src={vantisIcon} alt="" className="h-10 w-10 sm:hidden" />
-          <img src={vantisLogo} alt="VantisPOS" className="hidden h-11 w-auto sm:block" />
+          <img src={vantisIcon} alt="" className="h-11 w-11 sm:hidden" />
+          <img src={vantisLogo} alt="VantisPOS" className="hidden h-10 w-auto sm:block" />
           {demoMode && (
             <span className="rounded-full border border-[var(--warning)] bg-[var(--warning-bg)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--warning)]">
               Demo Mode

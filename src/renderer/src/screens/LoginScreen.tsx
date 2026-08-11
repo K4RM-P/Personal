@@ -29,7 +29,7 @@ export function LoginScreen(): React.JSX.Element {
     <div className="flex h-screen w-screen items-center justify-center bg-[var(--background)]">
       <Card className="w-[380px] space-y-4 p-8 shadow-lg">
         <div className="text-center">
-          <img src={vantisLogo} alt="VantisPOS" className="mx-auto mb-3 h-16 w-auto" />
+          <img src={vantisLogo} alt="VantisPOS" className="mx-auto mb-3 h-auto w-72 max-w-full" />
           <p className="text-xs text-[var(--muted-foreground)]">Sign in to continue</p>
         </div>
 
