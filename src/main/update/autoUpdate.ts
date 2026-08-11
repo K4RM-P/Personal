@@ -1,4 +1,5 @@
 import { BrowserWindow, ipcMain } from 'electron'
+import { is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import { IPC } from '../../shared/channels'
 import type { UpdateStatus } from '../../shared/types'
@@ -61,6 +62,17 @@ export function initAutoUpdater(window: BrowserWindow): void {
   if (initialized) return
   initialized = true
   mainWindow = window
+
+  // The renderer (UpdateBanner/UpdateSettingsCard) polls these channels unconditionally
+  // regardless of build type, so the handlers must exist even in `npm run dev` — a dev
+  // build has no packaged update feed to check against, so checkNow/installNow are no-ops
+  // there rather than driving the real autoUpdater below.
+  if (is.dev) {
+    ipcMain.handle(IPC.UPDATE_CHECK_NOW, () => Promise.resolve())
+    ipcMain.handle(IPC.UPDATE_INSTALL_NOW, () => undefined)
+    ipcMain.handle(IPC.UPDATE_GET_STATUS, () => status)
+    return
+  }
 
   // Download automatically as soon as a newer version is found — no interaction
   // required from a cashier — but always paired with the 'available' broadcast below so

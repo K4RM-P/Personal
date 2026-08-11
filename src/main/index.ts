@@ -133,16 +133,16 @@ app.whenReady().then(async () => {
       const newWindow = createWindow()
       // Keep the updater pointed at whichever window is actually on screen, so status
       // broadcasts (banner/settings card) don't try to reach the destroyed original.
-      if (!is.dev) setUpdateWindow(newWindow)
+      setUpdateWindow(newWindow)
     }
   })
 
   // Checks GitHub Releases for a newer signed build and downloads it in the background;
   // installing only ever happens on quit/restart (see main/update/autoUpdate.ts), never
-  // mid-session, so an update landing never interrupts an in-progress sale.
-  if (!is.dev) {
-    initAutoUpdater(mainWindow)
-  }
+  // mid-session, so an update landing never interrupts an in-progress sale. Always called
+  // (dev included) — it registers the update:* IPC handlers the renderer polls
+  // unconditionally; the real autoUpdater wiring inside is itself gated on !is.dev.
+  initAutoUpdater(mainWindow)
 })
 
 app.on('window-all-closed', () => {
