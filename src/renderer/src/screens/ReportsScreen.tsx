@@ -1,8 +1,9 @@
 import * as React from 'react'
-import { FileBarChart2, PackageSearch } from 'lucide-react'
+import { FileBarChart2, PackageSearch, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
 import { Alert } from '../components/ui/Alert'
 import { EmptyState } from '../components/ui/EmptyState'
+import { cn } from '../lib/utils'
 import { formatCurrency } from '@shared/formatCurrency'
 import type {
   DashboardData,
@@ -16,6 +17,81 @@ import type {
 } from '@shared/types'
 
 type ReportTab = 'dashboard' | 'sales' | 'inventory' | 'cashiers'
+
+// Shared focus-visible treatment for interactive elements in this screen —
+// matches the ring style already used by the Switch primitive.
+const FOCUS_RING =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2'
+
+type SortDir = 'asc' | 'desc'
+
+// Generic client-side column sort for report tables (data is already fully
+// loaded in-memory per range, so sorting is a pure display concern here).
+function useSort<T>(rows: T[], initialKey: keyof T, initialDir: SortDir = 'desc') {
+  const [sortKey, setSortKey] = React.useState<keyof T>(initialKey)
+  const [sortDir, setSortDir] = React.useState<SortDir>(initialDir)
+
+  const sorted = React.useMemo(() => {
+    const copy = [...rows]
+    copy.sort((a, b) => {
+      const av = a[sortKey]
+      const bv = b[sortKey]
+      let cmp: number
+      if (typeof av === 'number' && typeof bv === 'number') cmp = av - bv
+      else cmp = String(av).localeCompare(String(bv))
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+    return copy
+  }, [rows, sortKey, sortDir])
+
+  const toggleSort = (key: keyof T) => {
+    if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else {
+      setSortKey(key)
+      setSortDir('desc')
+    }
+  }
+
+  return { sorted, sortKey, sortDir, toggleSort }
+}
+
+// Sortable table header cell — click to sort, arrow indicates active
+// direction, neutral up/down glyph shows the affordance on inactive columns.
+function SortableTh<T>({
+  label,
+  sortKeyName,
+  active,
+  dir,
+  onSort,
+  align = 'left'
+}: {
+  label: string
+  sortKeyName: keyof T
+  active: boolean
+  dir: SortDir
+  onSort: (key: keyof T) => void
+  align?: 'left' | 'right'
+}): React.JSX.Element {
+  const Icon = active ? (dir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown
+  return (
+    <th className={cn('pb-2 pr-3 font-medium', align === 'right' && 'text-right')}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKeyName)}
+        aria-label={`Sort by ${label}`}
+        className={cn(
+          'inline-flex min-h-9 items-center gap-1 rounded-[var(--radius)] px-1 hover:text-[var(--foreground)]',
+          active && 'text-[var(--foreground)]',
+          align === 'right' && 'flex-row-reverse',
+          FOCUS_RING
+        )}
+      >
+        <span>{label}</span>
+        <Icon className={cn('icon-3_5 shrink-0', !active && 'opacity-40')} aria-hidden="true" />
+      </button>
+    </th>
+  )
+}
 
 function formatPercent(value: number): string {
   return `${value >= 0 ? '' : '-'}${Math.abs(value).toFixed(1)}%`
@@ -53,36 +129,47 @@ function DateRangePicker({
   presets?: { label: string; from: string; to: string }[]
 }): React.JSX.Element {
   return (
-    <div className="flex flex-wrap items-center gap-4 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4">
-      <div className="flex items-center gap-2 text-sm">
-        <label className="text-[var(--muted-foreground)]">From:</label>
+    <div className="flex flex-wrap items-end gap-4 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4">
+      <div className="flex flex-col gap-1">
+        <label htmlFor="report-from-date" className="text-xs font-medium text-[var(--muted-foreground)]">
+          From
+        </label>
         <input
+          id="report-from-date"
           type="date"
           value={fromDate}
           onChange={(e) => onChange(e.target.value, toDate)}
-          className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 text-sm"
+          className={cn('input w-auto', FOCUS_RING)}
         />
       </div>
-      <div className="flex items-center gap-2 text-sm">
-        <label className="text-[var(--muted-foreground)]">To:</label>
+      <div className="flex flex-col gap-1">
+        <label htmlFor="report-to-date" className="text-xs font-medium text-[var(--muted-foreground)]">
+          To
+        </label>
         <input
+          id="report-to-date"
           type="date"
           value={toDate}
           onChange={(e) => onChange(fromDate, e.target.value)}
-          className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 text-sm"
+          className={cn('input w-auto', FOCUS_RING)}
         />
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {presets?.map((p) => (
-          <button
-            key={p.label}
-            onClick={() => onChange(p.from, p.to)}
-            className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-4 text-xs font-medium text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
+      {presets && presets.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {presets.map((p) => (
+            <button
+              key={p.label}
+              onClick={() => onChange(p.from, p.to)}
+              className={cn(
+                'min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-4 text-xs font-medium text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]',
+                FOCUS_RING
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -315,7 +402,7 @@ function SalesReportsPage(): React.JSX.Element {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Sales Reports</h1>
           <p className="text-sm text-[var(--muted-foreground)]">Daily breakdown, tender analysis, top and slow items.</p>
@@ -336,7 +423,10 @@ function SalesReportsPage(): React.JSX.Element {
             })()
             downloadCsv(`sales-${subTab}`, csvHeaders, csvRows)
           }}
-          className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)]"
+          className={cn(
+            'min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)] hover:bg-[var(--primary-hover)]',
+            FOCUS_RING
+          )}
         >
           Export CSV
         </button>
@@ -349,14 +439,16 @@ function SalesReportsPage(): React.JSX.Element {
         presets={presets}
       />
 
-      <div className="flex space-x-1 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-1">
+      <div className="flex flex-wrap gap-1 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-1">
         {(['daily', 'tender', 'top', 'slow'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setSubTab(tab)}
-            className={`min-h-11 rounded-[var(--radius)] px-4 text-xs font-semibold ${
-              subTab === tab ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-            }`}
+            className={cn(
+              'min-h-11 rounded-[var(--radius)] px-4 text-xs font-semibold',
+              subTab === tab ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]',
+              FOCUS_RING
+            )}
           >
             {tab === 'daily' ? 'Daily Breakdown' : tab === 'tender' ? 'By Tender' : tab === 'top' ? 'Top Items' : 'Slow Items'}
           </button>
@@ -366,145 +458,177 @@ function SalesReportsPage(): React.JSX.Element {
       {loading && <Alert variant="pending">Loading…</Alert>}
       {!loading && error && <Alert variant="error">{error}</Alert>}
 
-      {!loading && subTab === 'daily' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Daily Sales</CardTitle>
-            <CardDescription>Sorted by date descending (most recent first).</CardDescription>
-          </CardHeader>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-left text-[var(--muted-foreground)]">
-                  <th className="pb-2 pr-3 font-medium">Date</th>
-                  <th className="pb-2 pr-3 font-medium">Transactions</th>
-                  <th className="pb-2 pr-3 text-right font-medium">Gross</th>
-                  <th className="pb-2 pr-3 text-right font-medium">Returns</th>
-                  <th className="pb-2 pr-3 text-right font-medium">Net</th>
-                  <th className="pb-2 text-right font-medium">Margin%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dailySales.map((row) => (
-                  <tr key={row.date} className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
-                    <td className="py-3 pr-3 font-medium">{row.date}</td>
-                    <td className="py-3 pr-3">{row.transactionCount}</td>
-                    <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(row.grossCents)}</td>
-                    <td className="py-3 pr-3 text-right tabular-nums text-[var(--error)]">{row.returnsCents !== 0 ? formatCurrency(row.returnsCents) : '—'}</td>
-                    <td className="py-3 pr-3 text-right font-semibold tabular-nums">{formatCurrency(row.netCents)}</td>
-                    <td className="py-3 text-right tabular-nums">{formatPercent(row.marginPercent)}</td>
-                  </tr>
-                ))}
-                {dailySales.length === 0 && (
-                  <tr><td colSpan={6} className="py-6 text-center text-[var(--muted-foreground)]">No sales in this period.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-
-      {!loading && subTab === 'tender' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Sales by Tender</CardTitle>
-            <CardDescription>Revenue split across payment methods.</CardDescription>
-          </CardHeader>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-left text-[var(--muted-foreground)]">
-                  <th className="pb-2 pr-3 font-medium">Tender</th>
-                  <th className="pb-2 pr-3 text-right font-medium">Amount</th>
-                  <th className="pb-2 text-right font-medium">%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tenderData
-                  .filter((r) => r.amountCents !== 0 || r.tender === 'Cash')
-                  .map((row) => (
-                    <tr key={row.tender} className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
-                      <td className="py-3 pr-3 font-medium">{row.tender}</td>
-                      <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(row.amountCents)}</td>
-                      <td className="py-3 text-right tabular-nums">{formatPercent(row.percent)}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-
-      {!loading && subTab === 'top' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Items</CardTitle>
-            <CardDescription>Ranked by revenue, descending.</CardDescription>
-          </CardHeader>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-left text-[var(--muted-foreground)]">
-                  <th className="pb-2 pr-3 font-medium">Item</th>
-                  <th className="pb-2 pr-3 font-medium">Category</th>
-                  <th className="pb-2 pr-3 text-right font-medium">Qty</th>
-                  <th className="pb-2 pr-3 text-right font-medium">Revenue</th>
-                  <th className="pb-2 text-right font-medium">Margin%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topItems.map((item) => (
-                  <tr key={item.productId} className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
-                    <td className="py-3 pr-3 font-medium">{item.name}</td>
-                    <td className="py-3 pr-3 text-[var(--muted-foreground)]">{item.category ?? '—'}</td>
-                    <td className="py-3 pr-3 text-right tabular-nums">{item.quantity}</td>
-                    <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(item.revenueCents)}</td>
-                    <td className="py-3 text-right tabular-nums">{formatPercent(item.marginPercent)}</td>
-                  </tr>
-                ))}
-                {topItems.length === 0 && (
-                  <tr><td colSpan={5} className="py-6 text-center text-[var(--muted-foreground)]">No sales in this period.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-
-      {!loading && subTab === 'slow' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Slow Items</CardTitle>
-            <CardDescription>Items with zero or near-zero sales in the period.</CardDescription>
-          </CardHeader>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-left text-[var(--muted-foreground)]">
-                  <th className="pb-2 pr-3 font-medium">Item</th>
-                  <th className="pb-2 pr-3 font-medium">Category</th>
-                  <th className="pb-2 pr-3 text-right font-medium">Qty Sold</th>
-                  <th className="pb-2 text-right font-medium">On Hand</th>
-                </tr>
-              </thead>
-              <tbody>
-                {slowItems.slice(0, 50).map((item) => (
-                  <tr key={item.productId} className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
-                    <td className="py-3 pr-3 font-medium">{item.name}</td>
-                    <td className="py-3 pr-3 text-[var(--muted-foreground)]">{item.category ?? '—'}</td>
-                    <td className="py-3 pr-3 text-right tabular-nums">{item.quantitySold}</td>
-                    <td className="py-3 text-right tabular-nums">{item.currentOnHand}</td>
-                  </tr>
-                ))}
-                {slowItems.length === 0 && (
-                  <tr><td colSpan={4} className="py-6 text-center text-[var(--muted-foreground)]">All items have sold in this period.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
+      {!loading && subTab === 'daily' && <DailySalesTable rows={dailySales} />}
+      {!loading && subTab === 'tender' && <TenderTable rows={tenderData} />}
+      {!loading && subTab === 'top' && <TopItemsTable rows={topItems} />}
+      {!loading && subTab === 'slow' && <SlowItemsTable rows={slowItems} />}
     </div>
+  )
+}
+
+function DailySalesTable({ rows }: { rows: DailySalesRow[] }): React.JSX.Element {
+  const { sorted, sortKey, sortDir, toggleSort } = useSort(rows, 'date', 'desc')
+  const th = (label: string, key: keyof DailySalesRow, align: 'left' | 'right' = 'left') => (
+    <SortableTh label={label} sortKeyName={key} active={sortKey === key} dir={sortDir} onSort={toggleSort} align={align} />
+  )
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Daily Sales</CardTitle>
+        <CardDescription>Click a column to sort. Defaults to date, most recent first.</CardDescription>
+      </CardHeader>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--border)] text-left text-[var(--muted-foreground)]">
+              {th('Date', 'date')}
+              {th('Transactions', 'transactionCount')}
+              {th('Gross', 'grossCents', 'right')}
+              {th('Returns', 'returnsCents', 'right')}
+              {th('Net', 'netCents', 'right')}
+              {th('Margin%', 'marginPercent', 'right')}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((row) => (
+              <tr key={row.date} className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
+                <td className="py-3 pr-3 font-medium">{row.date}</td>
+                <td className="py-3 pr-3 tabular-nums">{row.transactionCount}</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(row.grossCents)}</td>
+                <td className="py-3 pr-3 text-right tabular-nums text-[var(--error)]">{row.returnsCents !== 0 ? formatCurrency(row.returnsCents) : '—'}</td>
+                <td className="py-3 pr-3 text-right font-semibold tabular-nums">{formatCurrency(row.netCents)}</td>
+                <td className="py-3 text-right tabular-nums">{formatPercent(row.marginPercent)}</td>
+              </tr>
+            ))}
+            {sorted.length === 0 && (
+              <tr><td colSpan={6} className="py-6 text-center text-[var(--muted-foreground)]">No sales in this period.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}
+
+function TenderTable({ rows }: { rows: TenderBreakdownRow[] }): React.JSX.Element {
+  const filtered = rows.filter((r) => r.amountCents !== 0 || r.tender === 'Cash')
+  const { sorted, sortKey, sortDir, toggleSort } = useSort(filtered, 'amountCents', 'desc')
+  const th = (label: string, key: keyof TenderBreakdownRow, align: 'left' | 'right' = 'left') => (
+    <SortableTh label={label} sortKeyName={key} active={sortKey === key} dir={sortDir} onSort={toggleSort} align={align} />
+  )
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Sales by Tender</CardTitle>
+        <CardDescription>Revenue split across payment methods.</CardDescription>
+      </CardHeader>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--border)] text-left text-[var(--muted-foreground)]">
+              {th('Tender', 'tender')}
+              {th('Amount', 'amountCents', 'right')}
+              {th('%', 'percent', 'right')}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((row) => (
+              <tr key={row.tender} className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
+                <td className="py-3 pr-3 font-medium">{row.tender}</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(row.amountCents)}</td>
+                <td className="py-3 text-right tabular-nums">{formatPercent(row.percent)}</td>
+              </tr>
+            ))}
+            {sorted.length === 0 && (
+              <tr><td colSpan={3} className="py-6 text-center text-[var(--muted-foreground)]">No sales in this period.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}
+
+function TopItemsTable({ rows }: { rows: TopItemRow[] }): React.JSX.Element {
+  const { sorted, sortKey, sortDir, toggleSort } = useSort(rows, 'revenueCents', 'desc')
+  const th = (label: string, key: keyof TopItemRow, align: 'left' | 'right' = 'left') => (
+    <SortableTh label={label} sortKeyName={key} active={sortKey === key} dir={sortDir} onSort={toggleSort} align={align} />
+  )
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Top Items</CardTitle>
+        <CardDescription>Click a column to sort. Defaults to revenue, descending.</CardDescription>
+      </CardHeader>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--border)] text-left text-[var(--muted-foreground)]">
+              {th('Item', 'name')}
+              {th('Category', 'category')}
+              {th('Qty', 'quantity', 'right')}
+              {th('Revenue', 'revenueCents', 'right')}
+              {th('Margin%', 'marginPercent', 'right')}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((item) => (
+              <tr key={item.productId} className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
+                <td className="py-3 pr-3 font-medium">{item.name}</td>
+                <td className="py-3 pr-3 text-[var(--muted-foreground)]">{item.category ?? '—'}</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{item.quantity}</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(item.revenueCents)}</td>
+                <td className="py-3 text-right tabular-nums">{formatPercent(item.marginPercent)}</td>
+              </tr>
+            ))}
+            {sorted.length === 0 && (
+              <tr><td colSpan={5} className="py-6 text-center text-[var(--muted-foreground)]">No sales in this period.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}
+
+function SlowItemsTable({ rows }: { rows: SlowItemRow[] }): React.JSX.Element {
+  const capped = rows.slice(0, 50)
+  const { sorted, sortKey, sortDir, toggleSort } = useSort(capped, 'quantitySold', 'asc')
+  const th = (label: string, key: keyof SlowItemRow, align: 'left' | 'right' = 'left') => (
+    <SortableTh label={label} sortKeyName={key} active={sortKey === key} dir={sortDir} onSort={toggleSort} align={align} />
+  )
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Slow Items</CardTitle>
+        <CardDescription>Items with zero or near-zero sales in the period.</CardDescription>
+      </CardHeader>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--border)] text-left text-[var(--muted-foreground)]">
+              {th('Item', 'name')}
+              {th('Category', 'category')}
+              {th('Qty Sold', 'quantitySold', 'right')}
+              {th('On Hand', 'currentOnHand', 'right')}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((item) => (
+              <tr key={item.productId} className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
+                <td className="py-3 pr-3 font-medium">{item.name}</td>
+                <td className="py-3 pr-3 text-[var(--muted-foreground)]">{item.category ?? '—'}</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{item.quantitySold}</td>
+                <td className="py-3 text-right tabular-nums">{item.currentOnHand}</td>
+              </tr>
+            ))}
+            {sorted.length === 0 && (
+              <tr><td colSpan={4} className="py-6 text-center text-[var(--muted-foreground)]">All items have sold in this period.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </Card>
   )
 }
 
@@ -531,7 +655,7 @@ function InventoryReportsPage(): React.JSX.Element {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Inventory Reports</h1>
           <p className="text-sm text-[var(--muted-foreground)]">Current inventory valuation by category.</p>
@@ -544,7 +668,10 @@ function InventoryReportsPage(): React.JSX.Element {
               rows.push(['TOTAL', String(valuation.totalItemCount), String(valuation.totalCostValueCents), String(valuation.totalRetailValueCents), formatPercent(valuation.totalVariancePercent)])
               downloadCsv('inventory-valuation', headers, rows)
             }}
-            className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)]"
+            className={cn(
+              'min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)] hover:bg-[var(--primary-hover)]',
+              FOCUS_RING
+            )}
           >
             Export CSV
           </button>
@@ -557,48 +684,56 @@ function InventoryReportsPage(): React.JSX.Element {
         <EmptyState icon={PackageSearch} title="No inventory data yet" description="Valuation appears once products have cost and quantity data." />
       )}
 
-      {!loading && valuation && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Inventory Valuation</CardTitle>
-            <CardDescription>At cost and retail, grouped by category.</CardDescription>
-          </CardHeader>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-left text-[var(--muted-foreground)]">
-                  <th className="pb-2 pr-3 font-medium">Category</th>
-                  <th className="pb-2 pr-3 text-right font-medium">Items</th>
-                  <th className="pb-2 pr-3 text-right font-medium">Cost Value</th>
-                  <th className="pb-2 pr-3 text-right font-medium">Retail Value</th>
-                  <th className="pb-2 text-right font-medium">Variance%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {valuation.rows.map((row) => (
-                  <tr key={row.category} className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
-                    <td className="py-3 pr-3 font-medium">{row.category}</td>
-                    <td className="py-3 pr-3 text-right tabular-nums">{row.itemCount}</td>
-                    <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(row.costValueCents)}</td>
-                    <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(row.retailValueCents)}</td>
-                    <td className="py-3 text-right tabular-nums">{formatPercent(row.variancePercent)}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t-2 border-[var(--border)] font-semibold">
-                  <td className="py-3 pr-3">TOTAL</td>
-                  <td className="py-3 pr-3 text-right tabular-nums">{valuation.totalItemCount}</td>
-                  <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(valuation.totalCostValueCents)}</td>
-                  <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(valuation.totalRetailValueCents)}</td>
-                  <td className="py-3 text-right tabular-nums">{formatPercent(valuation.totalVariancePercent)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </Card>
-      )}
+      {!loading && valuation && <InventoryValuationTable valuation={valuation} />}
     </div>
+  )
+}
+
+function InventoryValuationTable({ valuation }: { valuation: InventoryValuation }): React.JSX.Element {
+  const { sorted, sortKey, sortDir, toggleSort } = useSort(valuation.rows, 'category', 'asc')
+  const th = (label: string, key: keyof InventoryValuation['rows'][number], align: 'left' | 'right' = 'left') => (
+    <SortableTh label={label} sortKeyName={key} active={sortKey === key} dir={sortDir} onSort={toggleSort} align={align} />
+  )
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Inventory Valuation</CardTitle>
+        <CardDescription>At cost and retail, grouped by category. Click a column to sort.</CardDescription>
+      </CardHeader>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--border)] text-left text-[var(--muted-foreground)]">
+              {th('Category', 'category')}
+              {th('Items', 'itemCount', 'right')}
+              {th('Cost Value', 'costValueCents', 'right')}
+              {th('Retail Value', 'retailValueCents', 'right')}
+              {th('Variance%', 'variancePercent', 'right')}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((row) => (
+              <tr key={row.category} className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
+                <td className="py-3 pr-3 font-medium">{row.category}</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{row.itemCount}</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(row.costValueCents)}</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(row.retailValueCents)}</td>
+                <td className="py-3 text-right tabular-nums">{formatPercent(row.variancePercent)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t-2 border-[var(--border)] font-semibold">
+              <td className="py-3 pr-3">TOTAL</td>
+              <td className="py-3 pr-3 text-right tabular-nums">{valuation.totalItemCount}</td>
+              <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(valuation.totalCostValueCents)}</td>
+              <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(valuation.totalRetailValueCents)}</td>
+              <td className="py-3 text-right tabular-nums">{formatPercent(valuation.totalVariancePercent)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </Card>
   )
 }
 
@@ -631,7 +766,7 @@ function CashierReportsPage(): React.JSX.Element {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Cashier Reports</h1>
           <p className="text-sm text-[var(--muted-foreground)]">Reconciliation view: sales, discounts, voids per cashier.</p>
@@ -642,7 +777,10 @@ function CashierReportsPage(): React.JSX.Element {
             const rows = cashiers.map((r) => [r.cashierName, String(r.transactionCount), String(r.totalSalesCents), String(r.avgTransactionCents), String(r.discountsCents), String(r.voidsCount), String(r.voidsCents)])
             downloadCsv('cashier-totals', headers, rows)
           }}
-          className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)]"
+          className={cn(
+            'min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)] hover:bg-[var(--primary-hover)]',
+            FOCUS_RING
+          )}
         >
           Export CSV
         </button>
@@ -661,59 +799,67 @@ function CashierReportsPage(): React.JSX.Element {
       {loading && <Alert variant="pending">Loading…</Alert>}
       {!loading && error && <Alert variant="error">{error}</Alert>}
 
-      {!loading && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Cashier Totals</CardTitle>
-            <CardDescription>Per-cashier transaction summary for reconciliation.</CardDescription>
-          </CardHeader>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-left text-[var(--muted-foreground)]">
-                  <th className="pb-2 pr-3 font-medium">Cashier</th>
-                  <th className="pb-2 pr-3 text-right font-medium">Transactions</th>
-                  <th className="pb-2 pr-3 text-right font-medium">Total Sales</th>
-                  <th className="pb-2 pr-3 text-right font-medium">Avg Trans</th>
-                  <th className="pb-2 pr-3 text-right font-medium">Discounts</th>
-                  <th className="pb-2 pr-3 text-right font-medium">Voids</th>
-                  <th className="pb-2 text-right font-medium">Void Amt</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cashiers.map((r) => (
-                  <tr key={r.userId ?? 'unassigned'} className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
-                    <td className="py-3 pr-3 font-medium">{r.cashierName}</td>
-                    <td className="py-3 pr-3 text-right tabular-nums">{r.transactionCount}</td>
-                    <td className="py-3 pr-3 text-right tabular-nums font-semibold">{formatCurrency(r.totalSalesCents)}</td>
-                    <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(r.avgTransactionCents)}</td>
-                    <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(r.discountsCents)}</td>
-                    <td className="py-3 pr-3 text-right tabular-nums">{r.voidsCount}</td>
-                    <td className="py-3 text-right tabular-nums">{formatCurrency(r.voidsCents)}</td>
-                  </tr>
-                ))}
-                {cashiers.length === 0 && (
-                  <tr><td colSpan={7} className="py-6 text-center text-[var(--muted-foreground)]">No data in this period.</td></tr>
-                )}
-              </tbody>
-              {cashiers.length > 0 && (
-                <tfoot>
-                  <tr className="border-t-2 border-[var(--border)] font-semibold">
-                    <td className="py-3 pr-3">TOTAL</td>
-                    <td className="py-3 pr-3 text-right tabular-nums">{cashiers.reduce((s, r) => s + r.transactionCount, 0)}</td>
-                    <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(cashiers.reduce((s, r) => s + r.totalSalesCents, 0))}</td>
-                    <td className="py-3 pr-3 text-right tabular-nums">—</td>
-                    <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(cashiers.reduce((s, r) => s + r.discountsCents, 0))}</td>
-                    <td className="py-3 pr-3 text-right tabular-nums">{cashiers.reduce((s, r) => s + r.voidsCount, 0)}</td>
-                    <td className="py-3 text-right tabular-nums">{formatCurrency(cashiers.reduce((s, r) => s + r.voidsCents, 0))}</td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          </div>
-        </Card>
-      )}
+      {!loading && <CashierTotalsTable rows={cashiers} />}
     </div>
+  )
+}
+
+function CashierTotalsTable({ rows }: { rows: CashierTotalRow[] }): React.JSX.Element {
+  const { sorted, sortKey, sortDir, toggleSort } = useSort(rows, 'totalSalesCents', 'desc')
+  const th = (label: string, key: keyof CashierTotalRow, align: 'left' | 'right' = 'left') => (
+    <SortableTh label={label} sortKeyName={key} active={sortKey === key} dir={sortDir} onSort={toggleSort} align={align} />
+  )
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Cashier Totals</CardTitle>
+        <CardDescription>Per-cashier transaction summary for reconciliation. Click a column to sort.</CardDescription>
+      </CardHeader>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--border)] text-left text-[var(--muted-foreground)]">
+              {th('Cashier', 'cashierName')}
+              {th('Transactions', 'transactionCount', 'right')}
+              {th('Total Sales', 'totalSalesCents', 'right')}
+              {th('Avg Trans', 'avgTransactionCents', 'right')}
+              {th('Discounts', 'discountsCents', 'right')}
+              {th('Voids', 'voidsCount', 'right')}
+              {th('Void Amt', 'voidsCents', 'right')}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((r) => (
+              <tr key={r.userId ?? 'unassigned'} className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
+                <td className="py-3 pr-3 font-medium">{r.cashierName}</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{r.transactionCount}</td>
+                <td className="py-3 pr-3 text-right tabular-nums font-semibold">{formatCurrency(r.totalSalesCents)}</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(r.avgTransactionCents)}</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(r.discountsCents)}</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{r.voidsCount}</td>
+                <td className="py-3 text-right tabular-nums">{formatCurrency(r.voidsCents)}</td>
+              </tr>
+            ))}
+            {sorted.length === 0 && (
+              <tr><td colSpan={7} className="py-6 text-center text-[var(--muted-foreground)]">No data in this period.</td></tr>
+            )}
+          </tbody>
+          {sorted.length > 0 && (
+            <tfoot>
+              <tr className="border-t-2 border-[var(--border)] font-semibold">
+                <td className="py-3 pr-3">TOTAL</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{rows.reduce((s, r) => s + r.transactionCount, 0)}</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(rows.reduce((s, r) => s + r.totalSalesCents, 0))}</td>
+                <td className="py-3 pr-3 text-right tabular-nums">—</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(rows.reduce((s, r) => s + r.discountsCents, 0))}</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{rows.reduce((s, r) => s + r.voidsCount, 0)}</td>
+                <td className="py-3 text-right tabular-nums">{formatCurrency(rows.reduce((s, r) => s + r.voidsCents, 0))}</td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+    </Card>
   )
 }
 
@@ -727,14 +873,16 @@ export function ReportsScreen(): React.JSX.Element {
   return (
     <div className="space-y-6">
       {/* Sub-navigation */}
-      <div className="flex space-x-1 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-1">
+      <div className="flex flex-wrap gap-1 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-1">
         {(['dashboard', 'sales', 'inventory', 'cashiers'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`min-h-11 rounded-[var(--radius)] px-4 text-sm font-semibold ${
-              activeTab === tab ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-            }`}
+            className={cn(
+              'min-h-11 rounded-[var(--radius)] px-4 text-sm font-semibold',
+              activeTab === tab ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]',
+              FOCUS_RING
+            )}
           >
             {tab === 'dashboard' ? 'Dashboard' : tab === 'sales' ? 'Sales' : tab === 'inventory' ? 'Inventory' : 'Cashiers'}
           </button>
