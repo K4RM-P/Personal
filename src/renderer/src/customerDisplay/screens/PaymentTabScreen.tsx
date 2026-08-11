@@ -3,6 +3,7 @@ import { ArrowDownRight, ArrowUpRight } from 'lucide-react'
 import { formatCurrency } from '../../../../shared/formatCurrency'
 import type { CustomerDisplayState } from '../../../../shared/customerDisplay'
 import { PaymentLayout, PaymentLine } from './PaymentLayout'
+import { useFitText } from '../useFitText'
 
 type TabState = Extract<CustomerDisplayState, { mode: 'payment-tab' }>
 
@@ -13,6 +14,16 @@ type TabState = Extract<CustomerDisplayState, { mode: 'payment-tab' }>
 export function PaymentTabScreen({ state }: { state: TabState }): React.JSX.Element {
   const credit = state.balanceAfterCents >= 0
   const Icon = credit ? ArrowUpRight : ArrowDownRight
+  const balanceText = `Balance After: ${formatCurrency(Math.abs(state.balanceAfterCents))} ${
+    credit ? 'credit' : 'owed'
+  }`
+  const balanceRef = React.useRef<HTMLDivElement>(null)
+  const balanceFontSize = useFitText(balanceText, balanceRef, {
+    maxPx: 70,
+    minPx: 22,
+    maxLines: 2
+  })
+
   return (
     <PaymentLayout totalCents={state.totalCents}>
       <PaymentLine
@@ -22,19 +33,33 @@ export function PaymentTabScreen({ state }: { state: TabState }): React.JSX.Elem
       />
       <div
         style={{
+          width: '100%',
+          maxHeight: '14vh',
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'center',
           gap: '1.5vw',
-          fontSize: '3.2vw',
-          fontWeight: 600,
-          color: credit ? 'var(--success)' : 'var(--owed)'
+          overflow: 'hidden'
         }}
       >
-        <Icon style={{ width: '3.2vw', height: '3.2vw', flexShrink: 0 }} aria-hidden="true" />
-        <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-          Balance After: {formatCurrency(Math.abs(state.balanceAfterCents))}{' '}
-          {credit ? 'credit' : 'owed'}
-        </span>
+        <Icon
+          style={{ width: balanceFontSize, height: balanceFontSize, flexShrink: 0 }}
+          aria-hidden="true"
+        />
+        <div
+          ref={balanceRef}
+          style={{
+            flex: '1 1 auto',
+            minWidth: 0,
+            maxWidth: '100%',
+            fontSize: balanceFontSize,
+            fontWeight: 600,
+            lineHeight: 1.15,
+            color: credit ? 'var(--success)' : 'var(--owed)'
+          }}
+        >
+          <span style={{ fontVariantNumeric: 'tabular-nums' }}>{balanceText}</span>
+        </div>
       </div>
     </PaymentLayout>
   )
