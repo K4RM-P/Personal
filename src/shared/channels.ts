@@ -138,7 +138,13 @@ export const IPC = {
   BACKUP_SAVE_DRIVE_PATH: 'backup:saveDrivePath',
   BACKUP_LIST_RESTORABLE: 'backup:listRestorable',
   BACKUP_RESTORE: 'backup:restore',
-  BACKUP_RELAUNCH: 'backup:relaunch'
+  BACKUP_RELAUNCH: 'backup:relaunch',
+
+  // Auto-update (B4/B5)
+  UPDATE_CHECK_NOW: 'update:checkNow',
+  UPDATE_INSTALL_NOW: 'update:installNow',
+  UPDATE_GET_STATUS: 'update:getStatus',
+  UPDATE_STATUS_CHANGED: 'update:statusChanged'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

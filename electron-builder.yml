@@ -24,6 +24,12 @@ asarUnpack:
   - node_modules/@prisma/client/**/*
 win:
   executableName: scaffold-tmp
+  # electron-builder signs automatically when CSC_LINK (path or base64 of the .pfx) and
+  # CSC_KEY_PASSWORD are set in the build environment — no cert path/password belongs in
+  # this file. See docs/CODE_SIGNING_AND_RELEASES.md for how to set these at build time.
+  signingHashAlgorithms:
+    - sha256
+  publisherName: 'PharmaPOS'
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}

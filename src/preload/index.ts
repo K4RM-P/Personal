@@ -48,7 +48,8 @@ import type {
   SaleRefundDetail,
   SaleDateRange,
   ProcessRefundPayload,
-  ProcessRefundResult
+  ProcessRefundResult,
+  UpdateStatus
 } from '../shared/types'
 import type {
   AutoImportResult,
@@ -382,6 +383,17 @@ const api = {
       ipcRenderer.invoke(IPC.REFUND_GET_SALE_DETAILS, transactionId),
     process: (payload: ProcessRefundPayload): Promise<ProcessRefundResult> =>
       ipcRenderer.invoke(IPC.REFUND_PROCESS, payload)
+  },
+  update: {
+    checkNow: (): Promise<void> => ipcRenderer.invoke(IPC.UPDATE_CHECK_NOW),
+    installNow: (): Promise<void> => ipcRenderer.invoke(IPC.UPDATE_INSTALL_NOW),
+    getStatus: (): Promise<UpdateStatus> => ipcRenderer.invoke(IPC.UPDATE_GET_STATUS),
+    /** Subscribe to update status changes. Returns an unsubscribe function. */
+    onStatusChanged: (callback: (status: UpdateStatus) => void): (() => void) => {
+      const listener = (_e: unknown, status: UpdateStatus): void => callback(status)
+      ipcRenderer.on(IPC.UPDATE_STATUS_CHANGED, listener)
+      return () => ipcRenderer.removeListener(IPC.UPDATE_STATUS_CHANGED, listener)
+    }
   }
 }
 

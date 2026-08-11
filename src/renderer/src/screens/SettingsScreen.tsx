@@ -10,6 +10,7 @@ import {
 } from '@shared/types'
 import { FeatureFlagCard } from '../components/FeatureFlagCard'
 import { PaymentSettingsCard } from '../components/PaymentSettingsCard'
+import { UpdateSettingsCard } from '../components/UpdateSettingsCard'
 import { BackupModal } from '../components/BackupModal'
 import { RestoreBackupModal } from '../components/RestoreBackupModal'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
@@ -651,6 +652,8 @@ export function SettingsScreen() {
           </div>
         </div>
       </Card>
+
+      <UpdateSettingsCard />
 
       {showBackupModal && user && (
         <BackupModal
