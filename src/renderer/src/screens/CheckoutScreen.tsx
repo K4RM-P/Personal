@@ -56,6 +56,10 @@ export function CheckoutScreen(): React.JSX.Element {
   const [scanFeedback, setScanFeedback] = React.useState<ScanFeedback>(null)
   const [tenderedDollars, setTenderedDollars] = React.useState('')
   const [cardProcessing, setCardProcessing] = React.useState(false)
+  // Stable across retries of the same in-flight card attempt so a timeout-retry reuses
+  // the original orderRef instead of minting a new one (which would defeat processor-side
+  // idempotency protection and risk a double charge). Cleared on success/cancel/reopen.
+  const cardOrderRefRef = React.useRef<string | null>(null)
   const [attachedCustomer, setAttachedCustomer] = React.useState<
     (Customer & { ledgerEntries?: { balanceCents: number }[] }) | null
   >(null)
@@ -393,6 +397,7 @@ export function CheckoutScreen(): React.JSX.Element {
         processorTransactionId: cardMeta?.processorTransactionId,
         cardLast4: cardMeta?.cardLast4
       })
+      cardOrderRefRef.current = null
       setActiveReceipt(transaction)
       setCart([])
       setTenderedDollars('')
@@ -464,7 +469,10 @@ export function CheckoutScreen(): React.JSX.Element {
     if (cart.length === 0 || cardProcessing) return
     setPaymentState('awaiting')
     setPaymentMessage('Waiting for terminal response…')
-    const orderRef = `SALE-${Date.now()}`
+    if (!cardOrderRefRef.current) {
+      cardOrderRefRef.current = `SALE-${Date.now()}`
+    }
+    const orderRef = cardOrderRefRef.current
     const cardAmount = effectiveTotal
 
     if (!window.api?.payment) {
@@ -1005,7 +1013,10 @@ export function CheckoutScreen(): React.JSX.Element {
                   Disc.
                 </button>
                 <button
-                  onClick={() => setShowPayModal(true)}
+                  onClick={() => {
+                    cardOrderRefRef.current = null
+                    setShowPayModal(true)
+                  }}
                   disabled={cart.length === 0}
                   className="h-14 flex-1 rounded-[var(--radius)] bg-[var(--primary)] text-lg font-bold tracking-wide text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >

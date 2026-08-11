@@ -49,7 +49,10 @@ export class SquareTerminalAdapter implements PaymentProvider {
       return { status: 'error', amountCents, message: 'No Square device id configured' }
     }
     const create = await this.http('POST', `${this.baseUrl}/v2/terminals/checkouts`, this.headers(), {
-      idempotency_key: randomUUID(),
+      // Derived from orderRef (not a fresh random id) so a retry of the same logical
+      // checkout attempt (same orderRef) reuses the same idempotency key, letting
+      // Square's own idempotency protection prevent a double charge on retry.
+      idempotency_key: `checkout-${orderRef}`,
       checkout: {
         amount_money: { amount: amountCents, currency: 'USD' },
         device_options: { device_id: this.deviceId },

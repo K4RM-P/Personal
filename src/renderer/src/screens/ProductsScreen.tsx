@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { PackageSearch, Sparkles, Lock, Search, Loader2 } from 'lucide-react'
+import { PackageSearch, Sparkles, Lock, Search, Loader2, Trash2 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
 import { Alert } from '../components/ui/Alert'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -211,6 +211,34 @@ export function ProductsScreen(): React.JSX.Element {
   const handleTierMaxChange = (index: number, dollars: string): void => {
     const maxCostCents = dollars.trim() === '' ? null : Math.round((parseFloat(dollars) || 0) * 100)
     const updated = editableTiers.map((t, idx) => (idx === index ? { ...t, maxCostCents } : t))
+    setEditableTiers(updated)
+    schedulePreview(updated)
+  }
+
+  const handleAddTier = (): void => {
+    const lastTier = editableTiers[editableTiers.length - 1]
+    const minCostCents = lastTier ? (lastTier.maxCostCents ?? lastTier.minCostCents) : 0
+    // Extend the open-ended top tier's range down to the new tier's start, since
+    // exactly one tier should ever have a null (unbounded) maxCostCents.
+    const updatedPrior =
+      lastTier && lastTier.maxCostCents === null
+        ? editableTiers.map((t, idx) =>
+            idx === editableTiers.length - 1 ? { ...t, maxCostCents: minCostCents } : t
+          )
+        : editableTiers
+    const newTier: PricingTier = {
+      id: crypto.randomUUID(),
+      minCostCents,
+      maxCostCents: null,
+      markupPercent: 0
+    }
+    const updated = [...updatedPrior, newTier]
+    setEditableTiers(updated)
+    schedulePreview(updated)
+  }
+
+  const handleDeleteTier = (index: number): void => {
+    const updated = editableTiers.filter((_, idx) => idx !== index)
     setEditableTiers(updated)
     schedulePreview(updated)
   }
@@ -627,10 +655,26 @@ export function ProductsScreen(): React.JSX.Element {
                       className="input min-h-9 w-24 text-right font-semibold tabular-nums"
                     />
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteTier(idx)}
+                    disabled={editableTiers.length <= 1}
+                    aria-label={`Delete tier ${idx + 1}`}
+                    className="min-h-9 min-w-9 rounded-[var(--radius)] text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--destructive)] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Trash2 className="icon-4" aria-hidden="true" />
+                  </button>
                 </div>
               ))}
               {tierMessage && <Alert variant={tierMessage.type}>{tierMessage.text}</Alert>}
-              <div className="flex justify-end pt-2">
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  type="button"
+                  onClick={handleAddTier}
+                  className="rounded-[var(--radius)] border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--muted)]"
+                >
+                  + Add Tier
+                </button>
                 <button
                   onClick={handleSaveTiers}
                   className="btn-primary rounded-[var(--radius)] bg-[var(--primary)] px-4 text-xs font-semibold text-[var(--primary-foreground)] hover:bg-[var(--primary-hover)]"

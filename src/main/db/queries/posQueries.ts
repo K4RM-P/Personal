@@ -7,6 +7,7 @@ import {
 } from '../../../shared/pricingEngine'
 import { CreateTransactionPayload, BulkImportProductInput, TransactionWithItems } from '../../../shared/types'
 import { customerLedgerInternals, getCreditSettings } from './customerQueries'
+import { getCardSurchargePercent } from './settingsQueries'
 import { getSession } from '../../auth/session'
 
 // Product Queries
@@ -267,7 +268,22 @@ export async function createTransaction(
     subtotalCents > 0 ? taxableSubtotalCents - (billDiscountCents * taxableSubtotalCents) / subtotalCents : 0
   const taxCents = Math.round((taxableAfterBillDiscountCents * payload.taxRatePercent) / 100)
   const sessionUserId = getSession()?.userId ?? null
-  const surchargeCents = payload.surchargeCents ?? 0
+  const requestedSurchargeCents = payload.surchargeCents ?? 0
+  // Surcharge is only legitimate on a CARD sale, and must match the configured rate applied
+  // to the post-discount, pre-tax amount — never trust a client-supplied surcharge outright,
+  // since nothing else validates it before this point.
+  if (requestedSurchargeCents > 0 && payload.tenderType !== 'CARD') {
+    throw new Error('Card surcharge cannot be applied to a non-card tender.')
+  }
+  let surchargeCents = 0
+  if (payload.tenderType === 'CARD' && requestedSurchargeCents > 0) {
+    const surchargePercent = await getCardSurchargePercent(db)
+    const expectedSurchargeCents = Math.floor((preTaxCents * surchargePercent) / 100)
+    if (requestedSurchargeCents !== expectedSurchargeCents) {
+      throw new Error('Card surcharge does not match the configured rate.')
+    }
+    surchargeCents = expectedSurchargeCents
+  }
   const totalCents = preTaxCents + taxCents + surchargeCents
   const cashOverageToCreditCents = payload.cashOverageToCreditCents ?? 0
   const changeCents = cashOverageToCreditCents > 0 ? 0 : Math.max(0, payload.tenderedCents - totalCents)
