@@ -23,7 +23,8 @@ import {
   PackagePlus,
   Trash2,
   MoreVertical,
-  Plus
+  Plus,
+  Check
 } from 'lucide-react'
 
 type ScanFeedback = { type: 'success' | 'error'; message: string } | null
@@ -764,13 +765,13 @@ export function CheckoutScreen(): React.JSX.Element {
           </div>
         )}
 
-        <div className="min-w-0 flex-1 space-y-4">
+        <div className="min-w-0 flex-1 space-y-2">
           {/* Product search — compact single row. A single match auto-adds to the
           cart (same as a barcode scan); multiple matches drop into a small
           overlay dropdown that never pushes page content down or scrolls
           the page itself — only the dropdown's own list scrolls if it's
           taller than ~4 rows. */}
-          <Card className="relative overflow-visible">
+          <Card className="relative overflow-visible p-2">
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
                 <input
@@ -852,15 +853,15 @@ export function CheckoutScreen(): React.JSX.Element {
           </Card>
 
           {/* Cart — full width */}
-          <Card className="p-3">
-            <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
+          <Card className="p-2.5">
+            <div className="flex items-center justify-between border-b border-[var(--border)] pb-1">
               <h3 className="text-sm font-semibold text-[var(--foreground)]">Current Cart</h3>
               <span className="text-xs text-[var(--muted-foreground)]">
                 {cart.length} line items
               </span>
             </div>
 
-            <div className="mt-2 max-h-[320px] space-y-1.5 overflow-y-auto pr-1">
+            <div className="mt-1.5 max-h-[360px] space-y-1 overflow-y-auto pr-1">
               {cart.length === 0 ? (
                 <EmptyState
                   icon={ShoppingCart}
@@ -877,37 +878,28 @@ export function CheckoutScreen(): React.JSX.Element {
                   return (
                     <div
                       key={item.product.id}
-                      className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-2 text-sm"
+                      className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-sm"
                     >
-                      <div className="min-w-0">
-                        <div
-                          className="truncate font-medium text-[var(--foreground)]"
-                          title={item.product.name}
-                        >
-                          {item.product.name}
-                        </div>
-                        <div className="text-xs text-[var(--muted-foreground)]">
-                          {formatCurrency(item.unitPriceCents)} × {item.quantity}
-                          {lineDiscountCents > 0 && (
-                            <span className="text-[var(--success)]">
-                              {' '}
-                              · discount {formatCurrency(lineDiscountCents)}
-                            </span>
-                          )}
-                        </div>
+                      <div className="min-w-0 truncate font-medium text-[var(--foreground)]">
+                        <span title={item.product.name}>{item.product.name}</span>
+                        {lineDiscountCents > 0 && (
+                          <span className="ml-1 text-xs font-normal text-[var(--success)]">
+                            -{formatCurrency(lineDiscountCents)}
+                          </span>
+                        )}
                       </div>
-                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                      <div className="flex shrink-0 flex-nowrap items-center justify-end gap-1">
                         <div className="flex min-h-8 items-center rounded-[var(--radius)] border border-[var(--border)]">
                           <button
                             onClick={() => handleQuantityChange(item.product.id, -1)}
-                            className="min-w-8 px-1.5 py-1 text-[var(--foreground)]"
+                            className="min-w-7 px-1 py-1 text-[var(--foreground)]"
                           >
                             −
                           </button>
-                          <span className="px-1.5 text-[var(--foreground)]">{item.quantity}</span>
+                          <span className="px-1 text-[var(--foreground)]">{item.quantity}</span>
                           <button
                             onClick={() => handleQuantityChange(item.product.id, 1)}
-                            className="min-w-8 px-1.5 py-1 text-[var(--foreground)]"
+                            className="min-w-7 px-1 py-1 text-[var(--foreground)]"
                           >
                             +
                           </button>
@@ -918,32 +910,23 @@ export function CheckoutScreen(): React.JSX.Element {
                         >
                           {lineDiscountCents > 0 ? 'Edit' : 'Disc.'}
                         </button>
-                        <label
-                          className={`flex min-h-8 items-center gap-1 rounded-[var(--radius)] border px-2 text-xs font-semibold ${itemHstOn ? 'border-[var(--border)] text-[var(--foreground)]' : 'border-[var(--warning)] text-[var(--warning)]'} ${item.hstLocked ? 'opacity-60' : ''}`}
+                        <button
+                          type="button"
+                          onClick={() => !item.hstLocked && handleToggleItemHst(item.product.id)}
+                          disabled={item.hstLocked}
+                          aria-pressed={itemHstOn}
+                          className={`flex min-h-8 items-center gap-0.5 rounded-[var(--radius)] border px-2 text-xs font-semibold ${itemHstOn ? 'border-[var(--border)] text-[var(--foreground)]' : 'border-[var(--warning)] text-[var(--warning)]'} ${item.hstLocked ? 'opacity-60' : ''}`}
                           title={
                             item.hstLocked
                               ? 'RX items cannot be charged HST'
                               : 'Charge HST on this item'
                           }
                         >
-                          <input
-                            type="checkbox"
-                            checked={itemHstOn}
-                            disabled={item.hstLocked}
-                            onChange={() => handleToggleItemHst(item.product.id)}
-                            className="icon-3_5"
-                          />
+                          {itemHstOn && <Check className="icon-3_5" aria-hidden="true" />}
                           HST
-                        </label>
-                        <div className="w-16 text-right">
-                          {lineDiscountCents > 0 && (
-                            <div className="text-[10px] text-[var(--muted-foreground)] line-through">
-                              {formatCurrency(lineRawCents)}
-                            </div>
-                          )}
-                          <span className="font-semibold text-[var(--foreground)]">
-                            {formatCurrency(lineTotalCents)}
-                          </span>
+                        </button>
+                        <div className="w-16 text-right font-semibold text-[var(--foreground)]">
+                          {formatCurrency(lineTotalCents)}
                         </div>
                       </div>
                     </div>
