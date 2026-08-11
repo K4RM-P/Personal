@@ -52,7 +52,7 @@ export function PaymentLayout({
             lineHeight: 1.15,
             color: 'var(--primary)',
             maxWidth: '100%',
-            wordBreak: 'break-word'
+            overflowWrap: 'break-word'
           }}
         >
           Total:{' '}
@@ -100,7 +100,7 @@ export function PaymentLine({
           lineHeight: 1.15,
           color: emphasis ? 'var(--foreground)' : 'var(--muted-foreground)',
           maxWidth: '100%',
-          wordBreak: 'break-word'
+          overflowWrap: 'break-word'
         }}
       >
         {label}: <span style={{ fontVariantNumeric: 'tabular-nums' }}>{value}</span>

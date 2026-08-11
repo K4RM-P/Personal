@@ -39,7 +39,7 @@ export function PaymentCardScreen({ totalCents }: { totalCents: number }): React
             fontWeight: 600,
             lineHeight: 1.15,
             maxWidth: '100%',
-            wordBreak: 'break-word'
+            overflowWrap: 'break-word'
           }}
         >
           {headlineText}
@@ -62,7 +62,7 @@ export function PaymentCardScreen({ totalCents }: { totalCents: number }): React
             lineHeight: 1.15,
             color: 'var(--muted-foreground)',
             maxWidth: '100%',
-            wordBreak: 'break-word'
+            overflowWrap: 'break-word'
           }}
         >
           {subtext}
