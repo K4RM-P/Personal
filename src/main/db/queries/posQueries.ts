@@ -11,8 +11,17 @@ import { getCardSurchargePercent } from './settingsQueries'
 import { getSession } from '../../auth/session'
 
 // Product Queries
+/**
+ * Manually-added products only — this backs the "Custom Products" panel, which
+ * is explicitly scoped to products the pharmacy entered by hand, separate from
+ * the (potentially 50k+ row) McKesson catalogue-origin products in this same
+ * table. Fetching unfiltered here previously loaded every catalogue-promoted
+ * product too, freezing the Products screen once any catalogue items had been
+ * promoted into inventory.
+ */
 export async function getAllProducts(db: PrismaClient): Promise<Product[]> {
   return db.product.findMany({
+    where: { origin: 'MANUAL' },
     orderBy: { name: 'asc' }
   })
 }
