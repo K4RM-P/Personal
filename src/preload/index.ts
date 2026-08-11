@@ -1,6 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '../shared/channels'
 import type {
+  CustomerDisplayState,
+  CustomerDisplaySlideDTO,
+  CustomerDisplaySettingsDTO
+} from '../shared/customerDisplay'
+import type {
   FeatureFlag,
   Product,
   Customer,
@@ -179,8 +184,7 @@ const api = {
       ipcRenderer.invoke(IPC.RECEIPT_PRINT, transaction),
     testNetwork: (ipAddress: string, port?: number): Promise<{ ok: boolean; message: string }> =>
       ipcRenderer.invoke(IPC.RECEIPT_TEST_NETWORK, { ipAddress, port }),
-    listPrinters: (): Promise<SystemPrinterInfo[]> =>
-      ipcRenderer.invoke(IPC.RECEIPT_LIST_PRINTERS),
+    listPrinters: (): Promise<SystemPrinterInfo[]> => ipcRenderer.invoke(IPC.RECEIPT_LIST_PRINTERS),
     preview: (): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.RECEIPT_PREVIEW),
     export: (): Promise<ExportReceiptResult | null> => ipcRenderer.invoke(IPC.RECEIPT_EXPORT)
   },
@@ -248,7 +252,8 @@ const api = {
     getStore: (): Promise<StoreInfo> => ipcRenderer.invoke(IPC.SETTINGS_GET_STORE),
     saveStore: (info: StoreInfo): Promise<StoreInfo> =>
       ipcRenderer.invoke(IPC.SETTINGS_SAVE_STORE, info),
-    uploadLogo: (): Promise<UploadLogoResult | null> => ipcRenderer.invoke(IPC.SETTINGS_UPLOAD_LOGO),
+    uploadLogo: (): Promise<UploadLogoResult | null> =>
+      ipcRenderer.invoke(IPC.SETTINGS_UPLOAD_LOGO),
     removeLogo: (): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.SETTINGS_REMOVE_LOGO),
     uploadReceiptTemplate: (): Promise<UploadReceiptTemplateResult | null> =>
       ipcRenderer.invoke(IPC.SETTINGS_UPLOAD_RECEIPT_TEMPLATE),
@@ -411,6 +416,26 @@ const api = {
       ipcRenderer.on(IPC.UPDATE_STATUS_CHANGED, listener)
       return () => ipcRenderer.removeListener(IPC.UPDATE_STATUS_CHANGED, listener)
     }
+  },
+  customerDisplay: {
+    /** Fire-and-forget state push to the second screen; never blocks checkout. */
+    push: (state: CustomerDisplayState): void => ipcRenderer.send(IPC.CUSTOMER_DISPLAY_PUSH, state),
+    getSlides: (): Promise<CustomerDisplaySlideDTO[]> =>
+      ipcRenderer.invoke(IPC.CUSTOMER_DISPLAY_GET_SLIDES),
+    saveSlides: (
+      slides: Array<{ id?: number; text: string }>
+    ): Promise<CustomerDisplaySlideDTO[]> =>
+      ipcRenderer.invoke(IPC.CUSTOMER_DISPLAY_SAVE_SLIDES, slides),
+    deleteSlide: (id: number): Promise<void> =>
+      ipcRenderer.invoke(IPC.CUSTOMER_DISPLAY_DELETE_SLIDE, id),
+    getSettings: (): Promise<CustomerDisplaySettingsDTO> =>
+      ipcRenderer.invoke(IPC.CUSTOMER_DISPLAY_GET_SETTINGS),
+    saveSettings: (input: {
+      enabled: boolean
+      slideDurationSeconds: number
+      eTransferEmail: string
+    }): Promise<CustomerDisplaySettingsDTO> =>
+      ipcRenderer.invoke(IPC.CUSTOMER_DISPLAY_SAVE_SETTINGS, input)
   }
 }
 

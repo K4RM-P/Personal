@@ -36,7 +36,12 @@ const DEFAULTS = {
   // Display density — device-level, not per-user (see docs/superpowers UI guide).
   // Stores the density level number (1-8); the level -> scale multiplier mapping
   // lives in the renderer (src/renderer/src/lib/density.ts).
-  'display.densityLevel': '4'
+  'display.densityLevel': '4',
+  // Customer-facing display (second screen) — see docs/superpowers/specs/
+  // 2026-08-11-customer-facing-display-spec.md §6/§8.4.
+  'customerDisplay.enabled': 'true',
+  'customerDisplay.slideDurationSeconds': '8',
+  'customerDisplay.eTransferEmail': ''
 } as const
 
 async function getSetting(db: PrismaClient, key: string): Promise<string> {

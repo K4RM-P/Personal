@@ -11,6 +11,7 @@ import {
 import { CheckCircle2, Circle, Search, X } from 'lucide-react'
 import { FeatureFlagCard } from '../components/FeatureFlagCard'
 import { PaymentSettingsCard } from '../components/PaymentSettingsCard'
+import { CustomerDisplaySettingsCard } from '../components/CustomerDisplaySettingsCard'
 import { UpdateSettingsCard } from '../components/UpdateSettingsCard'
 import { BackupModal } from '../components/BackupModal'
 import { RestoreBackupModal } from '../components/RestoreBackupModal'
@@ -129,6 +130,17 @@ const SECTION_KEYWORDS: Record<string, string[]> = {
     'fsa',
     'hsa'
   ],
+  customerDisplay: [
+    'customer display',
+    'customer facing display',
+    'second screen',
+    'second monitor',
+    'slideshow',
+    'slides',
+    'kiosk',
+    'e-transfer email',
+    'etransfer email'
+  ],
   featureFlags: ['feature flags', 'modules', 'toggle'],
   optionalModules: [
     'optional modules',
@@ -166,7 +178,7 @@ const TIER_LABELS: Record<SettingsTier, { title: string; description: string }> 
 
 const TIER_SECTIONS: Record<SettingsTier, string[]> = {
   daily: ['payment', 'printer', 'backup'],
-  setup: ['storeInfo', 'receiptTemplate', 'credit', 'density'],
+  setup: ['storeInfo', 'receiptTemplate', 'credit', 'density', 'customerDisplay'],
   compliance: ['compliance', 'featureFlags', 'optionalModules', 'otcPreview', 'reportingSnapshot'],
   system: ['updates', 'testMode']
 }
@@ -1083,6 +1095,12 @@ export function SettingsScreen() {
                   Save customer settings
                 </button>
               </div>
+            </Card>
+          )}
+
+          {sectionVisible('customerDisplay') && (
+            <Card>
+              <CustomerDisplaySettingsCard />
             </Card>
           )}
 

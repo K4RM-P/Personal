@@ -1,0 +1,22 @@
+/* Customer-facing display only. Read-only signage surface: no cursor, no
+   selection, no scrollbars outside the cart list (spec §1.1/§11). */
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  cursor: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@keyframes cd-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

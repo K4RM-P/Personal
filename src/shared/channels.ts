@@ -153,7 +153,18 @@ export const IPC = {
   UPDATE_CHECK_NOW: 'update:checkNow',
   UPDATE_INSTALL_NOW: 'update:installNow',
   UPDATE_GET_STATUS: 'update:getStatus',
-  UPDATE_STATUS_CHANGED: 'update:statusChanged'
+  UPDATE_STATUS_CHANGED: 'update:statusChanged',
+
+  // Customer-facing display (second screen)
+  CUSTOMER_DISPLAY_PUSH: 'customer-display:push',
+  CUSTOMER_DISPLAY_UPDATE: 'customer-display:update',
+  CUSTOMER_DISPLAY_SLIDES: 'customer-display:slides',
+  CUSTOMER_DISPLAY_SETTINGS: 'customer-display:settings',
+  CUSTOMER_DISPLAY_GET_SLIDES: 'customerDisplay:getSlides',
+  CUSTOMER_DISPLAY_SAVE_SLIDES: 'customerDisplay:saveSlides',
+  CUSTOMER_DISPLAY_DELETE_SLIDE: 'customerDisplay:deleteSlide',
+  CUSTOMER_DISPLAY_GET_SETTINGS: 'customerDisplay:getSettings',
+  CUSTOMER_DISPLAY_SAVE_SETTINGS: 'customerDisplay:saveSettings'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]
