@@ -48,14 +48,6 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps): R
 
   const [showLogoutConfirm, setShowLogoutConfirm] = React.useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
-  const [demoMode, setDemoMode] = React.useState(false)
-
-  React.useEffect(() => {
-    window.api.settings
-      .getDemoMode()
-      .then(setDemoMode)
-      .catch(() => {})
-  }, [])
 
   React.useEffect(() => {
     if (!mobileMenuOpen) return
@@ -103,14 +95,9 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps): R
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
       <header className="relative flex h-16 shrink-0 items-center gap-4 border-b border-[var(--border)] bg-[var(--card)] px-4 md:px-6">
-        <div className="flex shrink-0 items-center gap-3">
-          <img src={vantisIcon} alt="" className="h-11 w-11 sm:hidden" />
-          <img src={vantisLogo} alt="VantisPOS" className="hidden h-10 w-auto sm:block" />
-          {demoMode && (
-            <span className="rounded-full border border-[var(--warning)] bg-[var(--warning-bg)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--warning)]">
-              Demo Mode
-            </span>
-          )}
+        <div className="flex shrink-0 items-center border-r border-[var(--border)] pr-4">
+          <img src={vantisIcon} alt="" className="h-9 w-9 sm:hidden" />
+          <img src={vantisLogo} alt="VantisPOS" className="hidden h-8 w-auto sm:block" />
         </div>
 
         <nav className="hidden flex-1 items-center gap-1 overflow-x-auto md:flex">
