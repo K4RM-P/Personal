@@ -1,5 +1,6 @@
 import React from 'react'
 import { formatCurrency } from '../../../../shared/formatCurrency'
+import { useFitText } from '../useFitText'
 
 /**
  * Shared frame for the four payment states (spec §4): the total always stays on
@@ -12,6 +13,10 @@ export function PaymentLayout({
   totalCents: number
   children?: React.ReactNode
 }): React.JSX.Element {
+  const totalRef = React.useRef<HTMLDivElement>(null)
+  const totalText = `Total: ${formatCurrency(totalCents)}`
+  const totalFontSize = useFitText(totalText, totalRef, { maxPx: 130, minPx: 40, maxLines: 1 })
+
   return (
     <div
       style={{
@@ -29,9 +34,29 @@ export function PaymentLayout({
         textAlign: 'center'
       }}
     >
-      <div style={{ fontSize: '6vw', fontWeight: 700, color: 'var(--primary)' }}>
-        Total:{' '}
-        <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(totalCents)}</span>
+      <div
+        ref={totalRef}
+        style={{
+          width: '100%',
+          maxHeight: '22vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden'
+        }}
+      >
+        <div
+          style={{
+            fontSize: totalFontSize,
+            fontWeight: 700,
+            lineHeight: 1.15,
+            color: 'var(--primary)',
+            maxWidth: '100%'
+          }}
+        >
+          Total:{' '}
+          <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(totalCents)}</span>
+        </div>
       </div>
       {children}
     </div>
@@ -47,15 +72,37 @@ export function PaymentLine({
   value: string
   emphasis?: boolean
 }): React.JSX.Element {
+  const lineRef = React.useRef<HTMLDivElement>(null)
+  const lineText = `${label}: ${value}`
+  const fontSize = useFitText(lineText, lineRef, {
+    maxPx: emphasis ? 90 : 70,
+    minPx: 26,
+    maxLines: 2
+  })
+
   return (
     <div
+      ref={lineRef}
       style={{
-        fontSize: emphasis ? '4.5vw' : '3.5vw',
-        fontWeight: emphasis ? 700 : 500,
-        color: emphasis ? 'var(--foreground)' : 'var(--muted-foreground)'
+        width: '100%',
+        maxHeight: emphasis ? '16vh' : '12vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden'
       }}
     >
-      {label}: <span style={{ fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+      <div
+        style={{
+          fontSize,
+          fontWeight: emphasis ? 700 : 500,
+          lineHeight: 1.15,
+          color: emphasis ? 'var(--foreground)' : 'var(--muted-foreground)',
+          maxWidth: '100%'
+        }}
+      >
+        {label}: <span style={{ fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+      </div>
     </div>
   )
 }

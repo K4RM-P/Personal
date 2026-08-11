@@ -1,6 +1,7 @@
 import React from 'react'
 import { formatCurrency } from '../../../../shared/formatCurrency'
 import type { CustomerDisplayState } from '../../../../shared/customerDisplay'
+import { useFitText } from '../useFitText'
 
 type CartState = Extract<CustomerDisplayState, { mode: 'cart' }>
 
@@ -11,6 +12,9 @@ type CartState = Extract<CustomerDisplayState, { mode: 'cart' }>
 export function CartScreen({ state }: { state: CartState }): React.JSX.Element {
   const listRef = React.useRef<HTMLDivElement>(null)
   const itemCount = state.lineItems.length
+  const totalRef = React.useRef<HTMLDivElement>(null)
+  const totalText = `Total: ${formatCurrency(state.totalCents)}`
+  const totalFontSize = useFitText(totalText, totalRef, { maxPx: 90, minPx: 28, maxLines: 1 })
 
   // Keep the most recently added item in view (spec §3.3).
   React.useEffect(() => {
@@ -49,7 +53,7 @@ export function CartScreen({ state }: { state: CartState }): React.JSX.Element {
                 borderBottom: '1px solid var(--border)'
               }}
             >
-              <span style={{ flex: '1 1 auto', minWidth: 0 }}>
+              <span style={{ flex: '1 1 auto', minWidth: 0, wordBreak: 'break-word' }}>
                 {item.name}
                 {item.qty > 1 ? ` (${item.qty})` : ''}
               </span>
@@ -95,20 +99,33 @@ export function CartScreen({ state }: { state: CartState }): React.JSX.Element {
         ) : null}
         <FooterRow label="Tax" value={formatCurrency(state.taxCents)} />
         <div
+          ref={totalRef}
           style={{
             display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'baseline',
+            justifyContent: 'center',
+            alignItems: 'center',
             marginTop: '1.5vh',
-            fontSize: '4.5vw',
-            fontWeight: 700,
-            color: 'var(--primary)'
+            maxHeight: '12vh',
+            overflow: 'hidden'
           }}
         >
-          <span>Total</span>
-          <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-            {formatCurrency(state.totalCents)}
-          </span>
+          <div
+            style={{
+              display: 'flex',
+              width: '100%',
+              justifyContent: 'space-between',
+              alignItems: 'baseline',
+              fontSize: totalFontSize,
+              fontWeight: 700,
+              lineHeight: 1.15,
+              color: 'var(--primary)'
+            }}
+          >
+            <span>Total</span>
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {formatCurrency(state.totalCents)}
+            </span>
+          </div>
         </div>
       </div>
     </div>

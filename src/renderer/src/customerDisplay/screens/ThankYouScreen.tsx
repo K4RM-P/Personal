@@ -1,9 +1,15 @@
 import React from 'react'
+import { useFitText } from '../useFitText'
 
 /** Spec §5.2 — same visual weight as a slideshow slide. */
 export function ThankYouScreen({ pharmacyName }: { pharmacyName: string }): React.JSX.Element {
+  const containerRef = React.useRef<HTMLDivElement>(null)
+  const text = pharmacyName ? `Thank you for choosing ${pharmacyName}!` : 'Thank you!'
+  const fontSize = useFitText(text, containerRef, { maxPx: 220, minPx: 32, maxLines: 2 })
+
   return (
     <div
+      ref={containerRef}
       style={{
         height: '100vh',
         width: '100vw',
@@ -14,18 +20,20 @@ export function ThankYouScreen({ pharmacyName }: { pharmacyName: string }): Reac
         boxSizing: 'border-box',
         background: 'var(--background)',
         color: 'var(--primary)',
-        textAlign: 'center'
+        textAlign: 'center',
+        overflow: 'hidden'
       }}
     >
       <div
         style={{
-          fontSize: '7vw',
+          fontSize,
           fontWeight: 700,
           lineHeight: 1.15,
+          maxWidth: '100%',
           animation: 'cd-fade-in 400ms ease'
         }}
       >
-        {pharmacyName ? `Thank you for choosing ${pharmacyName}!` : 'Thank you!'}
+        {text}
       </div>
     </div>
   )
