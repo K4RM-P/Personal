@@ -272,7 +272,10 @@ const api = {
       ipcRenderer.invoke(IPC.SETTINGS_SAVE_IDLE_TIMEOUT, minutes),
     getDisplayDensity: (): Promise<number> => ipcRenderer.invoke(IPC.SETTINGS_GET_DISPLAY_DENSITY),
     saveDisplayDensity: (level: number): Promise<number> =>
-      ipcRenderer.invoke(IPC.SETTINGS_SAVE_DISPLAY_DENSITY, level)
+      ipcRenderer.invoke(IPC.SETTINGS_SAVE_DISPLAY_DENSITY, level),
+    getDemoMode: (): Promise<boolean> => ipcRenderer.invoke(IPC.SETTINGS_GET_DEMO_MODE),
+    setDemoMode: (enabled: boolean): Promise<void> =>
+      ipcRenderer.invoke(IPC.SETTINGS_SET_DEMO_MODE, enabled)
   },
   compliance: {
     searchRx: (query: string): Promise<PrescriptionRecord[]> =>

@@ -3,6 +3,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Alert } from '../components/ui/Alert'
 import { useCurrentUser } from '../context/CurrentUserContext'
+import vantisLogo from '../assets/vantis-logo.png'
 
 export function SetupWizard(): React.JSX.Element {
   const { setUser } = useCurrentUser()
@@ -37,7 +38,7 @@ export function SetupWizard(): React.JSX.Element {
     <div className="flex h-screen w-screen items-center justify-center bg-[var(--background)]">
       <Card className="w-[420px] space-y-4 p-8 shadow-lg">
         <div className="text-center">
-          <h1 className="text-xl font-semibold text-[var(--foreground)]">Welcome to PharmaPOS</h1>
+          <img src={vantisLogo} alt="VantisPOS" className="mx-auto mb-3 h-10 w-auto" />
           <p className="text-xs text-[var(--muted-foreground)]">
             Create the first Manager account to get started.
           </p>

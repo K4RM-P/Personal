@@ -2,7 +2,7 @@ import { formatCurrency } from '../../shared/formatCurrency'
 import type { StoreInfo, TransactionWithItems } from '../../shared/types'
 
 export const DEFAULT_STORE_INFO: StoreInfo = {
-  name: 'PharmaPOS Rx Pharmacy',
+  name: 'VantisPOS Rx Pharmacy',
   address: '123 Health Ave, Suite 100, Cityville',
   phone: '(555) 019-2831'
 }

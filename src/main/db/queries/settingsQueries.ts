@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client'
 import type { PrinterConfig, StoreInfo } from '../../../shared/types'
 
 const DEFAULTS = {
-  'store.name': 'PharmaPOS Rx Pharmacy',
+  'store.name': 'VantisPOS Rx Pharmacy',
   'store.address': '123 Health Ave, Suite 100, Cityville',
   'store.phone': '(555) 019-2831',
   'store.licenseNumber': '',

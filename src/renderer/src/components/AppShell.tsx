@@ -15,6 +15,8 @@ import { cn } from '../lib/utils'
 import { useCurrentUser } from '../context/CurrentUserContext'
 import { LogoutConfirmModal } from './LogoutConfirmModal'
 import { UpdateBanner } from './UpdateBanner'
+import vantisLogo from '../assets/vantis-logo.png'
+import vantisIcon from '../assets/vantis-icon.png'
 
 export type NavTab =
   'checkout' | 'products' | 'customers' | 'settings' | 'reports' | 'users' | 'sales'
@@ -46,6 +48,14 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps): R
 
   const [showLogoutConfirm, setShowLogoutConfirm] = React.useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
+  const [demoMode, setDemoMode] = React.useState(false)
+
+  React.useEffect(() => {
+    window.api.settings
+      .getDemoMode()
+      .then(setDemoMode)
+      .catch(() => {})
+  }, [])
 
   React.useEffect(() => {
     if (!mobileMenuOpen) return
@@ -94,15 +104,13 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps): R
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
       <header className="relative flex h-16 shrink-0 items-center gap-4 border-b border-[var(--border)] bg-[var(--card)] px-4 md:px-6">
         <div className="flex shrink-0 items-center gap-3">
-          <div className="flex icon-9 items-center justify-center rounded-[var(--radius)] bg-[var(--primary)] font-bold text-[var(--primary-foreground)]">
-            Rx
-          </div>
-          <div className="hidden sm:block">
-            <h1 className="text-base font-semibold leading-tight text-[var(--foreground)]">
-              PharmaPOS
-            </h1>
-            <p className="text-xs text-[var(--muted-foreground)]">Pharmacy Management</p>
-          </div>
+          <img src={vantisIcon} alt="" className="icon-9 sm:hidden" />
+          <img src={vantisLogo} alt="VantisPOS" className="hidden h-7 w-auto sm:block" />
+          {demoMode && (
+            <span className="rounded-full border border-[var(--warning)] bg-[var(--warning-bg)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--warning)]">
+              Demo Mode
+            </span>
+          )}
         </div>
 
         <nav className="hidden flex-1 items-center gap-1 overflow-x-auto md:flex">

@@ -12,13 +12,17 @@ import { resolveDbFilePath } from './backup/dbPath'
 import { initLogger, log } from './logging/logger'
 import { initAutoUpdater, setUpdateWindow } from './update/autoUpdate'
 import { initCustomerDisplayWindow, teardownCustomerDisplayWindow } from './customerDisplayWindow'
+import { isDemoModeEnabled, isDemoDatabaseUninitialized, resolveDatabaseUrl } from './demoMode'
+import { seedDemoDatabase } from './db/seedDemo'
 
-// .env (dev-only, gitignored) is the only thing that sets DATABASE_URL, and it's
-// intentionally excluded from the packaged app. Without this fallback, Prisma has
-// no database to connect to at all in a production install. userData survives
-// every reinstall/update, unlike the app's own install directory.
-if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = `file:${join(app.getPath('userData'), 'pharmapos.db')}`
+// .env (dev-only, gitignored) is the only thing that sets DATABASE_URL outside of
+// demo mode, and it's intentionally excluded from the packaged app. Without this
+// fallback, Prisma has no database to connect to at all in a production install.
+// userData survives every reinstall/update, unlike the app's own install directory.
+// Demo mode always wins over .env — it needs a fully separate, swappable database
+// file regardless of dev/prod, so a client demo never touches real data.
+if (isDemoModeEnabled() || !process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = resolveDatabaseUrl()
 }
 
 /**
@@ -111,9 +115,18 @@ app.whenReady().then(async () => {
   const restore = applyPendingRestoreIfStaged(resolveDbFilePath())
   if (restore.applied) log('RESTORE_STAGED', { dbFilePath: resolveDbFilePath() })
 
+  const demoMode = isDemoModeEnabled()
+  const demoDbIsNew = demoMode && isDemoDatabaseUninitialized()
+
   const db = getDb()
-  if (!is.dev) {
+  // The demo database is never touched by `prisma migrate dev`/deploy — it's created
+  // and migrated here on first activation, in both dev and packaged builds.
+  if (!is.dev || demoMode) {
     await runPendingMigrations(db)
+  }
+  if (demoDbIsNew) {
+    await seedDemoDatabase(db)
+    log('DEMO_MODE_SEEDED', {})
   }
   registerAllHandlers(db)
 

@@ -1,9 +1,14 @@
-import { dialog, ipcMain, BrowserWindow } from 'electron'
+import { dialog, ipcMain, BrowserWindow, app } from 'electron'
 import { PrismaClient } from '@prisma/client'
 import { readFile, writeFile } from 'fs/promises'
 import { extname } from 'path'
 import { IPC } from '../../shared/channels'
-import { printReceipt, testNetworkPrinter, listSystemPrinters, printToPdf } from '../receipt/receiptPrinter'
+import {
+  printReceipt,
+  testNetworkPrinter,
+  listSystemPrinters,
+  printToPdf
+} from '../receipt/receiptPrinter'
 import { buildReceiptHtml } from '../receipt/receiptTemplate'
 import {
   getPrinterConfig,
@@ -26,7 +31,8 @@ import {
   getDisplayDensityLevel,
   saveDisplayDensityLevel
 } from '../db/queries/settingsQueries'
-import { requireManager } from '../auth/session'
+import { requireManager, clearSession } from '../auth/session'
+import { isDemoModeEnabled, setDemoModeEnabled } from '../demoMode'
 import type {
   PrinterConfig,
   StoreInfo,
@@ -60,7 +66,14 @@ function guard<A extends unknown[], R>(
 }
 
 function buildSampleProduct(
-  overrides: { id: number; sku: string; name: string; costCents: number; priceCents: number; barcode: string },
+  overrides: {
+    id: number
+    sku: string
+    name: string
+    costCents: number
+    priceCents: number
+    barcode: string
+  },
   now: Date
 ): TransactionWithItems['items'][number]['product'] {
   return {
@@ -343,5 +356,17 @@ export function registerReceiptHandlers(db: PrismaClient): void {
   ipcMain.handle(IPC.SETTINGS_GET_DISPLAY_DENSITY, () => getDisplayDensityLevel(db))
   ipcMain.handle(IPC.SETTINGS_SAVE_DISPLAY_DENSITY, (_e, level: number) =>
     saveDisplayDensityLevel(db, level)
+  )
+
+  ipcMain.handle(IPC.SETTINGS_GET_DEMO_MODE, () => isDemoModeEnabled())
+  ipcMain.handle(
+    IPC.SETTINGS_SET_DEMO_MODE,
+    guard('Toggle demo mode', async (_e, enabled: boolean) => {
+      requireManager()
+      setDemoModeEnabled(enabled)
+      clearSession()
+      app.relaunch()
+      app.exit(0)
+    })
   )
 }

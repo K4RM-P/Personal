@@ -53,7 +53,7 @@ export function buildEscPosReceiptBuffer(options: PrintReceiptOptions): Uint8Arr
     .line(`Change Due: ${formatCurrency(transaction.changeCents)}`)
     .line('--------------------------------')
     .align('center')
-    .line('Thank you for choosing PharmaPOS!')
+    .line('Thank you for choosing VantisPOS!')
     .line('Please retain receipt for returns.')
 
   if (options.rxFooter) {
@@ -215,7 +215,7 @@ export async function printReceipt(options: PrintReceiptOptions): Promise<PrintR
  */
 export async function testNetworkPrinter(ipAddress: string, port = 9100): Promise<{ ok: boolean; message: string }> {
   const encoder = new ReceiptPrinterEncoder({ language: 'esc-pos', width: 32 })
-  const testBuffer = encoder.initialize().line('PharmaPOS Printer Test OK').newline().cut().encode()
+  const testBuffer = encoder.initialize().line('VantisPOS Printer Test OK').newline().cut().encode()
 
   try {
     await printToNetworkSocket(testBuffer, ipAddress, port, 3000)

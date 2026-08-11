@@ -3,6 +3,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Alert } from '../components/ui/Alert'
 import { useCurrentUser } from '../context/CurrentUserContext'
+import vantisLogo from '../assets/vantis-logo.png'
 
 export function LoginScreen(): React.JSX.Element {
   const { login } = useCurrentUser()
@@ -28,10 +29,7 @@ export function LoginScreen(): React.JSX.Element {
     <div className="flex h-screen w-screen items-center justify-center bg-[var(--background)]">
       <Card className="w-[380px] space-y-4 p-8 shadow-lg">
         <div className="text-center">
-          <div className="mx-auto mb-3 flex icon-9 items-center justify-center rounded-[var(--radius)] bg-[var(--primary)] text-lg font-bold text-[var(--primary-foreground)]">
-            Rx
-          </div>
-          <h1 className="text-xl font-semibold text-[var(--foreground)]">PharmaPOS</h1>
+          <img src={vantisLogo} alt="VantisPOS" className="mx-auto mb-3 h-10 w-auto" />
           <p className="text-xs text-[var(--muted-foreground)]">Sign in to continue</p>
         </div>
 

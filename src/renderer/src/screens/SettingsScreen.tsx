@@ -151,9 +151,9 @@ const SECTION_KEYWORDS: Record<string, string[]> = {
     'customer tab',
     'store credit'
   ],
-  otcPreview: ['otc', 'otc-only mode', 'otc only'],
   reportingSnapshot: ['reporting', 'reports', 'dashboard', 'csv', 'xlsx', 'export'],
   updates: ['software update', 'update', 'auto update', 'version', 'install update'],
+  demoMode: ['demo mode', 'demo', 'sandbox', 'client demo', 'presentation mode'],
   testMode: ['test mode', 'ipc error', 'force reject', 'debug', 'simulate error']
 }
 
@@ -179,8 +179,8 @@ const TIER_LABELS: Record<SettingsTier, { title: string; description: string }> 
 const TIER_SECTIONS: Record<SettingsTier, string[]> = {
   daily: ['payment', 'printer', 'backup'],
   setup: ['storeInfo', 'receiptTemplate', 'credit', 'density', 'customerDisplay'],
-  compliance: ['compliance', 'featureFlags', 'optionalModules', 'otcPreview', 'reportingSnapshot'],
-  system: ['updates', 'testMode']
+  compliance: ['compliance', 'featureFlags', 'optionalModules', 'reportingSnapshot'],
+  system: ['updates', 'demoMode', 'testMode']
 }
 
 export function SettingsScreen() {
@@ -212,6 +212,8 @@ export function SettingsScreen() {
   const [backupDestination, setBackupDestination] = React.useState<BackupDestination | null>(null)
   const [availableDrives, setAvailableDrives] = React.useState<ExternalDrive[]>([])
   const [savingDestination, setSavingDestination] = React.useState(false)
+  const [demoModeEnabled, setDemoModeEnabled] = React.useState(false)
+  const [togglingDemoMode, setTogglingDemoMode] = React.useState(false)
 
   const loadBackupSettings = async () => {
     try {
@@ -330,7 +332,28 @@ export function SettingsScreen() {
       .catch((err) =>
         setError(err instanceof Error ? err.message : 'Failed to load customer settings.')
       )
+    window.api.settings
+      .getDemoMode()
+      .then(setDemoModeEnabled)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load demo mode.'))
   }, [])
+
+  const handleToggleDemoMode = async (enabled: boolean): Promise<void> => {
+    const confirmMessage = enabled
+      ? 'Turn on Demo Mode? This signs you out and restarts the app into a separate demo database with 2 preset accounts (Cashier / Manager, password 12345678), sample customers, products, and sales history. Your real data is untouched and stays exactly as it is.'
+      : 'Turn off Demo Mode? This signs you out and restarts the app back into your real database and normal login.'
+    if (!window.confirm(confirmMessage)) return
+
+    setTogglingDemoMode(true)
+    setError(null)
+    try {
+      await window.api.settings.setDemoMode(enabled)
+      // The app relaunches from the main process right after this resolves.
+    } catch (err: unknown) {
+      setTogglingDemoMode(false)
+      setError(err instanceof Error ? err.message : 'Failed to toggle demo mode.')
+    }
+  }
 
   const handleToggle = async (key: string, enabled: boolean) => {
     setError(null)
@@ -480,7 +503,6 @@ export function SettingsScreen() {
     }
   }
 
-  const otcFlag = flags.find((f) => f.key === 'otcMode')
   const rewardFlag = flags.find((f) => f.key === 'rewardPoints')
   const lotteryFlag = flags.find((f) => f.key === 'lotteryTickets')
   const chargeFlag = flags.find((f) => f.key === 'chargeAccounts')
@@ -1179,20 +1201,6 @@ export function SettingsScreen() {
             </div>
           )}
 
-          {sectionVisible('otcPreview') && otcFlag?.enabled && (
-            <Card className="border-[var(--primary)]/30 bg-[var(--muted)] text-[var(--foreground)]">
-              <CardHeader>
-                <CardTitle className="text-[var(--primary)]">
-                  OTC-Only Mode Preview Active
-                </CardTitle>
-                <CardDescription className="text-[var(--muted-foreground)]">
-                  This placeholder card is rendered conditionally because the{' '}
-                  <strong>OTC-Only Mode</strong> feature flag is enabled.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          )}
-
           {(sectionVisible('optionalModules') || sectionVisible('reportingSnapshot')) && (
             <div className="grid gap-4 md:grid-cols-2">
               {sectionVisible('optionalModules') && (
@@ -1290,6 +1298,27 @@ export function SettingsScreen() {
           </div>
 
           {sectionVisible('updates') && <UpdateSettingsCard />}
+
+          {sectionVisible('demoMode') && user?.role === 'MANAGER' && (
+            <Card>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <CardTitle>Demo Mode</CardTitle>
+                  <CardDescription>
+                    Switch to a separate, sandboxed database with preset demo accounts, sample
+                    customers, products, and sales history — for showing the app to a client without
+                    touching your real data. Stays on until you turn it off here, even across
+                    sign-out or closing the app.
+                  </CardDescription>
+                </div>
+                <Switch
+                  checked={demoModeEnabled}
+                  onCheckedChange={handleToggleDemoMode}
+                  disabled={togglingDemoMode}
+                />
+              </div>
+            </Card>
+          )}
 
           {sectionVisible('testMode') && (
             <Card className="border-[var(--warning)]/30 bg-[var(--warning-bg)]">
