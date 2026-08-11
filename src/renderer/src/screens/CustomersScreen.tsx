@@ -2,6 +2,7 @@ import * as React from 'react'
 import {
   ArrowDownRight,
   ArrowUpRight,
+  Ban,
   Lock,
   Plus,
   Search,
@@ -19,7 +20,15 @@ const blank = { firstName: '', lastName: '', phone: '', address: '', email: '' }
 const cents = (value: string): number => Math.round(Number(value) * 100)
 
 function Balance({ value }: { value: number }): React.JSX.Element {
-  const credit = value >= 0
+  if (value === 0) {
+    return (
+      <div className="flex items-center gap-2 text-lg font-semibold text-[var(--muted-foreground)]">
+        <Ban className="icon-5 shrink-0" />
+        <span>No balance on file</span>
+      </div>
+    )
+  }
+  const credit = value > 0
   const Icon = credit ? ArrowUpRight : ArrowDownRight
   return (
     <div
@@ -27,9 +36,7 @@ function Balance({ value }: { value: number }): React.JSX.Element {
     >
       <Icon className="icon-5 shrink-0" />
       <span>
-        {credit
-          ? `Credit available: ${formatCurrency(value)}`
-          : `Customer owes: ${formatCurrency(Math.abs(value))}`}
+        {credit ? `Credit available: ${formatCurrency(value)}` : `Customer owes: ${formatCurrency(value)}`}
       </span>
     </div>
   )
@@ -53,6 +60,7 @@ export function CustomersScreen(): React.JSX.Element {
   const [action, setAction] = React.useState<'funds' | 'credit' | 'points' | null>(null)
   const isManager = useHasRole('MANAGER')
   const [confirmingDelete, setConfirmingDelete] = React.useState(false)
+  const [searching, setSearching] = React.useState(false)
 
   const refresh = React.useCallback(
     async (id?: number) => {
@@ -70,13 +78,27 @@ export function CustomersScreen(): React.JSX.Element {
   React.useEffect(() => {
     if (!query.trim()) {
       setResults([])
+      setSearching(false)
       return
     }
+    setSearching(true)
     const timer = window.setTimeout(() => {
-      void refresh()
+      void refresh().finally(() => setSearching(false))
     }, 200)
     return () => window.clearTimeout(timer)
   }, [refresh, query])
+
+  React.useEffect(() => {
+    if (!confirmingDelete && !action) return
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        setConfirmingDelete(false)
+        setAction(null)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [confirmingDelete, action])
 
   React.useEffect(() => {
     void window.api.featureFlag
@@ -206,19 +228,24 @@ export function CustomersScreen(): React.JSX.Element {
 
       {message && <Alert variant={message.type}>{message.text}</Alert>}
 
-      <div className="grid grid-cols-12 gap-4">
-        <Card className="col-span-4 h-fit">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
+        <Card className="md:col-span-4 h-fit">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 icon-4 -translate-y-1/2 text-[var(--muted-foreground)]" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search name, phone, address, email"
-              className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] pl-9 pr-3 text-sm focus:border-[var(--primary)] focus:outline-none"
+              aria-label="Search customers"
+              className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] pl-9 pr-3 text-sm focus:border-[var(--primary)] focus:shadow-[0_0_0_3px_rgba(15,118,110,0.15)] focus:outline-none"
             />
           </div>
           <div className="mt-3 space-y-2">
-            {results.map((customer) => (
+            {searching && (
+              <p className="px-1 py-1 text-xs text-[var(--muted-foreground)]">Searching…</p>
+            )}
+            {!searching &&
+              results.map((customer) => (
               <button
                 key={customer.id}
                 onClick={() => void choose(customer.id)}
@@ -236,7 +263,7 @@ export function CustomersScreen(): React.JSX.Element {
                 </div>
               </button>
             ))}
-            {!results.length && (
+            {!searching && !results.length && (
               <EmptyState
                 icon={UsersIcon}
                 title={query.trim() ? `No matches for "${query}"` : 'Search to find a customer'}
@@ -254,7 +281,7 @@ export function CustomersScreen(): React.JSX.Element {
           </div>
         </Card>
 
-        <div className="col-span-8 space-y-4">
+        <div className="md:col-span-8 space-y-4">
           {!editing && (
             <Card>
               <CardHeader>
@@ -275,7 +302,7 @@ export function CustomersScreen(): React.JSX.Element {
                   Required contact details are kept inline for quick corrections.
                 </CardDescription>
               </CardHeader>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input
                   value={form.firstName}
                   onChange={(e) => updateForm('firstName', e.target.value)}
@@ -335,7 +362,7 @@ export function CustomersScreen(): React.JSX.Element {
 
           {selected && (
             <>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Card>
                   <CardHeader>
                     <CardTitle>Pharmacy Credit</CardTitle>
@@ -491,7 +518,7 @@ export function CustomersScreen(): React.JSX.Element {
                 will no longer be linked to a name. This cannot be undone.
               </CardDescription>
             </CardHeader>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 onClick={() => setConfirmingDelete(false)}
                 className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm text-[var(--foreground)]"
