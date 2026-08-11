@@ -15,15 +15,13 @@ import { initCustomerDisplayWindow, teardownCustomerDisplayWindow } from './cust
 import { isDemoModeEnabled, isDemoDatabaseUninitialized, resolveDatabaseUrl } from './demoMode'
 import { seedDemoDatabase } from './db/seedDemo'
 
-// .env (dev-only, gitignored) is the only thing that sets DATABASE_URL outside of
-// demo mode, and it's intentionally excluded from the packaged app. Without this
-// fallback, Prisma has no database to connect to at all in a production install.
-// userData survives every reinstall/update, unlike the app's own install directory.
-// Demo mode always wins over .env — it needs a fully separate, swappable database
+// .env (dev-only, gitignored) is the only thing that sets DATABASE_URL under normal
+// circumstances, and it's intentionally excluded from the packaged app. resolveDatabaseUrl()
+// honors it when present and falls back appropriately otherwise (including right after an
+// app.relaunch(), which loses .env — see the comment on resolveDatabaseUrl for why that
+// matters). Demo mode always wins over .env — it needs a fully separate, swappable database
 // file regardless of dev/prod, so a client demo never touches real data.
-if (isDemoModeEnabled() || !process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = resolveDatabaseUrl()
-}
+process.env.DATABASE_URL = resolveDatabaseUrl()
 
 /**
  * Checks that the electron-vite dev server is actually reachable before pointing the
