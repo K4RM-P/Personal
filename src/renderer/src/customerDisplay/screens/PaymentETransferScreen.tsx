@@ -43,8 +43,7 @@ export function PaymentETransferScreen({
             fontSize: headlineFontSize,
             fontWeight: 600,
             lineHeight: 1.15,
-            maxWidth: '100%',
-            overflowWrap: 'break-word'
+            maxWidth: '100%'
           }}
         >
           {headlineText}

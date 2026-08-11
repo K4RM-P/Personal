@@ -24,6 +24,36 @@ function fakeMeasurer(text: string, containerWidthPx: number) {
   }
 }
 
+/**
+ * A word-aware stand-in, unlike `fakeMeasurer` above: wraps only at spaces —
+ * exactly like the real measurer with word-breaking disabled — and reports
+ * the widest line's width via widthPx so a word wider than the container is
+ * visible to computeFitFontSize instead of silently accepted.
+ */
+function wordWrapMeasurer(text: string, containerWidthPx: number) {
+  const AVG_GLYPH_WIDTH_RATIO = 0.55
+  const words = text.split(' ')
+  return (fontSizePx: number): { heightPx: number; widthPx: number } => {
+    const wordWidth = (w: string): number => w.length * fontSizePx * AVG_GLYPH_WIDTH_RATIO
+    let lineWidth = 0
+    let lines = 1
+    let widestLine = 0
+    for (const word of words) {
+      const w = wordWidth(word)
+      const withSpace = lineWidth > 0 ? w + fontSizePx * AVG_GLYPH_WIDTH_RATIO : w
+      if (lineWidth > 0 && lineWidth + withSpace > containerWidthPx) {
+        widestLine = Math.max(widestLine, lineWidth)
+        lines += 1
+        lineWidth = w
+      } else {
+        lineWidth += withSpace
+      }
+      widestLine = Math.max(widestLine, lineWidth, w)
+    }
+    return { heightPx: lines * fontSizePx * 1.15, widthPx: widestLine }
+  }
+}
+
 describe('computeFitFontSize', () => {
   it('uses the maximum size for text that already fits', () => {
     const size = computeFitFontSize(fakeMeasurer('HI', 1600), 800)
@@ -58,6 +88,18 @@ describe('computeFitFontSize', () => {
     const narrow = computeFitFontSize(fakeMeasurer(text, 800), 800)
     const wide = computeFitFontSize(fakeMeasurer(text, 2400), 800)
     expect(wide).toBeGreaterThan(narrow)
+  })
+
+  it('never chooses a size that leaves a word wider than the container (no word-breaking)', () => {
+    // Regression: a naive height/line-count check alone can pick a size where
+    // "PERSONALIZED" doesn't fit on its own line, which — with word-breaking
+    // disabled — would render as a horizontal overflow instead of a clean
+    // two-line wrap. The measurer here never breaks a word, so any accepted
+    // size must leave every word within the container width.
+    const measure = wordWrapMeasurer('PERSONALIZED SERVICE', 900)
+    const size = computeFitFontSize(measure, 100_000, { availableWidthPx: 900 })
+    const { widthPx } = measure(size)
+    expect(widthPx).toBeLessThanOrEqual(900)
   })
 })
 
