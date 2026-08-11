@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { PackageSearch } from 'lucide-react'
+import { PackageSearch, Sparkles, Lock, Search, Loader2 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
 import { Alert } from '../components/ui/Alert'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -28,10 +28,19 @@ type CatalogRow = {
   genericName: string | null
 }
 
+type ProductTab = 'catalog' | 'tiers' | 'import' | 'mckesson'
+
+const TABS: { id: ProductTab; label: string }[] = [
+  { id: 'catalog', label: 'Product Catalog' },
+  { id: 'tiers', label: 'Tiered Markup Engine' },
+  { id: 'import', label: 'Bulk Spreadsheet Import' },
+  { id: 'mckesson', label: 'McKesson Catalogue' }
+]
+
 export function ProductsScreen(): React.JSX.Element {
   const [tiers, setTiers] = React.useState<PricingTier[]>([])
   const [catalogItems, setCatalogItems] = React.useState<CatalogRow[]>([])
-  const [activeTab, setActiveTab] = React.useState<'catalog' | 'tiers' | 'import' | 'mckesson'>('catalog')
+  const [activeTab, setActiveTab] = React.useState<ProductTab>('catalog')
   const [catalogSearch, setCatalogSearch] = React.useState('')
   const [catalogLoading, setCatalogLoading] = React.useState(false)
 
@@ -233,41 +242,24 @@ export function ProductsScreen(): React.JSX.Element {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)]">Products & Pricing Tiers</h1>
-          <p className="text-[var(--muted-foreground)]">Product catalog CRUD, Tiered Markup Pricing Engine, and CSV import.</p>
+          <p className="text-sm text-[var(--muted-foreground)]">Product catalog CRUD, Tiered Markup Pricing Engine, and CSV import.</p>
         </div>
-        <div className="flex space-x-2 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-1">
-          <button
-            onClick={() => setActiveTab('catalog')}
-            className={`px-4 py-1.5 text-xs font-semibold rounded ${
-              activeTab === 'catalog' ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-            }`}
-          >
-            Product Catalog
-          </button>
-          <button
-            onClick={() => setActiveTab('tiers')}
-            className={`px-4 py-1.5 text-xs font-semibold rounded ${
-              activeTab === 'tiers' ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-            }`}
-          >
-            Tiered Markup Engine
-          </button>
-          <button
-            onClick={() => setActiveTab('import')}
-            className={`px-4 py-1.5 text-xs font-semibold rounded ${
-              activeTab === 'import' ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-            }`}
-          >
-            Bulk Spreadsheet Import
-          </button>
-          <button
-            onClick={() => setActiveTab('mckesson')}
-            className={`px-4 py-1.5 text-xs font-semibold rounded ${
-              activeTab === 'mckesson' ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-            }`}
-          >
-            McKesson Catalogue
-          </button>
+        <div role="tablist" aria-label="Products sections" className="flex gap-1 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-1">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`min-h-9 rounded-[calc(var(--radius)-2px)] px-4 text-xs font-semibold transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-[var(--primary)] text-[var(--primary-foreground)]'
+                  : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -277,103 +269,125 @@ export function ProductsScreen(): React.JSX.Element {
           {/* Add/Edit Product Form (4 Cols) */}
           <div className="col-span-4">
             <Card>
-              <h3 className="mb-4 font-semibold text-[var(--foreground)]">
-                {editingProductId ? 'Edit Product' : 'Add New Product'}
-              </h3>
-              {formMessage && <Alert variant={formMessage.type} className="mb-3">{formMessage.text}</Alert>}
-              <form onSubmit={handleSaveProduct} className="space-y-3 text-xs">
+              <CardHeader>
+                <CardTitle>{editingProductId ? 'Edit Product' : 'Add New Product'}</CardTitle>
+              </CardHeader>
+              {formMessage && (
+                <Alert variant={formMessage.type} className="mb-3">
+                  {formMessage.text}
+                </Alert>
+              )}
+              <form onSubmit={handleSaveProduct} className="space-y-3">
                 <div>
-                  <label className="mb-1 block text-[var(--muted-foreground)]">SKU Code*</label>
+                  <label htmlFor="product-sku" className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                    SKU Code*
+                  </label>
                   <input
+                    id="product-sku"
                     type="text"
                     value={sku}
                     onChange={(e) => setSku(e.target.value)}
                     required
                     placeholder="e.g. OTC-100"
-                    className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-[var(--foreground)]"
+                    className="input"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-[var(--muted-foreground)]">Product Name*</label>
+                  <label htmlFor="product-name" className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                    Product Name*
+                  </label>
                   <input
+                    id="product-name"
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
                     placeholder="e.g. Allergy Relief 24ct"
-                    className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-[var(--foreground)]"
+                    className="input"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-[var(--muted-foreground)]">Supplier Cost ($)*</label>
+                  <label htmlFor="product-cost" className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                    Supplier Cost ($)*
+                  </label>
                   <input
+                    id="product-cost"
                     type="number"
                     step="0.01"
                     value={costDollars}
                     onChange={(e) => setCostDollars(e.target.value)}
                     required
                     placeholder="0.00"
-                    className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-[var(--foreground)]"
+                    className="input"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-[var(--muted-foreground)]">Barcode / UPC</label>
+                  <label htmlFor="product-barcode" className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                    Barcode / UPC
+                  </label>
                   <input
+                    id="product-barcode"
                     type="text"
                     value={barcode}
                     onChange={(e) => setBarcode(e.target.value)}
                     placeholder="Optional barcode digits"
-                    className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-[var(--foreground)]"
+                    className="input"
                   />
                 </div>
 
-                <div className="flex items-center space-x-2 pt-1">
+                <label
+                  htmlFor="pinPrice"
+                  className="flex min-h-9 cursor-pointer items-center gap-2 rounded-[var(--radius)] px-1 text-xs text-[var(--foreground)]"
+                >
                   <input
                     type="checkbox"
                     id="pinPrice"
                     checked={isPinned}
                     onChange={(e) => setIsPinned(e.target.checked)}
+                    className="icon-4 shrink-0 accent-[var(--primary)]"
                   />
-                  <label htmlFor="pinPrice" className="text-[var(--foreground)]">
-                    Pin Manual Override Price (Ignore Tier Rule)
-                  </label>
-                </div>
+                  Pin manual override price (ignore tier rule)
+                </label>
 
                 {isPinned ? (
                   <div>
-                    <label className="mb-1 block text-[var(--muted-foreground)]">Manual Retail Price ($)</label>
+                    <label htmlFor="product-price" className="mb-1 flex items-center gap-1.5 text-xs font-medium text-[var(--muted-foreground)]">
+                      <Lock className="icon-3_5 shrink-0" aria-hidden="true" />
+                      Manual Retail Price ($)
+                    </label>
                     <input
+                      id="product-price"
                       type="number"
                       step="0.01"
                       value={priceDollars}
                       onChange={(e) => setPriceDollars(e.target.value)}
                       placeholder="0.00"
-                      className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-[var(--foreground)]"
+                      className="input"
                     />
                   </div>
                 ) : (
-                  <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-2.5 text-xs text-[var(--success)]">
-                    Auto-Calculated Tier Retail Price:{' '}
-                    <span className="font-bold">{formatCurrency(calculatedPriceCents)}</span>
+                  <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-2.5 text-xs">
+                    <span className="flex items-center gap-1.5 font-medium text-[var(--muted-foreground)]">
+                      <Sparkles className="icon-3_5 shrink-0 text-[var(--primary)]" aria-hidden="true" />
+                      Auto-calculated (tier)
+                    </span>
+                    <span className="font-semibold tabular-nums text-[var(--foreground)]">{formatCurrency(calculatedPriceCents)}</span>
                   </div>
                 )}
 
-                <div className="flex space-x-2 pt-2">
-                  <button
-                    type="submit"
-                    className="flex-1 rounded-[var(--radius)] bg-[var(--primary)] px-4 py-2 text-xs font-semibold text-[var(--primary-foreground)]"
-                  >
-                    {editingProductId ? 'Update Product' : 'Create Product'}
-                  </button>
+                <div className="flex justify-end gap-2 pt-2">
                   {editingProductId && (
                     <button
                       type="button"
                       onClick={resetForm}
-                      className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-xs text-[var(--foreground)]"
+                      className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] px-4 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--muted)]"
                     >
                       Cancel
                     </button>
                   )}
+                  <button type="submit" className="btn-primary flex-1 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-xs font-semibold text-[var(--primary-foreground)] hover:bg-[var(--primary-hover)]">
+                    {editingProductId ? 'Update Product' : 'Create Product'}
+                  </button>
                 </div>
               </form>
             </Card>
@@ -386,9 +400,7 @@ export function ProductsScreen(): React.JSX.Element {
                 <CardTitle>
                   McKesson Catalogue ({catalogItems.length.toLocaleString()} items)
                   {catalogSearch && !catalogLoading && (
-                    <span className="ml-2 text-xs font-normal text-[var(--muted-foreground)]">
-                      (filtered from full catalogue)
-                    </span>
+                    <span className="ml-2 text-xs font-normal text-[var(--muted-foreground)]">(filtered from full catalogue)</span>
                   )}
                 </CardTitle>
                 <CardDescription>
@@ -398,17 +410,20 @@ export function ProductsScreen(): React.JSX.Element {
                 </CardDescription>
               </CardHeader>
               <div className="space-y-3">
-                <input
-                  type="text"
-                  placeholder="Search catalogue by any field: code, description, UPC, vendor, form, strength..."
-                  value={catalogSearch}
-                  onChange={(e) => setCatalogSearch(e.target.value)}
-                  className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:border-[var(--primary)] focus:outline-none"
-                />
+                <div className="relative">
+                  <Search className="icon-4 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" aria-hidden="true" />
+                  <input
+                    type="text"
+                    placeholder="Search catalogue by any field: code, description, UPC, vendor, form, strength..."
+                    value={catalogSearch}
+                    onChange={(e) => setCatalogSearch(e.target.value)}
+                    className="input pl-9"
+                  />
+                </div>
                 <div className="max-h-[600px] overflow-y-auto pr-1">
                   {catalogLoading ? (
                     <div className="flex items-center justify-center gap-2 rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-6 text-sm text-[var(--muted-foreground)]">
-                      <span className="icon-4 shrink-0 animate-spin rounded-full border-2 border-[var(--muted-foreground)] border-t-transparent" aria-hidden="true" />
+                      <Loader2 className="icon-4 shrink-0 animate-spin" aria-hidden="true" />
                       Searching catalogue…
                     </div>
                   ) : displayCatalog.length === 0 ? (
@@ -420,33 +435,33 @@ export function ProductsScreen(): React.JSX.Element {
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs">
-                        <thead className="sticky top-0 bg-[var(--background)]">
-                          <tr className="text-left text-[var(--muted-foreground)]">
-                            <th className="pb-2 pr-2 font-medium">Product Code</th>
-                            <th className="pb-2 pr-2 font-medium">Description</th>
-                            <th className="pb-2 pr-2 font-medium">Effective Date</th>
-                            <th className="pb-2 pr-2 font-medium">Pack Size</th>
-                            <th className="pb-2 pr-2 font-medium">Form / Strength</th>
-                            <th className="pb-2 pr-2 font-medium">Vendor / Brand</th>
-                            <th className="pb-2 pr-2 text-right font-medium">Unit Cost ($)</th>
-                            <th className="pb-2 pr-2 text-right font-medium">Retail Price ($)</th>
-                            <th className="pb-2 text-right font-medium">UPC / Barcode</th>
+                        <thead className="sticky top-0 bg-[var(--card)]">
+                          <tr className="border-b border-[var(--border)] text-left text-[var(--muted-foreground)]">
+                            <th className="py-2 pr-2 font-medium">Product Code</th>
+                            <th className="py-2 pr-2 font-medium">Description</th>
+                            <th className="py-2 pr-2 font-medium">Effective Date</th>
+                            <th className="py-2 pr-2 font-medium">Pack Size</th>
+                            <th className="py-2 pr-2 font-medium">Form / Strength</th>
+                            <th className="py-2 pr-2 font-medium">Vendor / Brand</th>
+                            <th className="py-2 pr-2 text-right font-medium">Unit Cost</th>
+                            <th className="py-2 pr-2 text-right font-medium">Retail Price</th>
+                            <th className="py-2 text-right font-medium">UPC / Barcode</th>
                           </tr>
                         </thead>
                         <tbody>
                           {displayCatalog.map((item) => (
-                            <tr key={item.id} className="border-t border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
-                              <td className="py-1.5 pr-2 text-[var(--foreground)] font-mono">{item.itemNumber}</td>
-                              <td className="py-1.5 pr-2 text-[var(--foreground)]">{item.displayName || item.description}</td>
-                              <td className="py-1.5 pr-2 text-[var(--muted-foreground)]">{item.effectiveDate || 'N/A'}</td>
-                              <td className="py-1.5 pr-2 text-[var(--muted-foreground)]">{item.packSize || 'N/A'}</td>
-                              <td className="py-1.5 pr-2 text-[var(--muted-foreground)]">
-                                {[item.dosageForm, item.strength].filter(Boolean).join(' ') || 'N/A'}
+                            <tr key={item.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--muted)]">
+                              <td className="py-2 pr-2 font-mono text-[var(--foreground)]">{item.itemNumber}</td>
+                              <td className="py-2 pr-2 text-[var(--foreground)]">{item.displayName || item.description}</td>
+                              <td className="py-2 pr-2 text-[var(--muted-foreground)]">{item.effectiveDate || '—'}</td>
+                              <td className="py-2 pr-2 text-[var(--muted-foreground)]">{item.packSize || '—'}</td>
+                              <td className="py-2 pr-2 text-[var(--muted-foreground)]">
+                                {[item.dosageForm, item.strength].filter(Boolean).join(' ') || '—'}
                               </td>
-                              <td className="py-1.5 pr-2 text-[var(--muted-foreground)]">{item.vendorCode || 'N/A'}</td>
-                              <td className="py-1.5 pr-2 text-right text-[var(--foreground)]">{formatCurrency(item.costPriceCents)}</td>
-                              <td className="py-1.5 pr-2 text-right text-[var(--primary)] font-semibold">{formatCurrency(item.listPriceCents)}</td>
-                              <td className="py-1.5 text-right text-[var(--muted-foreground)] font-mono">{item.gtinPrimary || 'N/A'}</td>
+                              <td className="py-2 pr-2 text-[var(--muted-foreground)]">{item.vendorCode || '—'}</td>
+                              <td className="py-2 pr-2 text-right tabular-nums text-[var(--foreground)]">{formatCurrency(item.costPriceCents)}</td>
+                              <td className="py-2 pr-2 text-right tabular-nums font-semibold text-[var(--primary)]">{formatCurrency(item.listPriceCents)}</td>
+                              <td className="py-2 text-right font-mono text-[var(--muted-foreground)]">{item.gtinPrimary || '—'}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -471,32 +486,38 @@ export function ProductsScreen(): React.JSX.Element {
               </CardDescription>
             </CardHeader>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3">
               {editableTiers.map((tier, idx) => (
-                <div key={tier.id} className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3">
+                <div
+                  key={tier.id}
+                  className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3 text-xs"
+                >
                   <div>
-                    <span className="font-bold text-[var(--foreground)]">Tier {idx + 1}: </span>
-                    <span className="text-[var(--foreground)]">
-                      Cost {formatCurrency(tier.minCostCents)}
-                      {tier.maxCostCents !== null ? ` to ${formatCurrency(tier.maxCostCents)}` : '+'}
+                    <span className="font-semibold text-[var(--foreground)]">Tier {idx + 1}: </span>
+                    <span className="tabular-nums text-[var(--foreground)]">
+                      {formatCurrency(tier.minCostCents)}
+                      {tier.maxCostCents !== null ? ` – ${formatCurrency(tier.maxCostCents)}` : '+'}
                     </span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <label className="text-[var(--muted-foreground)]">Markup %:</label>
+                  <div className="flex items-center gap-2">
+                    <label htmlFor={`tier-markup-${tier.id}`} className="text-[var(--muted-foreground)]">
+                      Markup %:
+                    </label>
                     <input
+                      id={`tier-markup-${tier.id}`}
                       type="number"
                       value={tier.markupPercent}
                       onChange={(e) => handleTierMarkupChange(idx, parseFloat(e.target.value) || 0)}
-                      className="w-20 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-2 py-1 font-bold text-[var(--foreground)]"
+                      className="input min-h-9 w-24 text-right font-semibold tabular-nums"
                     />
                   </div>
                 </div>
               ))}
               {tierMessage && <Alert variant={tierMessage.type}>{tierMessage.text}</Alert>}
-              <div className="pt-2 flex justify-end">
+              <div className="flex justify-end pt-2">
                 <button
                   onClick={handleSaveTiers}
-                  className="rounded-[var(--radius)] bg-[var(--primary)] px-4 py-2 text-xs font-semibold text-[var(--primary-foreground)]"
+                  className="btn-primary rounded-[var(--radius)] bg-[var(--primary)] px-4 text-xs font-semibold text-[var(--primary-foreground)] hover:bg-[var(--primary-hover)]"
                 >
                   Save Tier Table & Recalculate Catalog
                 </button>
@@ -506,27 +527,29 @@ export function ProductsScreen(): React.JSX.Element {
 
           {/* Tier Change Impact Preview */}
           {previewImpact.length > 0 && (
-            <Card className="border-[var(--warning)]/30 bg-[var(--warning-bg)]">
+            <Card className="border-[var(--warning)]/40">
               <CardHeader>
                 <CardTitle className="text-[var(--warning)]">
                   Tier Change Impact Preview ({previewAffectedCount} products affected)
                 </CardTitle>
-                <CardDescription className="text-[var(--warning)]/80">
+                <CardDescription>
                   Preview showing which catalog items will change retail price before saving tier edits.
-                  {previewAffectedCount > previewImpact.length &&
-                    ` Showing the first ${previewImpact.length} of ${previewAffectedCount}.`}
+                  {previewAffectedCount > previewImpact.length && ` Showing the first ${previewImpact.length} of ${previewAffectedCount}.`}
                 </CardDescription>
               </CardHeader>
-              <div className="space-y-2 max-h-60 overflow-y-auto text-xs pr-1">
+              <div className="max-h-60 space-y-2 overflow-y-auto pr-1 text-xs">
                 {previewImpact.map((item) => (
-                  <div key={item.productId} className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-2">
+                  <div
+                    key={item.productId}
+                    className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-2"
+                  >
                     <div>
-                      <span className="font-bold text-[var(--foreground)]">{item.name}</span>{' '}
+                      <span className="font-semibold text-[var(--foreground)]">{item.name}</span>{' '}
                       <span className="text-[var(--muted-foreground)]">({item.sku})</span>
                     </div>
-                    <div className="flex space-x-4">
+                    <div className="flex items-center gap-4 tabular-nums">
                       <span className="text-[var(--muted-foreground)]">Current: {formatCurrency(item.currentPriceCents)}</span>
-                      <span className="font-bold text-[var(--primary)]">New: {formatCurrency(item.newPriceCents)}</span>
+                      <span className="font-semibold text-[var(--primary)]">New: {formatCurrency(item.newPriceCents)}</span>
                       <span className={item.priceDiffCents > 0 ? 'text-[var(--success)]' : 'text-[var(--warning)]'}>
                         ({item.priceDiffCents > 0 ? '+' : ''}
                         {formatCurrency(item.priceDiffCents)})
@@ -546,19 +569,25 @@ export function ProductsScreen(): React.JSX.Element {
           <CardHeader>
             <CardTitle>Bulk Product Spreadsheet Import (CSV)</CardTitle>
             <CardDescription>
-              Paste CSV text formatted as <code>SKU,Name,CostInDollars,Barcode(optional)</code>.
-              Retail prices will auto-calculate via the active Tiered Markup Engine.
+              Paste CSV text formatted as <code>SKU,Name,CostInDollars,Barcode(optional)</code>. Retail prices will
+              auto-calculate via the active Tiered Markup Engine.
             </CardDescription>
           </CardHeader>
 
           <div className="space-y-4">
-            <textarea
-              rows={8}
-              value={csvText}
-              onChange={(e) => setCsvText(e.target.value)}
-              placeholder={`OTC-101,Aspirin 81mg 100ct,2.50,012345678910\nOTC-102,Cough Syrup 120ml,4.00,012345678911\nOTC-103,First Aid Kit,12.00,012345678912`}
-              className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3 text-xs text-[var(--foreground)] font-mono placeholder:text-[var(--muted-foreground)] focus:border-[var(--primary)] focus:outline-none"
-            />
+            <div>
+              <label htmlFor="csv-import" className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                CSV data
+              </label>
+              <textarea
+                id="csv-import"
+                rows={8}
+                value={csvText}
+                onChange={(e) => setCsvText(e.target.value)}
+                placeholder={`OTC-101,Aspirin 81mg 100ct,2.50,012345678910\nOTC-102,Cough Syrup 120ml,4.00,012345678911\nOTC-103,First Aid Kit,12.00,012345678912`}
+                className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3 font-mono text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/15"
+              />
+            </div>
 
             {importPreview.length > 0 && (
               <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
@@ -567,11 +596,19 @@ export function ProductsScreen(): React.JSX.Element {
                 </div>
                 <div className="space-y-2 text-xs">
                   {importPreview.slice(0, 6).map((row, index) => (
-                    <div key={`${row.sku}-${index}`} className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-white px-3 py-2">
+                    <div
+                      key={`${row.sku}-${index}`}
+                      className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] px-3 py-2"
+                    >
                       <span className="font-medium text-[var(--foreground)]">{row.name}</span>
-                      <span className="text-[var(--muted-foreground)]">{row.sku} • {formatCurrency(row.costCents)}</span>
+                      <span className="tabular-nums text-[var(--muted-foreground)]">
+                        {row.sku} • {formatCurrency(row.costCents)}
+                      </span>
                     </div>
                   ))}
+                  {importPreview.length > 6 && (
+                    <p className="text-[var(--muted-foreground)]">…and {importPreview.length - 6} more rows.</p>
+                  )}
                 </div>
               </div>
             )}
@@ -579,12 +616,14 @@ export function ProductsScreen(): React.JSX.Element {
             {importError && <Alert variant="error">{importError}</Alert>}
             {importCount !== null && <Alert variant="success">Successfully imported/upserted {importCount} products.</Alert>}
 
-            <button
-              onClick={handleBulkImport}
-              className="rounded-[var(--radius)] bg-[var(--primary)] px-4 py-2 text-xs font-semibold text-[var(--primary-foreground)]"
-            >
-              Preview and import CSV
-            </button>
+            <div className="flex justify-end">
+              <button
+                onClick={handleBulkImport}
+                className="btn-primary rounded-[var(--radius)] bg-[var(--primary)] px-4 text-xs font-semibold text-[var(--primary-foreground)] hover:bg-[var(--primary-hover)]"
+              >
+                Preview and import CSV
+              </button>
+            </div>
           </div>
         </Card>
       )}

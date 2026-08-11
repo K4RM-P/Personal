@@ -1,7 +1,8 @@
 import * as React from 'react'
-import { UploadCloud, CheckCircle2 } from 'lucide-react'
+import { UploadCloud, CheckCircle2, PackageCheck } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription } from './ui/Card'
 import { Alert } from './ui/Alert'
+import { EmptyState } from './ui/EmptyState'
 import { formatCurrency } from '@shared/formatCurrency'
 import type {
   AutoImportResult,
@@ -162,7 +163,7 @@ export function McKessonCatalogTab(): React.JSX.Element {
 
       {/* Success result */}
       {result && phase === 'done' && (
-        <Card className="border-[var(--success)]/30 bg-[var(--success-bg)]">
+        <Card className="border-[var(--success)]/40">
           <CardHeader>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="icon-5 shrink-0 text-[var(--success)]" aria-hidden="true" />
@@ -176,42 +177,42 @@ export function McKessonCatalogTab(): React.JSX.Element {
             </CardDescription>
           </CardHeader>
 
-          {result.newItems.length > 0 && (
+          {result.newItems.length > 0 ? (
             <div>
-              <h4 className="mb-3 px-6 text-xs font-semibold text-[var(--foreground)]">
+              <h4 className="mb-3 text-xs font-semibold text-[var(--foreground)]">
                 New items added to catalogue ({result.newItems.length.toLocaleString()})
               </h4>
-              <div className="max-h-96 space-y-1 overflow-y-auto px-6 pb-6">
+              <div className="max-h-96 overflow-y-auto pr-1">
                 <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-left text-[var(--muted-foreground)]">
-                      <th className="pb-2 pr-2 font-medium">Product Code</th>
-                      <th className="pb-2 pr-2 font-medium">Description</th>
-                      <th className="pb-2 pr-2 text-right font-medium">Unit Cost ($)</th>
-                      <th className="pb-2 pr-2 text-right font-medium">Retail Price ($)</th>
-                      <th className="pb-2 text-right font-medium">UPC / Barcode</th>
+                  <thead className="sticky top-0 bg-[var(--card)]">
+                    <tr className="border-b border-[var(--border)] text-left text-[var(--muted-foreground)]">
+                      <th className="py-2 pr-2 font-medium">Product Code</th>
+                      <th className="py-2 pr-2 font-medium">Description</th>
+                      <th className="py-2 pr-2 text-right font-medium">Unit Cost</th>
+                      <th className="py-2 pr-2 text-right font-medium">Retail Price</th>
+                      <th className="py-2 text-right font-medium">UPC / Barcode</th>
                     </tr>
                   </thead>
                   <tbody>
                     {result.newItems.map((item) => (
-                      <tr key={item.productId} className="border-t border-[var(--border)]/50 hover:bg-[var(--muted)]/30">
-                        <td className="py-2 pr-2 text-[var(--muted-foreground)] font-mono">{item.itemNumber}</td>
+                      <tr key={item.productId} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--muted)]">
+                        <td className="py-2 pr-2 font-mono text-[var(--muted-foreground)]">{item.itemNumber}</td>
                         <td className="py-2 pr-2 font-medium text-[var(--foreground)]">{item.name}</td>
                         <td className="py-2 pr-2 text-right tabular-nums text-[var(--foreground)]">{formatCurrency(item.costCents)}</td>
-                        <td className="py-2 pr-2 text-right tabular-nums text-[var(--primary)] font-semibold">{formatCurrency(item.priceCents)}</td>
-                        <td className="py-2 text-right text-[var(--muted-foreground)] font-mono">{item.barcode || 'N/A'}</td>
+                        <td className="py-2 pr-2 text-right tabular-nums font-semibold text-[var(--primary)]">{formatCurrency(item.priceCents)}</td>
+                        <td className="py-2 text-right font-mono text-[var(--muted-foreground)]">{item.barcode || '—'}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             </div>
-          )}
-
-          {result.newItems.length === 0 && (
-            <div className="px-6 pb-6 text-xs text-[var(--muted-foreground)]">
-              No new items were found — all products in this catalogue were already present in the previous one.
-            </div>
+          ) : (
+            <EmptyState
+              icon={PackageCheck}
+              title="No new items in this catalogue"
+              description="Every product in this file was already present from a previous import."
+            />
           )}
         </Card>
       )}
