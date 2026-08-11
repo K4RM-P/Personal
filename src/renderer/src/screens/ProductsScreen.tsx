@@ -5,7 +5,11 @@ import { Alert } from '../components/ui/Alert'
 import { EmptyState } from '../components/ui/EmptyState'
 import { PricingTier, BulkImportProductInput, Product } from '@shared/types'
 import { formatCurrency } from '@shared/formatCurrency'
-import { calculateRetailPriceCents, TierChangePreviewItem } from '@shared/pricingEngine'
+import {
+  calculateRetailPriceCents,
+  findPricingTier,
+  TierChangePreviewItem
+} from '@shared/pricingEngine'
 import { parseImportPreviewCsv } from '../lib/checkoutUi'
 import { McKessonCatalogTab } from '../components/McKessonCatalogTab'
 
@@ -26,6 +30,10 @@ type CatalogRow = {
   categoryCode: string | null
   din: string | null
   genericName: string | null
+  /** Set when this catalogue item is already stocked as a sellable Product. */
+  stockedProductId: number | null
+  /** The stocked Product's current retail price, when stockedProductId is set. */
+  stockedPriceCents: number | null
 }
 
 type ProductTab = 'catalog' | 'tiers' | 'import' | 'mckesson'
@@ -57,6 +65,10 @@ export function ProductsScreen(): React.JSX.Element {
     type: 'success' | 'error'
     text: string
   } | null>(null)
+
+  // McKesson Catalogue Retail-Price Edit State
+  const [catalogEditItem, setCatalogEditItem] = React.useState<CatalogRow | null>(null)
+  const [catalogPriceDollars, setCatalogPriceDollars] = React.useState('')
 
   // Tier Edit & Preview State
   const [editableTiers, setEditableTiers] = React.useState<PricingTier[]>([])
@@ -203,6 +215,51 @@ export function ProductsScreen(): React.JSX.Element {
     setBarcode('')
     setIsPinned(false)
     setFormMessage(null)
+  }
+
+  const refreshAfterCatalogEdit = async (): Promise<void> => {
+    if (catalogSearch.trim().length > 0) {
+      await loadCatalogSearch(catalogSearch)
+    } else {
+      await loadData()
+    }
+  }
+
+  const handleEditCatalogItem = (item: CatalogRow): void => {
+    setEditingProductId(null)
+    setCatalogEditItem(item)
+    setFormMessage(null)
+    const prefillCents =
+      item.stockedPriceCents ??
+      (item.costPriceCents > 0 && findPricingTier(item.costPriceCents, tiers)
+        ? calculateRetailPriceCents(item.costPriceCents, tiers)
+        : item.listPriceCents)
+    setCatalogPriceDollars((prefillCents / 100).toFixed(2))
+  }
+
+  const resetCatalogEdit = (): void => {
+    setCatalogEditItem(null)
+    setCatalogPriceDollars('')
+    setFormMessage(null)
+  }
+
+  const handleSaveCatalogPrice = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault()
+    if (!catalogEditItem) return
+    setFormMessage(null)
+    const priceCentsOverride = Math.round((parseFloat(catalogPriceDollars) || 0) * 100)
+
+    try {
+      if (window.api?.catalog) {
+        await window.api.catalog.promote(catalogEditItem.id, priceCentsOverride)
+        resetCatalogEdit()
+        await refreshAfterCatalogEdit()
+        setFormMessage({ type: 'success', text: 'Retail price saved.' })
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to save retail price'
+      setFormMessage({ type: 'error', text: message })
+    }
   }
 
   // Tier Table Handlers
@@ -364,149 +421,244 @@ export function ProductsScreen(): React.JSX.Element {
           <div className="col-span-4">
             <Card>
               <CardHeader>
-                <CardTitle>{editingProductId ? 'Edit Product' : 'Add New Product'}</CardTitle>
+                <CardTitle>
+                  {catalogEditItem
+                    ? 'Edit McKesson Retail Price'
+                    : editingProductId
+                      ? 'Edit Product'
+                      : 'Add New Product'}
+                </CardTitle>
               </CardHeader>
               {formMessage && (
                 <Alert variant={formMessage.type} className="mb-3">
                   {formMessage.text}
                 </Alert>
               )}
-              <form onSubmit={handleSaveProduct} className="space-y-3">
-                <div>
-                  <label
-                    htmlFor="product-sku"
-                    className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]"
-                  >
-                    SKU Code*
-                  </label>
-                  <input
-                    id="product-sku"
-                    type="text"
-                    value={sku}
-                    onChange={(e) => setSku(e.target.value)}
-                    required
-                    placeholder="e.g. OTC-100"
-                    className="input"
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="product-name"
-                    className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]"
-                  >
-                    Product Name*
-                  </label>
-                  <input
-                    id="product-name"
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    placeholder="e.g. Allergy Relief 24ct"
-                    className="input"
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="product-cost"
-                    className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]"
-                  >
-                    Supplier Cost ($)*
-                  </label>
-                  <input
-                    id="product-cost"
-                    type="number"
-                    step="0.01"
-                    value={costDollars}
-                    onChange={(e) => setCostDollars(e.target.value)}
-                    required
-                    placeholder="0.00"
-                    className="input"
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="product-barcode"
-                    className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]"
-                  >
-                    Barcode / UPC
-                  </label>
-                  <input
-                    id="product-barcode"
-                    type="text"
-                    value={barcode}
-                    onChange={(e) => setBarcode(e.target.value)}
-                    placeholder="Optional barcode digits"
-                    className="input"
-                  />
-                </div>
-
-                <label
-                  htmlFor="pinPrice"
-                  className="flex min-h-9 cursor-pointer items-center gap-2 rounded-[var(--radius)] px-1 text-xs text-[var(--foreground)]"
-                >
-                  <input
-                    type="checkbox"
-                    id="pinPrice"
-                    checked={isPinned}
-                    onChange={(e) => setIsPinned(e.target.checked)}
-                    className="icon-4 shrink-0 accent-[var(--primary)]"
-                  />
-                  Pin manual override price (ignore tier rule)
-                </label>
-
-                {isPinned ? (
+              {catalogEditItem ? (
+                <form onSubmit={handleSaveCatalogPrice} className="space-y-3">
                   <div>
-                    <label
-                      htmlFor="product-price"
-                      className="mb-1 flex items-center gap-1.5 text-xs font-medium text-[var(--muted-foreground)]"
-                    >
-                      <Lock className="icon-3_5 shrink-0" aria-hidden="true" />
-                      Manual Retail Price ($)
+                    <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                      SKU Code
                     </label>
                     <input
-                      id="product-price"
+                      type="text"
+                      value={`MCK-${catalogEditItem.itemNumber}`}
+                      disabled
+                      className="input opacity-70"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                      Product Name
+                    </label>
+                    <input
+                      type="text"
+                      value={catalogEditItem.displayName || catalogEditItem.description}
+                      disabled
+                      className="input opacity-70"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-[var(--muted-foreground)]">
+                      <Lock className="icon-3_5 shrink-0" aria-hidden="true" />
+                      Supplier Cost (McKesson)
+                    </label>
+                    <input
+                      type="text"
+                      value={formatCurrency(catalogEditItem.costPriceCents)}
+                      disabled
+                      className="input opacity-70"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+                      Barcode / UPC
+                    </label>
+                    <input
+                      type="text"
+                      value={catalogEditItem.gtinPrimary || 'None'}
+                      disabled
+                      className="input opacity-70"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="catalog-price"
+                      className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]"
+                    >
+                      Retail Price ($)*
+                    </label>
+                    <input
+                      id="catalog-price"
                       type="number"
                       step="0.01"
-                      value={priceDollars}
-                      onChange={(e) => setPriceDollars(e.target.value)}
+                      min="0"
+                      value={catalogPriceDollars}
+                      onChange={(e) => setCatalogPriceDollars(e.target.value)}
+                      required
                       placeholder="0.00"
                       className="input"
                     />
                   </div>
-                ) : (
-                  <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-2.5 text-xs">
-                    <span className="flex items-center gap-1.5 font-medium text-[var(--muted-foreground)]">
-                      <Sparkles
-                        className="icon-3_5 shrink-0 text-[var(--primary)]"
-                        aria-hidden="true"
-                      />
-                      Auto-calculated (tier)
-                    </span>
-                    <span className="font-semibold tabular-nums text-[var(--foreground)]">
-                      {formatCurrency(calculatedPriceCents)}
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex justify-end gap-2 pt-2">
-                  {editingProductId && (
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    {catalogEditItem.stockedProductId
+                      ? 'Already in your sellable catalog — saving updates its retail price.'
+                      : 'Not yet in your sellable catalog — saving adds it at this retail price.'}
+                  </p>
+                  <div className="flex justify-end gap-2 pt-2">
                     <button
                       type="button"
-                      onClick={resetForm}
+                      onClick={resetCatalogEdit}
                       className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] px-4 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--muted)]"
                     >
                       Cancel
                     </button>
-                  )}
-                  <button
-                    type="submit"
-                    className="btn-primary flex-1 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-xs font-semibold text-[var(--primary-foreground)] hover:bg-[var(--primary-hover)]"
+                    <button
+                      type="submit"
+                      className="btn-primary flex-1 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-xs font-semibold text-[var(--primary-foreground)] hover:bg-[var(--primary-hover)]"
+                    >
+                      Save Retail Price
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleSaveProduct} className="space-y-3">
+                  <div>
+                    <label
+                      htmlFor="product-sku"
+                      className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]"
+                    >
+                      SKU Code*
+                    </label>
+                    <input
+                      id="product-sku"
+                      type="text"
+                      value={sku}
+                      onChange={(e) => setSku(e.target.value)}
+                      required
+                      placeholder="e.g. OTC-100"
+                      className="input"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="product-name"
+                      className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]"
+                    >
+                      Product Name*
+                    </label>
+                    <input
+                      id="product-name"
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                      placeholder="e.g. Allergy Relief 24ct"
+                      className="input"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="product-cost"
+                      className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]"
+                    >
+                      Supplier Cost ($)*
+                    </label>
+                    <input
+                      id="product-cost"
+                      type="number"
+                      step="0.01"
+                      value={costDollars}
+                      onChange={(e) => setCostDollars(e.target.value)}
+                      required
+                      placeholder="0.00"
+                      className="input"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="product-barcode"
+                      className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]"
+                    >
+                      Barcode / UPC
+                    </label>
+                    <input
+                      id="product-barcode"
+                      type="text"
+                      value={barcode}
+                      onChange={(e) => setBarcode(e.target.value)}
+                      placeholder="Optional barcode digits"
+                      className="input"
+                    />
+                  </div>
+
+                  <label
+                    htmlFor="pinPrice"
+                    className="flex min-h-9 cursor-pointer items-center gap-2 rounded-[var(--radius)] px-1 text-xs text-[var(--foreground)]"
                   >
-                    {editingProductId ? 'Update Product' : 'Create Product'}
-                  </button>
-                </div>
-              </form>
+                    <input
+                      type="checkbox"
+                      id="pinPrice"
+                      checked={isPinned}
+                      onChange={(e) => setIsPinned(e.target.checked)}
+                      className="icon-4 shrink-0 accent-[var(--primary)]"
+                    />
+                    Pin manual override price (ignore tier rule)
+                  </label>
+
+                  {isPinned ? (
+                    <div>
+                      <label
+                        htmlFor="product-price"
+                        className="mb-1 flex items-center gap-1.5 text-xs font-medium text-[var(--muted-foreground)]"
+                      >
+                        <Lock className="icon-3_5 shrink-0" aria-hidden="true" />
+                        Manual Retail Price ($)
+                      </label>
+                      <input
+                        id="product-price"
+                        type="number"
+                        step="0.01"
+                        value={priceDollars}
+                        onChange={(e) => setPriceDollars(e.target.value)}
+                        placeholder="0.00"
+                        className="input"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-2.5 text-xs">
+                      <span className="flex items-center gap-1.5 font-medium text-[var(--muted-foreground)]">
+                        <Sparkles
+                          className="icon-3_5 shrink-0 text-[var(--primary)]"
+                          aria-hidden="true"
+                        />
+                        Auto-calculated (tier)
+                      </span>
+                      <span className="font-semibold tabular-nums text-[var(--foreground)]">
+                        {formatCurrency(calculatedPriceCents)}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    {editingProductId && (
+                      <button
+                        type="button"
+                        onClick={resetForm}
+                        className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] px-4 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--muted)]"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                    <button
+                      type="submit"
+                      className="btn-primary flex-1 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-xs font-semibold text-[var(--primary-foreground)] hover:bg-[var(--primary-hover)]"
+                    >
+                      {editingProductId ? 'Update Product' : 'Create Product'}
+                    </button>
+                  </div>
+                </form>
+              )}
             </Card>
           </div>
 
@@ -659,13 +811,22 @@ export function ProductsScreen(): React.JSX.Element {
                           {displayCatalog.map((item) => (
                             <tr
                               key={item.id}
-                              className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--muted)]"
+                              onClick={() => handleEditCatalogItem(item)}
+                              className={`cursor-pointer border-b border-[var(--border)] last:border-0 hover:bg-[var(--muted)] ${
+                                catalogEditItem?.id === item.id ? 'bg-[var(--muted)]' : ''
+                              }`}
                             >
                               <td className="py-2 pr-2 font-mono text-[var(--foreground)]">
                                 {item.itemNumber}
                               </td>
                               <td className="py-2 pr-2 text-[var(--foreground)]">
                                 {item.displayName || item.description}
+                                {item.stockedProductId && (
+                                  <Lock
+                                    className="icon-3_5 ml-1 inline shrink-0 text-[var(--muted-foreground)]"
+                                    aria-hidden="true"
+                                  />
+                                )}
                               </td>
                               <td className="py-2 pr-2 text-[var(--muted-foreground)]">
                                 {item.effectiveDate || '—'}
@@ -683,7 +844,12 @@ export function ProductsScreen(): React.JSX.Element {
                                 {formatCurrency(item.costPriceCents)}
                               </td>
                               <td className="py-2 pr-2 text-right tabular-nums font-semibold text-[var(--primary)]">
-                                {formatCurrency(item.listPriceCents)}
+                                {formatCurrency(item.stockedPriceCents ?? item.listPriceCents)}
+                                {item.stockedPriceCents === null && (
+                                  <span className="ml-1 text-[10px] font-normal text-[var(--muted-foreground)]">
+                                    (list)
+                                  </span>
+                                )}
                               </td>
                               <td className="py-2 text-right font-mono text-[var(--muted-foreground)]">
                                 {item.gtinPrimary || '—'}

@@ -222,7 +222,8 @@ const api = {
     getDeals: (catalogProductId: number): Promise<CatalogDealRow[]> =>
       ipcRenderer.invoke(IPC.CATALOG_GET_DEALS, catalogProductId),
     promote: (
-      catalogProductId: number
+      catalogProductId: number,
+      priceCentsOverride?: number
     ): Promise<{
       productId: number
       created: boolean
@@ -231,7 +232,7 @@ const api = {
       listPriceCents: number
       barcodeSkipped: boolean
       pricePinnedForZeroCost: boolean
-    }> => ipcRenderer.invoke(IPC.CATALOG_PROMOTE, catalogProductId),
+    }> => ipcRenderer.invoke(IPC.CATALOG_PROMOTE, { catalogProductId, priceCentsOverride }),
     promoteAll: (): Promise<PromoteAllResult> => ipcRenderer.invoke(IPC.CATALOG_PROMOTE_ALL),
     autoImport: (filePath: string): Promise<AutoImportResult> =>
       ipcRenderer.invoke(IPC.CATALOG_AUTO_IMPORT, filePath),

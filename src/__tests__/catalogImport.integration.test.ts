@@ -209,6 +209,59 @@ describe('promote to product', () => {
     const again = await promoteCatalogProduct(db, alpha.id)
     expect(again.created).toBe(false)
   })
+
+  it('falls back to the McKesson list price, not the supplier cost, when no tier matches', async () => {
+    // Charlie costs $5.00. Temporarily replace the tiers with a gap that
+    // excludes it, so the tier engine has nothing to compute a markup from.
+    const savedTiers = await db.pricingTier.findMany()
+    await db.pricingTier.deleteMany()
+    await db.pricingTier.createMany({
+      data: [{ id: 'gap-tier', minCostCents: 600, maxCostCents: null, markupPercent: 50 }]
+    })
+    try {
+      const charlie = await db.catalogProduct.findFirstOrThrow({ where: { itemNumber: '000003' } })
+      const promoted = await promoteCatalogProduct(db, charlie.id)
+
+      expect(promoted.created).toBe(true)
+      expect(promoted.costCents).toBe(500)
+      // Must be McKesson's list price ($10.00), never a bare re-statement of
+      // the $5.00 supplier cost.
+      expect(promoted.priceCents).toBe(promoted.listPriceCents)
+      expect(promoted.priceCents).not.toBe(promoted.costCents)
+
+      const product = await db.product.findUniqueOrThrow({ where: { id: promoted.productId } })
+      expect(product.isPinned).toBe(true)
+    } finally {
+      await db.pricingTier.deleteMany()
+      await db.pricingTier.createMany({ data: savedTiers })
+    }
+  })
+
+  it('an explicit price override pins the product at that price on create', async () => {
+    const bravo = await db.catalogProduct.findFirstOrThrow({ where: { itemNumber: '000002' } })
+    const promoted = await promoteCatalogProduct(db, bravo.id, 4999)
+
+    expect(promoted.created).toBe(true)
+    expect(promoted.priceCents).toBe(4999)
+
+    const product = await db.product.findUniqueOrThrow({ where: { id: promoted.productId } })
+    expect(product.isPinned).toBe(true)
+    expect(product.priceCents).toBe(4999)
+  })
+
+  it('an explicit price override edits an already-promoted product in place', async () => {
+    const bravo = await db.catalogProduct.findFirstOrThrow({ where: { itemNumber: '000002' } })
+    const edited = await promoteCatalogProduct(db, bravo.id, 5999)
+
+    expect(edited.created).toBe(false)
+    expect(edited.priceCents).toBe(5999)
+
+    const product = await db.product.findUniqueOrThrow({ where: { id: edited.productId } })
+    expect(product.isPinned).toBe(true)
+    expect(product.priceCents).toBe(5999)
+    // Supplier cost is never touched by a retail-price override.
+    expect(product.costCents).toBe(2000)
+  })
 })
 
 describe('refresh + reconciliation', () => {
@@ -247,7 +300,12 @@ describe('refresh + reconciliation', () => {
   it('shows the full impact in the preview WITHOUT touching the live catalogue', async () => {
     const v2 = [
       // Alpha's cost doubles -> must reprice.
-      productRecord({ itemNumber: '000001', description: 'ITEM ALPHA', costCents: 2000, gtin: GTIN_A }),
+      productRecord({
+        itemNumber: '000001',
+        description: 'ITEM ALPHA',
+        costCents: 2000,
+        gtin: GTIN_A
+      }),
       // Bravo is GONE -> must be discontinued, never deleted.
       productRecord({ itemNumber: '000003', description: 'ITEM CHARLIE 15ML', costCents: 500 }),
       productRecord({ itemNumber: '000004', description: 'ITEM DELTA', costCents: 300 })
@@ -300,8 +358,18 @@ describe('refresh + reconciliation', () => {
 
   it('clears discontinued when the item reappears in a later catalogue', async () => {
     const v3 = [
-      productRecord({ itemNumber: '000001', description: 'ITEM ALPHA', costCents: 2000, gtin: GTIN_A }),
-      productRecord({ itemNumber: '000002', description: 'ITEM BRAVO', costCents: 2000, gtin: GTIN_B }),
+      productRecord({
+        itemNumber: '000001',
+        description: 'ITEM ALPHA',
+        costCents: 2000,
+        gtin: GTIN_A
+      }),
+      productRecord({
+        itemNumber: '000002',
+        description: 'ITEM BRAVO',
+        costCents: 2000,
+        gtin: GTIN_B
+      }),
       productRecord({ itemNumber: '000003', description: 'ITEM CHARLIE 15ML', costCents: 500 }),
       productRecord({ itemNumber: '000004', description: 'ITEM DELTA', costCents: 300 })
     ]
@@ -319,7 +387,14 @@ describe('refresh + reconciliation', () => {
 describe('bad files', () => {
   it('blocks a >20% shrink until the phrase is typed, then allows it', async () => {
     // 4 products -> 1 product is a 75% shrink.
-    const tiny = [productRecord({ itemNumber: '000001', description: 'ITEM ALPHA', costCents: 2000, gtin: GTIN_A })]
+    const tiny = [
+      productRecord({
+        itemNumber: '000001',
+        description: 'ITEM ALPHA',
+        costCents: 2000,
+        gtin: GTIN_A
+      })
+    ]
     const preview = await startImport(db, writeCatalogFile('tiny.txt', tiny), noop)
 
     const shrink = preview.guards.find((g) => g.code === 'largeShrink')
