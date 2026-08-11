@@ -8,7 +8,7 @@ import { RefundsScreen } from './RefundsScreen'
 import { formatCurrency } from '@shared/formatCurrency'
 import type { Product, Customer, TransactionWithItems, ChargeResult } from '@shared/types'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
-import { Lock, RotateCcw, ShoppingCart, ArrowUpRight, ArrowDownRight, Banknote, Send, CreditCard, HeartHandshake, ChevronLeft, Pill, PackagePlus, Trash2 } from 'lucide-react'
+import { Lock, RotateCcw, ShoppingCart, ArrowUpRight, ArrowDownRight, Banknote, Send, CreditCard, HeartHandshake, ChevronLeft, Pill, PackagePlus, Trash2, MoreVertical, Plus } from 'lucide-react'
 
 type ScanFeedback = { type: 'success' | 'error'; message: string } | null
 type PaymentMethod = 'CASH' | 'E_TRANSFER' | 'CARD' | 'PHARMACY_CREDIT' | null
@@ -47,6 +47,8 @@ export function CheckoutScreen(): React.JSX.Element {
   const [showRefunds, setShowRefunds] = React.useState(false)
   const [showPayModal, setShowPayModal] = React.useState(false)
   const [customProductMode, setCustomProductMode] = React.useState<'RX' | 'NONRX' | null>(null)
+  const [showHeaderMenu, setShowHeaderMenu] = React.useState(false)
+  const [showAddMenu, setShowAddMenu] = React.useState(false)
   const [customProductError, setCustomProductError] = React.useState<string | null>(null)
 
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod>(null)
@@ -574,12 +576,31 @@ export function CheckoutScreen(): React.JSX.Element {
     <div className="mx-auto max-w-7xl space-y-4 p-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-[var(--foreground)]">Checkout</h1>
-        <button
-          onClick={() => setShowRefunds(true)}
-          className="flex items-center gap-2 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--card)]"
-        >
-          <RotateCcw className="icon-4" /> Refunds
-        </button>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowHeaderMenu((v) => !v)}
+            aria-label="More actions"
+            aria-haspopup="true"
+            aria-expanded={showHeaderMenu}
+            className="flex h-9 w-9 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)] hover:bg-[var(--card)]"
+          >
+            <MoreVertical className="icon-4" />
+          </button>
+          {showHeaderMenu && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowHeaderMenu(false)} />
+              <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">
+                <button
+                  onClick={() => { setShowRefunds(true); setShowHeaderMenu(false) }}
+                  className="flex min-h-9 w-full items-center gap-2 px-3 text-left text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted)]"
+                >
+                  <RotateCcw className="icon-4" /> Refunds
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Scan feedback — errors only; a successful add is already visible in the cart. */}
@@ -645,7 +666,7 @@ export function CheckoutScreen(): React.JSX.Element {
                   <button
                     key={product.id}
                     onClick={() => addProductToCart(product)}
-                    className="flex min-h-11 w-full items-center justify-between gap-3 border-b border-[var(--border)] px-3 text-left text-sm last:border-0 hover:bg-[var(--muted)]"
+                    className="flex min-h-9 w-full items-center justify-between gap-2 border-b border-[var(--border)] px-2.5 text-left text-sm last:border-0 hover:bg-[var(--muted)]"
                   >
                     <span className="min-w-0 flex-1 truncate">
                       <span className="font-medium text-[var(--foreground)]">{product.name}</span>
@@ -662,35 +683,50 @@ export function CheckoutScreen(): React.JSX.Element {
               </div>
             )}
           </div>
-          <button
-            type="button"
-            title="Add RX Item"
-            aria-label="Add RX Item"
-            onClick={() => setCustomProductMode('RX')}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] border border-[var(--warning)] bg-[var(--warning-bg)] text-[var(--warning)]"
-          >
-            <Pill className="icon-5" />
-          </button>
-          <button
-            type="button"
-            title="Add Non-RX Item"
-            aria-label="Add Non-RX Item"
-            onClick={() => setCustomProductMode('NONRX')}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]"
-          >
-            <PackagePlus className="icon-5" />
-          </button>
+          {/* Single "+" menu replaces the separate RX / Non-RX buttons to save header width. */}
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              title="Add custom item"
+              aria-label="Add custom item"
+              aria-haspopup="true"
+              aria-expanded={showAddMenu}
+              onClick={() => setShowAddMenu((v) => !v)}
+              className="flex h-11 w-11 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]"
+            >
+              <Plus className="icon-5" />
+            </button>
+            {showAddMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowAddMenu(false)} />
+                <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">
+                  <button
+                    onClick={() => { setCustomProductMode('RX'); setShowAddMenu(false) }}
+                    className="flex min-h-9 w-full items-center gap-2 px-3 text-left text-sm font-medium text-[var(--warning)] hover:bg-[var(--muted)]"
+                  >
+                    <Pill className="icon-4" /> Add RX Item
+                  </button>
+                  <button
+                    onClick={() => { setCustomProductMode('NONRX'); setShowAddMenu(false) }}
+                    className="flex min-h-9 w-full items-center gap-2 px-3 text-left text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted)]"
+                  >
+                    <PackagePlus className="icon-4" /> Add Non-RX Item
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </Card>
 
       {/* Cart — full width */}
-      <Card>
-        <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
-          <h3 className="font-semibold text-[var(--foreground)]">Current Cart</h3>
+      <Card className="p-3">
+        <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
+          <h3 className="text-sm font-semibold text-[var(--foreground)]">Current Cart</h3>
           <span className="text-xs text-[var(--muted-foreground)]">{cart.length} line items</span>
         </div>
 
-        <div className="mt-3 max-h-[320px] space-y-2 overflow-y-auto pr-1">
+        <div className="mt-2 max-h-[320px] space-y-1.5 overflow-y-auto pr-1">
           {cart.length === 0 ? (
             <EmptyState icon={ShoppingCart} title="Cart is empty" description="Search or scan to add items." className="p-4" />
           ) : (
@@ -700,7 +736,7 @@ export function CheckoutScreen(): React.JSX.Element {
               const lineTotalCents = lineRawCents - lineDiscountCents
               const itemHstOn = item.hstApplied !== false
               return (
-                <div key={item.product.id} className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3 text-sm">
+                <div key={item.product.id} className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-2 text-sm">
                   <div className="min-w-0">
                     <div className="truncate font-medium text-[var(--foreground)]" title={item.product.name}>{item.product.name}</div>
                     <div className="text-xs text-[var(--muted-foreground)]">
@@ -708,20 +744,20 @@ export function CheckoutScreen(): React.JSX.Element {
                       {lineDiscountCents > 0 && <span className="text-[var(--success)]"> · discount {formatCurrency(lineDiscountCents)}</span>}
                     </div>
                   </div>
-                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                    <div className="flex min-h-11 items-center rounded-[var(--radius)] border border-[var(--border)]">
-                      <button onClick={() => handleQuantityChange(item.product.id, -1)} className="min-w-11 px-2 py-2 text-[var(--foreground)]">−</button>
-                      <span className="px-2 text-[var(--foreground)]">{item.quantity}</span>
-                      <button onClick={() => handleQuantityChange(item.product.id, 1)} className="min-w-11 px-2 py-2 text-[var(--foreground)]">+</button>
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                    <div className="flex min-h-8 items-center rounded-[var(--radius)] border border-[var(--border)]">
+                      <button onClick={() => handleQuantityChange(item.product.id, -1)} className="min-w-8 px-1.5 py-1 text-[var(--foreground)]">−</button>
+                      <span className="px-1.5 text-[var(--foreground)]">{item.quantity}</span>
+                      <button onClick={() => handleQuantityChange(item.product.id, 1)} className="min-w-8 px-1.5 py-1 text-[var(--foreground)]">+</button>
                     </div>
                     <button
                       onClick={() => setDiscountItemTarget(item.product.id)}
-                      className={`min-h-11 rounded-[var(--radius)] border px-2.5 text-xs font-semibold ${lineDiscountCents > 0 ? 'border-[var(--success)] text-[var(--success)]' : 'border-[var(--border)] text-[var(--muted-foreground)]'}`}
+                      className={`min-h-8 rounded-[var(--radius)] border px-2 text-xs font-semibold ${lineDiscountCents > 0 ? 'border-[var(--success)] text-[var(--success)]' : 'border-[var(--border)] text-[var(--muted-foreground)]'}`}
                     >
-                      {lineDiscountCents > 0 ? 'Edit' : 'Discount'}
+                      {lineDiscountCents > 0 ? 'Edit' : 'Disc.'}
                     </button>
                     <label
-                      className={`flex min-h-11 items-center gap-1.5 rounded-[var(--radius)] border px-2.5 text-xs font-semibold ${itemHstOn ? 'border-[var(--border)] text-[var(--foreground)]' : 'border-[var(--warning)] text-[var(--warning)]'} ${item.hstLocked ? 'opacity-60' : ''}`}
+                      className={`flex min-h-8 items-center gap-1 rounded-[var(--radius)] border px-2 text-xs font-semibold ${itemHstOn ? 'border-[var(--border)] text-[var(--foreground)]' : 'border-[var(--warning)] text-[var(--warning)]'} ${item.hstLocked ? 'opacity-60' : ''}`}
                       title={item.hstLocked ? 'RX items cannot be charged HST' : 'Charge HST on this item'}
                     >
                       <input
@@ -733,7 +769,7 @@ export function CheckoutScreen(): React.JSX.Element {
                       />
                       HST
                     </label>
-                    <div className="w-20 text-right">
+                    <div className="w-16 text-right">
                       {lineDiscountCents > 0 && (
                         <div className="text-[10px] text-[var(--muted-foreground)] line-through">{formatCurrency(lineRawCents)}</div>
                       )}
