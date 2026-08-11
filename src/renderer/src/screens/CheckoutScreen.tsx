@@ -175,7 +175,8 @@ export function CheckoutScreen(): React.JSX.Element {
     const load = async (): Promise<void> => {
       try {
         const s = await window.api?.customerDisplay?.getSettings()
-        if (s) setCustomerDisplayInfo({ pharmacyName: s.pharmacyName, pharmacyEmail: s.eTransferEmail })
+        if (s)
+          setCustomerDisplayInfo({ pharmacyName: s.pharmacyName, pharmacyEmail: s.eTransferEmail })
       } catch {
         // Second screen is an enhancement; ignore.
       }

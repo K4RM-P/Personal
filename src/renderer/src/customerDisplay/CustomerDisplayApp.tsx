@@ -21,7 +21,11 @@ export function CustomerDisplayApp(): React.JSX.Element {
   React.useEffect(() => {
     const api = window.customerDisplayApi
     if (!api) return
-    const unsubscribers = [api.onUpdate(setState), api.onSlides(setSlides), api.onSettings(setSettings)]
+    const unsubscribers = [
+      api.onUpdate(setState),
+      api.onSlides(setSlides),
+      api.onSettings(setSettings)
+    ]
     void api
       .getSlides()
       .then(setSlides)

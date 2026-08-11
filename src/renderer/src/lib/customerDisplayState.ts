@@ -1,7 +1,4 @@
-import type {
-  CustomerDisplayLineItem,
-  CustomerDisplayState
-} from '../../../shared/customerDisplay'
+import type { CustomerDisplayLineItem, CustomerDisplayState } from '../../../shared/customerDisplay'
 
 export type CheckoutPaymentMethod = 'CASH' | 'E_TRANSFER' | 'CARD' | 'PHARMACY_CREDIT' | null
 

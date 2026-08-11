@@ -134,7 +134,9 @@ export function initCustomerDisplayWindow(db: PrismaClient): void {
   safelyCall('initial reconcile', () => {
     void reconcileWindow()
   })
-  screen.on('display-added', () => safelyCall('display-added handler', () => void reconcileWindow()))
+  screen.on('display-added', () =>
+    safelyCall('display-added handler', () => void reconcileWindow())
+  )
   screen.on('display-removed', () =>
     safelyCall('display-removed handler', () => void reconcileWindow())
   )

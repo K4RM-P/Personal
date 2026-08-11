@@ -21,15 +21,12 @@ export function IdleScreen({
   // single fallback slide (spec §2.2).
   const effectiveSlides = React.useMemo<CustomerDisplaySlideDTO[]>(
     () =>
-      slides.length > 0
-        ? slides
-        : [{ id: -1, text: pharmacyName || 'Welcome', sortOrder: 0 }],
+      slides.length > 0 ? slides : [{ id: -1, text: pharmacyName || 'Welcome', sortOrder: 0 }],
     [slides, pharmacyName]
   )
 
   const containerRef = React.useRef<HTMLDivElement>(null)
   const slidesRef = React.useRef(effectiveSlides)
-  slidesRef.current = effectiveSlides
   const indexRef = React.useRef(0)
 
   // The slide currently on screen is a snapshot, not a live lookup: editing a
@@ -38,12 +35,9 @@ export function IdleScreen({
   const [current, setCurrent] = React.useState<CustomerDisplaySlideDTO>(effectiveSlides[0])
 
   React.useEffect(() => {
-    const list = slidesRef.current
-    if (!current || !list.some((s) => s.id === current.id && s.text === current.text)) {
-      if (indexRef.current >= list.length) indexRef.current = 0
-    }
-    if (!current) setCurrent(list[0])
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    slidesRef.current = effectiveSlides
+    if (indexRef.current >= effectiveSlides.length) indexRef.current = 0
+    setCurrent((prev) => prev ?? effectiveSlides[indexRef.current])
   }, [effectiveSlides])
 
   React.useEffect(() => {
