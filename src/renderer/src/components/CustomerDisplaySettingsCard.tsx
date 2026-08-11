@@ -47,6 +47,9 @@ export function CustomerDisplaySettingsCard(): React.JSX.Element {
   }
 
   React.useEffect(() => {
+    // Initial fetch on mount, matching the other settings cards. The setState
+    // calls happen in load()'s async continuation, not synchronously here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load()
   }, [])
 
