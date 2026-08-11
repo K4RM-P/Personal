@@ -200,7 +200,7 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
             {sale.items.map((item) => (
               <label key={item.id} className="flex min-h-11 items-center justify-between rounded-[var(--radius)] border border-[var(--border)] p-3 text-sm">
                 <span className="flex items-center gap-2.5">
-                  <input type="checkbox" checked={selectedItemIds.has(item.id)} onChange={() => toggleItem(item.id)} className="h-4 w-4 shrink-0" />
+                  <input type="checkbox" checked={selectedItemIds.has(item.id)} onChange={() => toggleItem(item.id)} className="icon-4 shrink-0" />
                   {item.product.name} (qty {item.quantity}) @ {formatCurrency(item.unitPriceCents)} ea
                 </span>
                 <span className="font-semibold text-[var(--foreground)]">{formatCurrency(item.totalCents)}</span>
@@ -243,7 +243,7 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
               onClick={() => setStep('CASH')}
               className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)]"
             >
-              <Banknote className="h-5 w-5 shrink-0" />
+              <Banknote className="icon-5 shrink-0" />
               CASH
             </button>
             <button
@@ -252,21 +252,21 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
               title={!cardAvailable ? 'This sale has no card charge on file to reverse.' : undefined}
               className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              <CreditCard className="h-5 w-5 shrink-0" />
+              <CreditCard className="icon-5 shrink-0" />
               CARD
             </button>
             <button
               onClick={() => setStep('E_TRANSFER')}
               className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)]"
             >
-              <Send className="h-5 w-5 shrink-0" />
+              <Send className="icon-5 shrink-0" />
               E-TRANSFER
             </button>
             <button
               onClick={() => setStep('TAB_CREDIT')}
               className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
             >
-              <HeartHandshake className="h-5 w-5 shrink-0" />
+              <HeartHandshake className="icon-5 shrink-0" />
               DEPOSIT TO TAB
             </button>
           </div>
@@ -274,7 +274,7 @@ export function RefundWorkflowModal({ transactionId, manager, onClose }: RefundW
             onClick={() => setStep(selectedItemIds.size > 0 ? 'items' : 'scope')}
             className="flex min-h-9 w-full items-center justify-center gap-1 rounded-[var(--radius)] text-xs text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
           >
-            <ChevronLeft className="h-3.5 w-3.5" />
+            <ChevronLeft className="icon-3_5" />
             Back
           </button>
         </Card>

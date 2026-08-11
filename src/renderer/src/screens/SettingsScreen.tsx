@@ -16,6 +16,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/C
 import { Switch } from '../components/ui/Switch'
 import { Alert } from '../components/ui/Alert'
 import { useCurrentUser } from '../context/CurrentUserContext'
+import { DisplayDensityCard } from '../components/DisplayDensityCard'
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`
@@ -271,6 +272,10 @@ export function SettingsScreen() {
       )}
 
       {settingsSaved && <Alert variant="success">{settingsSaved}</Alert>}
+
+      {/* Display Density — device-level, visible to every role (not gated on
+          `isManager`/user role like the sections below). */}
+      <DisplayDensityCard />
 
       {/* Store Info for Receipt Header */}
       <Card>

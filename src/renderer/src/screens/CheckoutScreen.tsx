@@ -580,7 +580,7 @@ export function CheckoutScreen(): React.JSX.Element {
           onClick={() => setShowRefunds(true)}
           className="flex items-center gap-2 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--card)]"
         >
-          <RotateCcw className="h-4 w-4" /> Refunds
+          <RotateCcw className="icon-4" /> Refunds
         </button>
       </div>
 
@@ -632,7 +632,7 @@ export function CheckoutScreen(): React.JSX.Element {
             onClick={() => setCustomProductMode('RX')}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] border border-[var(--warning)] bg-[var(--warning-bg)] text-[var(--warning)]"
           >
-            <Pill className="h-5 w-5" />
+            <Pill className="icon-5" />
           </button>
           <button
             type="button"
@@ -641,7 +641,7 @@ export function CheckoutScreen(): React.JSX.Element {
             onClick={() => setCustomProductMode('NONRX')}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]"
           >
-            <PackagePlus className="h-5 w-5" />
+            <PackagePlus className="icon-5" />
           </button>
         </div>
       </Card>
@@ -671,7 +671,7 @@ export function CheckoutScreen(): React.JSX.Element {
                     aria-label="Delete parked sale"
                     className="flex min-h-8 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] px-2 py-1 font-medium text-[var(--error)] hover:bg-[var(--error-bg)]"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="icon-3_5" />
                   </button>
                 </div>
               </div>
@@ -726,7 +726,7 @@ export function CheckoutScreen(): React.JSX.Element {
                         checked={itemHstOn}
                         disabled={item.hstLocked}
                         onChange={() => handleToggleItemHst(item.product.id)}
-                        className="h-3.5 w-3.5"
+                        className="icon-3_5"
                       />
                       HST
                     </label>
@@ -790,7 +790,7 @@ export function CheckoutScreen(): React.JSX.Element {
               aria-label={effectiveBillDiscountCents > 0 ? 'Edit whole-bill discount' : 'Whole Bill Discount'}
               className={`flex h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-[var(--radius)] border text-[10px] font-semibold disabled:opacity-50 ${effectiveBillDiscountCents > 0 ? 'border-[var(--success)] bg-[var(--success-bg)] text-[var(--success)]' : 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]'}`}
             >
-              <Percent className="h-4 w-4" />
+              <Percent className="icon-4" />
               Disc.
             </button>
             <button
@@ -820,7 +820,7 @@ export function CheckoutScreen(): React.JSX.Element {
                   disabled={cart.length === 0}
                   className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Banknote className="h-5 w-5 shrink-0" />
+                  <Banknote className="icon-5 shrink-0" />
                   CASH
                 </button>
                 <button
@@ -828,7 +828,7 @@ export function CheckoutScreen(): React.JSX.Element {
                   disabled={cart.length === 0}
                   className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Send className="h-5 w-5 shrink-0" />
+                  <Send className="icon-5 shrink-0" />
                   E-TRANSFER
                 </button>
                 <button
@@ -836,7 +836,7 @@ export function CheckoutScreen(): React.JSX.Element {
                   disabled={cart.length === 0}
                   className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <CreditCard className="h-5 w-5 shrink-0" />
+                  <CreditCard className="icon-5 shrink-0" />
                   CARD (Debit/Credit)
                 </button>
                 <button
@@ -844,7 +844,7 @@ export function CheckoutScreen(): React.JSX.Element {
                   disabled={cart.length === 0}
                   className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <HeartHandshake className="h-5 w-5 shrink-0" />
+                  <HeartHandshake className="icon-5 shrink-0" />
                   PHARMACY CREDIT
                 </button>
                 <button
@@ -852,7 +852,7 @@ export function CheckoutScreen(): React.JSX.Element {
                   disabled={cart.length === 0}
                   className="col-span-2 flex min-h-11 items-center justify-center gap-1.5 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-xs font-medium text-[var(--foreground)] transition-colors duration-150 hover:bg-[var(--card)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Lock className="h-3.5 w-3.5" />
+                  <Lock className="icon-3_5" />
                   Hold / Park sale
                 </button>
                 <button
@@ -865,7 +865,7 @@ export function CheckoutScreen(): React.JSX.Element {
             ) : (
               <div className="mt-3 space-y-3 text-xs">
                 <button onClick={resetPaymentMethod} className="flex min-h-9 items-center gap-1 rounded-[var(--radius)] px-1 text-[var(--primary)] hover:bg-[var(--muted)]">
-                  <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="icon-4" />
                   Back to payment methods
                 </button>
 
@@ -1050,7 +1050,7 @@ export function CheckoutScreen(): React.JSX.Element {
                           </button>
                         </div>
                         <div className={`flex items-center gap-1.5 text-xs font-semibold ${customerBalance >= 0 ? 'text-[var(--success)]' : 'text-[var(--owed)]'}`}>
-                          {customerBalance >= 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+                          {customerBalance >= 0 ? <ArrowUpRight className="icon-4" /> : <ArrowDownRight className="icon-4" />}
                           <span>{customerBalance >= 0 ? 'Credit available' : 'Customer owes'}: {formatCurrency(Math.abs(customerBalance))}</span>
                         </div>
                         <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3 text-sm">

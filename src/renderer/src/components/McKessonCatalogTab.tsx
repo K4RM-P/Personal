@@ -31,7 +31,7 @@ function StepIndicator({ phase }: { phase: Phase }): React.JSX.Element {
             {idx > 0 && <div className="h-px w-6 shrink-0 bg-[var(--border)]" aria-hidden="true" />}
             <div className="flex items-center gap-1.5">
               <span
-                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${
+                className={`flex icon-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${
                   active || complete
                     ? 'bg-[var(--primary)] text-[var(--primary-foreground)]'
                     : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
@@ -126,7 +126,7 @@ export function McKessonCatalogTab(): React.JSX.Element {
           disabled={phase === 'importing'}
           className="flex min-h-24 w-full flex-col items-center justify-center gap-2 rounded-[var(--radius)] border-2 border-dashed border-[var(--border)] bg-[var(--muted)] px-4 py-6 text-center transition-colors hover:border-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <UploadCloud className="h-6 w-6 text-[var(--muted-foreground)]" aria-hidden="true" />
+          <UploadCloud className="icon-6 text-[var(--muted-foreground)]" aria-hidden="true" />
           <span className="text-sm font-semibold text-[var(--foreground)]">
             {phase === 'importing' ? 'Importing…' : 'Click to choose a WEBCAT file'}
           </span>
@@ -165,7 +165,7 @@ export function McKessonCatalogTab(): React.JSX.Element {
         <Card className="border-[var(--success)]/30 bg-[var(--success-bg)]">
           <CardHeader>
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--success)]" aria-hidden="true" />
+              <CheckCircle2 className="icon-5 shrink-0 text-[var(--success)]" aria-hidden="true" />
               <CardTitle className="text-[var(--success)]">Catalogue imported successfully</CardTitle>
             </div>
             <CardDescription>

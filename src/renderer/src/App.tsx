@@ -1,6 +1,7 @@
 import React from 'react'
 import { AppShell, NavTab } from './components/AppShell'
 import { CurrentUserProvider, useCurrentUser } from './context/CurrentUserContext'
+import { DensityProvider } from './context/DensityContext'
 import { LoginScreen } from './screens/LoginScreen'
 import { SetupWizard } from './screens/SetupWizard'
 import { useIdleLogout } from './hooks/useIdleLogout'
@@ -115,7 +116,9 @@ function Gate(): React.JSX.Element | null {
 export function App(): React.JSX.Element {
   return (
     <CurrentUserProvider>
-      <Gate />
+      <DensityProvider>
+        <Gate />
+      </DensityProvider>
     </CurrentUserProvider>
   )
 }

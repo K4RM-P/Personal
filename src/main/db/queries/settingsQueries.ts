@@ -27,7 +27,11 @@ const DEFAULTS = {
   'backup.driveName': '',
   // A15 — idle auto-logout. A checkout terminal left signed in as a manager,
   // unattended, can process refunds or adjust customer balances.
-  'session.idleTimeoutMinutes': '20'
+  'session.idleTimeoutMinutes': '20',
+  // Display density — device-level, not per-user (see docs/superpowers UI guide).
+  // Stores the density level number (1-8); the level -> scale multiplier mapping
+  // lives in the renderer (src/renderer/src/lib/density.ts).
+  'display.densityLevel': '4'
 } as const
 
 async function getSetting(db: PrismaClient, key: string): Promise<string> {
@@ -176,4 +180,20 @@ export async function saveIdleTimeoutMinutes(db: PrismaClient, minutes: number):
     throw new Error('Idle timeout must be between 1 and 240 minutes.')
   }
   await setSetting(db, 'session.idleTimeoutMinutes', String(Math.round(minutes)))
+}
+
+/** Display density (1-8, see src/renderer/src/lib/density.ts). Device-level — not per-user. */
+export async function getDisplayDensityLevel(db: PrismaClient): Promise<number> {
+  const raw = await getSetting(db, 'display.densityLevel')
+  const n = parseInt(raw, 10)
+  return Number.isFinite(n) && n >= 1 && n <= 8 ? n : 4
+}
+
+export async function saveDisplayDensityLevel(db: PrismaClient, level: number): Promise<number> {
+  if (!Number.isFinite(level) || level < 1 || level > 8) {
+    throw new Error('Display density level must be between 1 and 8.')
+  }
+  const rounded = Math.round(level)
+  await setSetting(db, 'display.densityLevel', String(rounded))
+  return rounded
 }
