@@ -225,6 +225,26 @@ export function CheckoutScreen(): React.JSX.Element {
 
   useBarcodeScanner({ onScan: handleBarcode, pauseRefs: [searchRef, tenderRef] })
 
+  // Escape closes whichever modal is currently open, topmost first. The PAY
+  // popup itself is intentionally excluded before a method is chosen (it
+  // requires an explicit Cancel tap per the guide's "no accidental dismiss
+  // mid-sale" rule) but escapes out of an in-progress payment sub-flow.
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return
+      if (customProductMode) setCustomProductMode(null)
+      else if (discountItemTarget !== null) setDiscountItemTarget(null)
+      else if (showBillDiscountModal) setShowBillDiscountModal(false)
+      else if (manualPrompt) setManualPrompt(null)
+      else if (showAddCustomer) setShowAddCustomer(false)
+      else if (showParkModal) setShowParkModal(false)
+      else if (paymentMethod) resetPaymentMethod()
+      else if (showRefunds) setShowRefunds(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [customProductMode, discountItemTarget, showBillDiscountModal, manualPrompt, showAddCustomer, showParkModal, paymentMethod, showRefunds])
+
   const handleToggleItemHst = (productId: number): void => {
     setCart((prev) =>
       prev.map((item) =>
@@ -834,7 +854,7 @@ export function CheckoutScreen(): React.JSX.Element {
             <button
               onClick={() => setShowPayModal(true)}
               disabled={cart.length === 0}
-              className="h-14 flex-1 rounded-[var(--radius)] bg-[var(--primary)] text-lg font-bold tracking-wide text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-14 flex-1 rounded-[var(--radius)] bg-[var(--primary)] text-lg font-bold tracking-wide text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               PAY
             </button>
@@ -858,7 +878,7 @@ export function CheckoutScreen(): React.JSX.Element {
                 <button
                   onClick={() => setPaymentMethod('CASH')}
                   disabled={cart.length === 0}
-                  className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Banknote className="icon-5 shrink-0" />
                   CASH
@@ -866,7 +886,7 @@ export function CheckoutScreen(): React.JSX.Element {
                 <button
                   onClick={() => setPaymentMethod('E_TRANSFER')}
                   disabled={cart.length === 0}
-                  className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Send className="icon-5 shrink-0" />
                   E-TRANSFER
@@ -874,7 +894,7 @@ export function CheckoutScreen(): React.JSX.Element {
                 <button
                   onClick={() => setPaymentMethod('CARD')}
                   disabled={cart.length === 0}
-                  className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <CreditCard className="icon-5 shrink-0" />
                   CARD (Debit/Credit)
@@ -882,7 +902,7 @@ export function CheckoutScreen(): React.JSX.Element {
                 <button
                   onClick={() => setPaymentMethod('PHARMACY_CREDIT')}
                   disabled={cart.length === 0}
-                  className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <HeartHandshake className="icon-5 shrink-0" />
                   PHARMACY CREDIT
@@ -1200,12 +1220,27 @@ export function CheckoutScreen(): React.JSX.Element {
             <CardTitle className="text-[var(--foreground)]">Add new customer</CardTitle>
             {customerCreationError && <Alert variant="error">{customerCreationError}</Alert>}
             <div className="grid grid-cols-2 gap-2">
-              <input placeholder="First name" value={newCustomer.firstName} onChange={(e) => setNewCustomer((p) => ({ ...p, firstName: e.target.value }))} className="rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm" />
-              <input placeholder="Last name" value={newCustomer.lastName} onChange={(e) => setNewCustomer((p) => ({ ...p, lastName: e.target.value }))} className="rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm" />
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">First name</label>
+                <input autoFocus value={newCustomer.firstName} onChange={(e) => setNewCustomer((p) => ({ ...p, firstName: e.target.value }))} className="input" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Last name</label>
+                <input value={newCustomer.lastName} onChange={(e) => setNewCustomer((p) => ({ ...p, lastName: e.target.value }))} className="input" />
+              </div>
             </div>
-            <input placeholder="Phone (required)" value={newCustomer.phone} onChange={(e) => setNewCustomer((p) => ({ ...p, phone: e.target.value }))} className="w-full rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm" />
-            <input placeholder="Address" value={newCustomer.address} onChange={(e) => setNewCustomer((p) => ({ ...p, address: e.target.value }))} className="w-full rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm" />
-            <input placeholder="Email (optional)" value={newCustomer.email} onChange={(e) => setNewCustomer((p) => ({ ...p, email: e.target.value }))} className="w-full rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm" />
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Phone (required)</label>
+              <input value={newCustomer.phone} onChange={(e) => setNewCustomer((p) => ({ ...p, phone: e.target.value }))} className="input" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Address</label>
+              <input value={newCustomer.address} onChange={(e) => setNewCustomer((p) => ({ ...p, address: e.target.value }))} className="input" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Email (optional)</label>
+              <input type="email" value={newCustomer.email} onChange={(e) => setNewCustomer((p) => ({ ...p, email: e.target.value }))} className="input" />
+            </div>
             <div className="grid grid-cols-2 gap-2 pt-1">
               <button
                 onClick={() => { setShowAddCustomer(false); setCustomerCreationError(null) }}
