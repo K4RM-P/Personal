@@ -47,7 +47,7 @@ export function DisplayDensityCard(): React.JSX.Element {
           style={{ minHeight: '36px' }}
         />
 
-        <div className="flex justify-between px-0.5">
+        <div className="flex justify-between">
           {DENSITY_LEVELS.map((d) => (
             <button
               key={d.level}
@@ -56,12 +56,17 @@ export function DisplayDensityCard(): React.JSX.Element {
               title={d.label}
               aria-label={d.label}
               aria-pressed={d.level === level}
-              className={`flex h-3 w-3 items-center justify-center rounded-full border ${
-                d.level === level
-                  ? 'border-[var(--primary)] bg-[var(--primary)]'
-                  : 'border-[var(--border)] bg-[var(--muted)]'
-              }`}
-            />
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
+            >
+              <span
+                aria-hidden="true"
+                className={`block h-3 w-3 rounded-full border ${
+                  d.level === level
+                    ? 'border-[var(--primary)] bg-[var(--primary)]'
+                    : 'border-[var(--border)] bg-[var(--muted)]'
+                }`}
+              />
+            </button>
           ))}
         </div>
 

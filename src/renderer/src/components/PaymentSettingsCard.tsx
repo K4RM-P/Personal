@@ -125,7 +125,7 @@ export function PaymentSettingsCard(): React.JSX.Element {
       <div className="mt-2">
         <button
           onClick={() => setWizardOpen((o) => !o)}
-          className="rounded-[var(--radius)] border border-[var(--primary)]/30 px-3 py-1.5 text-xs text-[var(--primary)] hover:bg-[var(--muted)]"
+          className="min-h-11 rounded-[var(--radius)] border border-[var(--primary)]/30 px-3 text-xs text-[var(--primary)] hover:bg-[var(--muted)]"
         >
           {wizardOpen ? 'Hide setup guide' : 'Not sure? Run the setup guide'}
         </button>
@@ -138,7 +138,7 @@ export function PaymentSettingsCard(): React.JSX.Element {
             <div className="flex gap-2 mt-2">
               <button
                 onClick={() => setWizardOpen(true)}
-                className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-xs text-[var(--foreground)]"
+                className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 text-xs text-[var(--foreground)] disabled:opacity-50"
                 disabled
               >
                 Answer below ↓
@@ -156,13 +156,13 @@ export function PaymentSettingsCard(): React.JSX.Element {
           <div className="grid gap-2">
             <p className="font-medium text-[var(--foreground)]">Recommended for your setup:</p>
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => pickFromWizard('manual')} className="rounded-[var(--radius)] bg-[var(--primary)] px-3 py-1.5 text-xs text-[var(--primary-foreground)]">
+              <button onClick={() => pickFromWizard('manual')} className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-xs text-[var(--primary-foreground)]">
                 No terminal / not integrated → Manual/External
               </button>
-              <button onClick={() => pickFromWizard('stripe')} className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-xs text-[var(--foreground)]">
+              <button onClick={() => pickFromWizard('stripe')} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 text-xs text-[var(--foreground)]">
                 Integrated cloud reader → Stripe/Square
               </button>
-              <button onClick={() => pickFromWizard('moneris')} className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-xs text-[var(--foreground)]">
+              <button onClick={() => pickFromWizard('moneris')} className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 text-xs text-[var(--foreground)]">
                 Integrated PIN pad → Moneris/Global Payments
               </button>
             </div>
