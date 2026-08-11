@@ -5,6 +5,7 @@ import type {
   CustomerDisplaySlideDTO
 } from '../../../shared/customerDisplay'
 import { IdleScreen } from './screens/IdleScreen'
+import { CartScreen } from './screens/CartScreen'
 
 const DEFAULT_SETTINGS: CustomerDisplaySettingsDTO = {
   enabled: true,
@@ -45,6 +46,10 @@ export function CustomerDisplayApp(): React.JSX.Element {
         durationSeconds={settings.slideDurationSeconds}
       />
     )
+  }
+
+  if (state.mode === 'cart') {
+    return <CartScreen state={state} />
   }
 
   // Remaining modes are built in later tasks.
