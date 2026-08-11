@@ -38,14 +38,18 @@ export function SetupWizard(): React.JSX.Element {
       <Card className="w-[420px] space-y-4 p-8 shadow-lg">
         <div className="text-center">
           <h1 className="text-xl font-semibold text-[var(--foreground)]">Welcome to PharmaPOS</h1>
-          <p className="text-xs text-[var(--muted-foreground)]">Create the first Manager account to get started.</p>
+          <p className="text-xs text-[var(--muted-foreground)]">
+            Create the first Manager account to get started.
+          </p>
         </div>
 
         {error && <Alert variant="error">{error}</Alert>}
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--foreground)]">Full name</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--foreground)]">
+              Full name
+            </label>
             <input
               autoFocus
               value={fullName}
@@ -54,7 +58,9 @@ export function SetupWizard(): React.JSX.Element {
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--foreground)]">Password (min 8 characters)</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--foreground)]">
+              Password (min 8 characters)
+            </label>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -73,7 +79,9 @@ export function SetupWizard(): React.JSX.Element {
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--foreground)]">Confirm password</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--foreground)]">
+              Confirm password
+            </label>
             <input
               type={showPassword ? 'text' : 'password'}
               value={confirm}

@@ -67,11 +67,21 @@ export function RestoreBackupModal({ onClose }: RestoreBackupModalProps): React.
   }, [closable, onClose])
 
   return (
-    <div role="presentation" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <Card role="dialog" aria-modal="true" aria-labelledby="restore-modal-title" className="w-[560px] border-[var(--warning)] bg-[var(--card)] p-6 space-y-4 shadow-lg">
+    <div
+      role="presentation"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+    >
+      <Card
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="restore-modal-title"
+        className="w-[560px] border-[var(--warning)] bg-[var(--card)] p-6 space-y-4 shadow-lg"
+      >
         {step === 'pick' && (
           <>
-            <CardTitle id="restore-modal-title" className="text-[var(--foreground)]">Restore from Backup</CardTitle>
+            <CardTitle id="restore-modal-title" className="text-[var(--foreground)]">
+              Restore from Backup
+            </CardTitle>
             <Alert variant="pending">
               This replaces the current database with a backup. Anything entered since that backup
               was taken will be lost. Choose the drive or folder holding the backup to restore from.
@@ -95,14 +105,18 @@ export function RestoreBackupModal({ onClose }: RestoreBackupModalProps): React.
 
         {step === 'listing' && (
           <>
-            <CardTitle id="restore-modal-title" className="text-[var(--foreground)]">Restore from Backup</CardTitle>
+            <CardTitle id="restore-modal-title" className="text-[var(--foreground)]">
+              Restore from Backup
+            </CardTitle>
             <Alert variant="pending">Scanning {drivePath} for backups…</Alert>
           </>
         )}
 
         {step === 'select' && (
           <>
-            <CardTitle id="restore-modal-title" className="text-[var(--foreground)]">Restore from Backup</CardTitle>
+            <CardTitle id="restore-modal-title" className="text-[var(--foreground)]">
+              Restore from Backup
+            </CardTitle>
             {backups.length === 0 ? (
               <CardDescription>No valid backups found in {drivePath}.</CardDescription>
             ) : (
@@ -156,7 +170,9 @@ export function RestoreBackupModal({ onClose }: RestoreBackupModalProps): React.
 
         {step === 'confirm' && selected && (
           <>
-            <CardTitle id="restore-modal-title" className="text-[var(--foreground)]">Confirm Restore</CardTitle>
+            <CardTitle id="restore-modal-title" className="text-[var(--foreground)]">
+              Confirm Restore
+            </CardTitle>
             <Alert variant="error">
               This will permanently replace all current data — sales, customers, credit balances,
               everything — with the backup from {new Date(selected.timestamp).toLocaleString()}.
@@ -181,14 +197,18 @@ export function RestoreBackupModal({ onClose }: RestoreBackupModalProps): React.
 
         {step === 'restoring' && (
           <>
-            <CardTitle id="restore-modal-title" className="text-[var(--foreground)]">Restoring…</CardTitle>
+            <CardTitle id="restore-modal-title" className="text-[var(--foreground)]">
+              Restoring…
+            </CardTitle>
             <Alert variant="pending">Verifying and staging the backup. Do not close the app.</Alert>
           </>
         )}
 
         {step === 'done' && (
           <>
-            <CardTitle id="restore-modal-title" className="text-[var(--foreground)]">Backup Staged</CardTitle>
+            <CardTitle id="restore-modal-title" className="text-[var(--foreground)]">
+              Backup Staged
+            </CardTitle>
             <Alert variant="success">
               The backup has been verified and staged. Restart the application now to complete the
               restore.
@@ -204,7 +224,9 @@ export function RestoreBackupModal({ onClose }: RestoreBackupModalProps): React.
 
         {step === 'error' && (
           <>
-            <CardTitle id="restore-modal-title" className="text-[var(--foreground)]">Restore Failed</CardTitle>
+            <CardTitle id="restore-modal-title" className="text-[var(--foreground)]">
+              Restore Failed
+            </CardTitle>
             <Alert variant="error">{error}</Alert>
             <button
               onClick={onClose}

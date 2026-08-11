@@ -21,10 +21,17 @@ interface BackupModalProps {
   onClose: () => void
 }
 
-export function BackupModal({ userId, standalone = false, presetDrive, onClose }: BackupModalProps): React.JSX.Element {
+export function BackupModal({
+  userId,
+  standalone = false,
+  presetDrive,
+  onClose
+}: BackupModalProps): React.JSX.Element {
   const [step, setStep] = React.useState<Step>(presetDrive ? 'running' : 'scanning')
   const [drives, setDrives] = React.useState<ExternalDrive[]>([])
-  const [selected, setSelected] = React.useState<{ path: string; name: string } | null>(presetDrive ?? null)
+  const [selected, setSelected] = React.useState<{ path: string; name: string } | null>(
+    presetDrive ?? null
+  )
   const [result, setResult] = React.useState<BackupRunResult | null>(null)
   const [error, setError] = React.useState<string | null>(null)
 
@@ -91,21 +98,34 @@ export function BackupModal({ userId, standalone = false, presetDrive, onClose }
   }, [closable, onClose])
 
   return (
-    <div role="presentation" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <Card role="dialog" aria-modal="true" aria-labelledby="backup-modal-title" className="w-[520px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-4 shadow-lg">
+    <div
+      role="presentation"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+    >
+      <Card
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="backup-modal-title"
+        className="w-[520px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-4 shadow-lg"
+      >
         {step === 'scanning' && (
           <>
-            <CardTitle id="backup-modal-title" className="text-[var(--foreground)]">Backing Up Data…</CardTitle>
+            <CardTitle id="backup-modal-title" className="text-[var(--foreground)]">
+              Backing Up Data…
+            </CardTitle>
             <Alert variant="pending">Step 1 of 2 — Scanning for external drives…</Alert>
           </>
         )}
 
         {step === 'select' && (
           <>
-            <CardTitle id="backup-modal-title" className="text-[var(--foreground)]">Backing Up Data…</CardTitle>
+            <CardTitle id="backup-modal-title" className="text-[var(--foreground)]">
+              Backing Up Data…
+            </CardTitle>
             {drives.length === 0 ? (
               <CardDescription>
-                No external drives found. Use &quot;Browse…&quot; to choose a backup location manually.
+                No external drives found. Use &quot;Browse…&quot; to choose a backup location
+                manually.
               </CardDescription>
             ) : (
               <CardDescription>
@@ -115,7 +135,8 @@ export function BackupModal({ userId, standalone = false, presetDrive, onClose }
 
             <div className="space-y-2">
               {drives.map((drive) => {
-                const freePercent = drive.totalBytes > 0 ? Math.round((drive.freeBytes / drive.totalBytes) * 100) : 0
+                const freePercent =
+                  drive.totalBytes > 0 ? Math.round((drive.freeBytes / drive.totalBytes) * 100) : 0
                 return (
                   <label
                     key={drive.path}
@@ -134,8 +155,18 @@ export function BackupModal({ userId, standalone = false, presetDrive, onClose }
                         {formatBytes(drive.freeBytes)} free of {formatBytes(drive.totalBytes)}
                       </span>
                     </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--border)]" role="progressbar" aria-valuenow={freePercent} aria-valuemin={0} aria-valuemax={100} aria-label={`${drive.name} free space`}>
-                      <div className="h-full rounded-full bg-[var(--primary)] transition-[width] duration-150" style={{ width: `${Math.min(100, Math.max(0, freePercent))}%` }} />
+                    <div
+                      className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--border)]"
+                      role="progressbar"
+                      aria-valuenow={freePercent}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label={`${drive.name} free space`}
+                    >
+                      <div
+                        className="h-full rounded-full bg-[var(--primary)] transition-[width] duration-150"
+                        style={{ width: `${Math.min(100, Math.max(0, freePercent))}%` }}
+                      />
                     </div>
                   </label>
                 )
@@ -176,17 +207,21 @@ export function BackupModal({ userId, standalone = false, presetDrive, onClose }
 
         {step === 'running' && (
           <>
-            <CardTitle id="backup-modal-title" className="text-[var(--foreground)]">Backing Up Data…</CardTitle>
+            <CardTitle id="backup-modal-title" className="text-[var(--foreground)]">
+              Backing Up Data…
+            </CardTitle>
             <Alert variant="pending">
-              Step 2 of 2 — Copying sales, customers, users, discounts, refunds, and inventory to {selected?.name}. This
-              may take a moment.
+              Step 2 of 2 — Copying sales, customers, users, discounts, refunds, and inventory to{' '}
+              {selected?.name}. This may take a moment.
             </Alert>
           </>
         )}
 
         {step === 'success' && result && (
           <>
-            <CardTitle id="backup-modal-title" className="text-[var(--foreground)]">Backup Complete</CardTitle>
+            <CardTitle id="backup-modal-title" className="text-[var(--foreground)]">
+              Backup Complete
+            </CardTitle>
             <Alert variant="success">Data backed up successfully.</Alert>
             <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-xs text-[var(--foreground)]">
               {result.backupDir}
@@ -195,7 +230,9 @@ export function BackupModal({ userId, standalone = false, presetDrive, onClose }
               {result.files.map((file) => (
                 <div key={file.name} className="flex justify-between">
                   <span>• {file.name}</span>
-                  <span className="text-[var(--muted-foreground)]">{formatBytes(file.sizeBytes)}</span>
+                  <span className="text-[var(--muted-foreground)]">
+                    {formatBytes(file.sizeBytes)}
+                  </span>
                 </div>
               ))}
             </div>
@@ -210,7 +247,9 @@ export function BackupModal({ userId, standalone = false, presetDrive, onClose }
 
         {step === 'error' && (
           <>
-            <CardTitle id="backup-modal-title" className="text-[var(--foreground)]">Backup Failed</CardTitle>
+            <CardTitle id="backup-modal-title" className="text-[var(--foreground)]">
+              Backup Failed
+            </CardTitle>
             <Alert variant="error">{error}</Alert>
             <div className="grid grid-cols-3 gap-3">
               <button

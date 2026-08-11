@@ -36,10 +36,20 @@ export function LogoutConfirmModal({ onCancel }: LogoutConfirmModalProps): React
   // app quit that may never come on a POS device left running for days.
   if (updateReadyVersion !== null) {
     return (
-      <div role="presentation" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-        <Card role="dialog" aria-modal="true" aria-labelledby="update-ready-title" className="w-[480px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-4 shadow-lg">
+      <div
+        role="presentation"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      >
+        <Card
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="update-ready-title"
+          className="w-[480px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-4 shadow-lg"
+        >
           <div>
-            <CardTitle id="update-ready-title" className="text-[var(--foreground)]">Update ready to install</CardTitle>
+            <CardTitle id="update-ready-title" className="text-[var(--foreground)]">
+              Update ready to install
+            </CardTitle>
           </div>
           <CardDescription>
             {`Version ${updateReadyVersion} has finished downloading. Install it now while you're logging out? This
@@ -65,10 +75,20 @@ export function LogoutConfirmModal({ onCancel }: LogoutConfirmModalProps): React
   }
 
   return (
-    <div role="presentation" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <Card role="dialog" aria-modal="true" aria-labelledby="logout-confirm-title" className="w-[480px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-4 shadow-lg">
+    <div
+      role="presentation"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+    >
+      <Card
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="logout-confirm-title"
+        className="w-[480px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-4 shadow-lg"
+      >
         <div>
-          <CardTitle id="logout-confirm-title" className="text-[var(--foreground)]">Ready to log out?</CardTitle>
+          <CardTitle id="logout-confirm-title" className="text-[var(--foreground)]">
+            Ready to log out?
+          </CardTitle>
         </div>
         <CardDescription>
           Before you go, would you like to back up all your pharmacy data to an external drive? This
