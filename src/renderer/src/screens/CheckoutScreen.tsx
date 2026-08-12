@@ -125,6 +125,7 @@ export function CheckoutScreen(): React.JSX.Element {
   const [showCustomerProfileModal, setShowCustomerProfileModal] = React.useState(false)
   const [debtSettlement, setDebtSettlement] = React.useState<{
     amountCents: number
+    ledgerEntryIds: number[]
   } | null>(null)
 
   const searchRef = React.useRef<HTMLInputElement>(null)
@@ -482,7 +483,7 @@ export function CheckoutScreen(): React.JSX.Element {
         billDiscountReason,
         processorTransactionId: cardMeta?.processorTransactionId,
         cardLast4: cardMeta?.cardLast4,
-        debtSettlementCents: debtSettlementCents > 0 ? debtSettlementCents : undefined
+        debtSettlementLedgerEntryIds: debtSettlement ? debtSettlement.ledgerEntryIds : undefined
       })
       cardOrderRefRef.current = null
       setActiveReceipt(transaction)
@@ -1900,8 +1901,8 @@ export function CheckoutScreen(): React.JSX.Element {
           customerId={attachedCustomer.id}
           customerName={`${attachedCustomer.firstName} ${attachedCustomer.lastName}`}
           readOnly={false}
-          onAdd={(amountCents) => {
-            setDebtSettlement({ amountCents })
+          onAdd={(ledgerEntryIds, amountCents) => {
+            setDebtSettlement({ amountCents, ledgerEntryIds })
             setShowBringInBalanceModal(false)
           }}
           onClose={() => setShowBringInBalanceModal(false)}
@@ -1913,7 +1914,7 @@ export function CheckoutScreen(): React.JSX.Element {
           customerId={attachedCustomer.id}
           customerName={`${attachedCustomer.firstName} ${attachedCustomer.lastName}`}
           readOnly
-          fixedAmountCents={debtSettlement.amountCents}
+          fixedLedgerEntryIds={debtSettlement.ledgerEntryIds}
           onClose={() => setShowDebtDetailsModal(false)}
         />
       )}

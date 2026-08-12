@@ -77,8 +77,7 @@ export function DeleteAllDataModal({ onClose }: DeleteAllDataModalProps): React.
             {step === 'code' && (
               <CardDescription>
                 Verified as {manager?.fullName}. This permanently erases every product, customer,
-                transaction, and setting — there is no undo. Enter the confirmation code to
-                proceed.
+                transaction, and setting — there is no undo. Enter the confirmation code to proceed.
               </CardDescription>
             )}
             {step === 'done' && (

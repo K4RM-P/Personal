@@ -391,6 +391,10 @@ const api = {
       ipcRenderer.invoke(IPC.BACKUP_RESTORE, { backupDir }),
     relaunch: (): Promise<void> => ipcRenderer.invoke(IPC.BACKUP_RELAUNCH)
   },
+  dangerZone: {
+    deleteAllData: (code: string): Promise<{ ok: boolean; message: string }> =>
+      ipcRenderer.invoke(IPC.DANGER_ZONE_DELETE_ALL_DATA, { code })
+  },
   auth: {
     checkFirstBoot: (): Promise<boolean> => ipcRenderer.invoke(IPC.AUTH_CHECK_FIRST_BOOT),
     getCurrentUser: (): Promise<AuthUser | null> => ipcRenderer.invoke(IPC.AUTH_GET_CURRENT_USER),

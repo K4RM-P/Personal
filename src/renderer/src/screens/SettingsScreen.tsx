@@ -16,6 +16,7 @@ import { ReportEmailSettingsCard } from '../components/ReportEmailSettingsCard'
 import { UpdateSettingsCard } from '../components/UpdateSettingsCard'
 import { BackupModal } from '../components/BackupModal'
 import { RestoreBackupModal } from '../components/RestoreBackupModal'
+import { DeleteAllDataModal } from '../components/DeleteAllDataModal'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
 import { Switch } from '../components/ui/Switch'
 import { Alert } from '../components/ui/Alert'
@@ -221,6 +222,7 @@ export function SettingsScreen() {
   const [promptOnLogout, setPromptOnLogout] = React.useState(true)
   const [showBackupModal, setShowBackupModal] = React.useState(false)
   const [showRestoreModal, setShowRestoreModal] = React.useState(false)
+  const [showDeleteAllDataModal, setShowDeleteAllDataModal] = React.useState(false)
   const [backupDestination, setBackupDestination] = React.useState<BackupDestination | null>(null)
   const [availableDrives, setAvailableDrives] = React.useState<ExternalDrive[]>([])
   const [savingDestination, setSavingDestination] = React.useState(false)
@@ -1334,6 +1336,39 @@ export function SettingsScreen() {
             </Card>
           )}
         </div>
+      )}
+
+      {/* Danger Zone — always shown at the very bottom, regardless of tier/search filtering. */}
+      <div className="space-y-4">
+        <div className="border-b border-[var(--error)]/30 pb-1">
+          <h2 className="text-base font-semibold text-[var(--error)]">Danger Zone</h2>
+          <p className="text-xs text-[var(--muted-foreground)]">
+            Irreversible actions. Proceed with extreme caution.
+          </p>
+        </div>
+        <Card className="border-[var(--error)]/40 bg-[var(--error-bg)]">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-sm font-medium text-[var(--error)]">
+                Delete all data
+              </CardTitle>
+              <CardDescription className="text-xs text-[var(--error)]/80">
+                Permanently erases every product, customer, transaction, and setting in this
+                store. Requires manager re-authentication and a confirmation code.
+              </CardDescription>
+            </div>
+            <button
+              onClick={() => setShowDeleteAllDataModal(true)}
+              className="min-h-11 shrink-0 rounded-[var(--radius)] bg-[var(--error)] px-4 text-sm font-semibold text-white"
+            >
+              DELETE ALL DATA
+            </button>
+          </div>
+        </Card>
+      </div>
+
+      {showDeleteAllDataModal && (
+        <DeleteAllDataModal onClose={() => setShowDeleteAllDataModal(false)} />
       )}
 
       {showBackupModal && user && (
