@@ -453,7 +453,7 @@ export function CheckoutScreen(): React.JSX.Element {
     email?: string,
     cardMeta?: { processorTransactionId?: string; cardLast4?: string }
   ): Promise<void> => {
-    if (cart.length === 0) return
+    if (cart.length === 0 && !debtSettlement) return
     setCardProcessing(true)
     try {
       if (!window.api?.transaction) {
@@ -510,7 +510,7 @@ export function CheckoutScreen(): React.JSX.Element {
   }
 
   const handleCashCheckout = (): void => {
-    if (cart.length === 0) return
+    if (cart.length === 0 && !debtSettlement) return
     if (tenderedCents < effectiveTotal && !attachedCustomer) {
       setScanFeedback({
         type: 'error',
@@ -555,7 +555,7 @@ export function CheckoutScreen(): React.JSX.Element {
   }
 
   const startCardCheckout = async (): Promise<void> => {
-    if (cart.length === 0 || cardProcessing) return
+    if ((cart.length === 0 && !debtSettlement) || cardProcessing) return
     setPaymentState('awaiting')
     setPaymentMessage('Waiting for terminal response…')
     if (!cardOrderRefRef.current) {
@@ -603,7 +603,7 @@ export function CheckoutScreen(): React.JSX.Element {
   }
 
   const handleETransferComplete = (): void => {
-    if (cart.length === 0 || !eTransferConfirmed) return
+    if ((cart.length === 0 && !debtSettlement) || !eTransferConfirmed) return
     void completeSale('E_TRANSFER', undefined, undefined, 0, eTransferEmail || undefined)
   }
 
@@ -1226,7 +1226,7 @@ export function CheckoutScreen(): React.JSX.Element {
                     cardOrderRefRef.current = null
                     setShowPayModal(true)
                   }}
-                  disabled={cart.length === 0}
+                  disabled={cart.length === 0 && !debtSettlement}
                   className="h-14 flex-1 rounded-[var(--radius)] bg-[var(--primary)] text-lg font-bold tracking-wide text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   PAY
@@ -1250,7 +1250,7 @@ export function CheckoutScreen(): React.JSX.Element {
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <button
                   onClick={() => setPaymentMethod('CASH')}
-                  disabled={cart.length === 0}
+                  disabled={cart.length === 0 && !debtSettlement}
                   className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Banknote className="icon-5 shrink-0" />
@@ -1258,7 +1258,7 @@ export function CheckoutScreen(): React.JSX.Element {
                 </button>
                 <button
                   onClick={() => setPaymentMethod('E_TRANSFER')}
-                  disabled={cart.length === 0}
+                  disabled={cart.length === 0 && !debtSettlement}
                   className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Send className="icon-5 shrink-0" />
@@ -1266,7 +1266,7 @@ export function CheckoutScreen(): React.JSX.Element {
                 </button>
                 <button
                   onClick={() => setPaymentMethod('CARD')}
-                  disabled={cart.length === 0}
+                  disabled={cart.length === 0 && !debtSettlement}
                   className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <CreditCard className="icon-5 shrink-0" />
