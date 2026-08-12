@@ -88,6 +88,31 @@ export interface CreateTransactionPayload {
   debtSettlementCents?: number
 }
 
+// ------------------------------------------------- Pharmacy Credit debt settlement
+
+export interface DebtBreakdownEntry {
+  ledgerEntryId: number
+  type: 'SALE_CHARGE' | 'MANUAL_ADJUSTMENT'
+  /** Positive cents this entry still contributes to the customer's current outstanding balance. */
+  amountCents: number
+  createdAt: Date
+  note: string | null
+  // Populated only for type === 'SALE_CHARGE'.
+  transactionId?: string
+  receiptNumber?: string
+  transactionDate?: Date
+  transactionTotalCents?: number
+  tabAmountCents?: number
+  chargeKind?: 'FULL_CHARGE' | 'SHORT_PAY'
+  items?: { productName: string; quantity: number }[]
+}
+
+export interface DebtBreakdown {
+  customerId: number
+  totalOutstandingCents: number
+  entries: DebtBreakdownEntry[]
+}
+
 export interface BulkImportProductInput {
   sku: string
   name: string

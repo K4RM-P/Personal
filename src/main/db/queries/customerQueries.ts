@@ -1,5 +1,6 @@
 import type { CreditEntryType, LoyaltyEventType, Prisma, PrismaClient } from '@prisma/client'
 import { getSession } from '../../auth/session'
+import type { DebtBreakdown } from '../../../shared/types'
 
 export const normalizePhone = (phone: string): string => phone.replace(/\D/g, '')
 
@@ -140,29 +141,6 @@ export async function deleteCustomerData(db: PrismaClient, id: number) {
       deletedAt: new Date()
     }
   })
-}
-
-export interface DebtBreakdownEntry {
-  ledgerEntryId: number
-  type: 'SALE_CHARGE' | 'MANUAL_ADJUSTMENT'
-  /** Positive cents this entry still contributes to the customer's current outstanding balance. */
-  amountCents: number
-  createdAt: Date
-  note: string | null
-  // Populated only for type === 'SALE_CHARGE'.
-  transactionId?: string
-  receiptNumber?: string
-  transactionDate?: Date
-  transactionTotalCents?: number
-  tabAmountCents?: number
-  chargeKind?: 'FULL_CHARGE' | 'SHORT_PAY'
-  items?: { productName: string; quantity: number }[]
-}
-
-export interface DebtBreakdown {
-  customerId: number
-  totalOutstandingCents: number
-  entries: DebtBreakdownEntry[]
 }
 
 /**
