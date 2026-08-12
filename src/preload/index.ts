@@ -424,11 +424,18 @@ const api = {
     getSlides: (): Promise<CustomerDisplaySlideDTO[]> =>
       ipcRenderer.invoke(IPC.CUSTOMER_DISPLAY_GET_SLIDES),
     saveSlides: (
-      slides: Array<{ id?: number; text: string }>
+      slides: Array<{
+        id?: number
+        type?: 'TEXT' | 'IMAGE'
+        text: string
+        imageDataUrl?: string | null
+      }>
     ): Promise<CustomerDisplaySlideDTO[]> =>
       ipcRenderer.invoke(IPC.CUSTOMER_DISPLAY_SAVE_SLIDES, slides),
     deleteSlide: (id: number): Promise<void> =>
       ipcRenderer.invoke(IPC.CUSTOMER_DISPLAY_DELETE_SLIDE, id),
+    uploadSlideImage: (): Promise<{ imageDataUrl: string } | null> =>
+      ipcRenderer.invoke(IPC.CUSTOMER_DISPLAY_UPLOAD_SLIDE_IMAGE),
     getSettings: (): Promise<CustomerDisplaySettingsDTO> =>
       ipcRenderer.invoke(IPC.CUSTOMER_DISPLAY_GET_SETTINGS),
     saveSettings: (input: {

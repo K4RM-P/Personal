@@ -37,9 +37,13 @@ export type CustomerDisplayState =
     }
   | { mode: 'thank-you'; pharmacyName: string }
 
+export type CustomerDisplaySlideType = 'TEXT' | 'IMAGE'
+
 export interface CustomerDisplaySlideDTO {
   id: number
+  type: CustomerDisplaySlideType
   text: string
+  imageDataUrl: string | null
   sortOrder: number
 }
 

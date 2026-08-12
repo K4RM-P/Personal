@@ -425,15 +425,18 @@ model InventoryAdjustment {
   @@index([productId, createdAt])
 }
 
-/// A single line of promotional text shown in the customer-facing display's
-/// idle slideshow. Text length is capped at 60 chars at the application layer
-/// (see CUSTOMER_DISPLAY_SLIDE_MAX_LENGTH in src/shared/customerDisplay.ts).
+/// A single slide shown in the customer-facing display's idle slideshow —
+/// either a line of promotional text or an uploaded image. Text length is
+/// capped at 60 chars at the application layer (see
+/// CUSTOMER_DISPLAY_SLIDE_MAX_LENGTH in src/shared/customerDisplay.ts).
 model CustomerDisplaySlide {
-  id        Int      @id @default(autoincrement())
-  text      String
-  sortOrder Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           Int      @id @default(autoincrement())
+  type         String   @default("TEXT") // "TEXT" | "IMAGE"
+  text         String
+  imageDataUrl String?
+  sortOrder    Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@index([sortOrder])
 }

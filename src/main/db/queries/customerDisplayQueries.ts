@@ -19,7 +19,13 @@ export async function getCustomerDisplaySlides(
   db: PrismaClient
 ): Promise<CustomerDisplaySlideDTO[]> {
   const rows = await db.customerDisplaySlide.findMany({ orderBy: { sortOrder: 'asc' } })
-  return rows.map((r) => ({ id: r.id, text: r.text, sortOrder: r.sortOrder }))
+  return rows.map((r) => ({
+    id: r.id,
+    type: r.type === 'IMAGE' ? 'IMAGE' : 'TEXT',
+    text: r.text,
+    imageDataUrl: r.imageDataUrl,
+    sortOrder: r.sortOrder
+  }))
 }
 
 /**
@@ -28,22 +34,40 @@ export async function getCustomerDisplaySlides(
  */
 export async function saveCustomerDisplaySlides(
   db: PrismaClient,
-  slides: Array<{ id?: number; text: string }>
+  slides: Array<{ id?: number; type?: 'TEXT' | 'IMAGE'; text: string; imageDataUrl?: string | null }>
 ): Promise<CustomerDisplaySlideDTO[]> {
   for (const s of slides) {
-    const text = s.text?.trim() ?? ''
-    if (text.length === 0 || text.length > CUSTOMER_DISPLAY_SLIDE_MAX_LENGTH) {
-      throw new Error(`Slide text must be 1-${CUSTOMER_DISPLAY_SLIDE_MAX_LENGTH} characters`)
+    const type = s.type === 'IMAGE' ? 'IMAGE' : 'TEXT'
+    if (type === 'IMAGE') {
+      if (!s.imageDataUrl) throw new Error('Image slide is missing an uploaded image')
+    } else {
+      const text = s.text?.trim() ?? ''
+      if (text.length === 0 || text.length > CUSTOMER_DISPLAY_SLIDE_MAX_LENGTH) {
+        throw new Error(`Slide text must be 1-${CUSTOMER_DISPLAY_SLIDE_MAX_LENGTH} characters`)
+      }
     }
   }
   return db.$transaction(async (tx) => {
     await tx.customerDisplaySlide.deleteMany()
     const created: CustomerDisplaySlideDTO[] = []
     for (let i = 0; i < slides.length; i++) {
+      const s = slides[i]
+      const type = s.type === 'IMAGE' ? 'IMAGE' : 'TEXT'
       const row = await tx.customerDisplaySlide.create({
-        data: { text: slides[i].text.trim(), sortOrder: i }
+        data: {
+          type,
+          text: s.text?.trim() ?? '',
+          imageDataUrl: type === 'IMAGE' ? s.imageDataUrl : null,
+          sortOrder: i
+        }
       })
-      created.push({ id: row.id, text: row.text, sortOrder: row.sortOrder })
+      created.push({
+        id: row.id,
+        type: row.type === 'IMAGE' ? 'IMAGE' : 'TEXT',
+        text: row.text,
+        imageDataUrl: row.imageDataUrl,
+        sortOrder: row.sortOrder
+      })
     }
     return created
   })

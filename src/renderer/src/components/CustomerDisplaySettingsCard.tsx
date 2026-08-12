@@ -1,12 +1,13 @@
 import * as React from 'react'
-import { ArrowDown, ArrowUp, Pencil, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, ImageIcon, Pencil, Trash2 } from 'lucide-react'
 import { CardHeader, CardTitle, CardDescription } from './ui/Card'
 import { Alert } from './ui/Alert'
 import { Switch } from './ui/Switch'
 import {
   CUSTOMER_DISPLAY_SLIDE_MAX_LENGTH,
   type CustomerDisplaySettingsDTO,
-  type CustomerDisplaySlideDTO
+  type CustomerDisplaySlideDTO,
+  type CustomerDisplaySlideType
 } from '@shared/customerDisplay'
 
 /**
@@ -27,7 +28,11 @@ export function CustomerDisplaySettingsCard(): React.JSX.Element {
   const [error, setError] = React.useState<string | null>(null)
 
   const [modalOpen, setModalOpen] = React.useState(false)
+  const [modalType, setModalType] = React.useState<CustomerDisplaySlideType>('TEXT')
   const [modalText, setModalText] = React.useState('')
+  const [modalImageDataUrl, setModalImageDataUrl] = React.useState<string | null>(null)
+  const [modalImageError, setModalImageError] = React.useState<string | null>(null)
+  const [uploadingImage, setUploadingImage] = React.useState(false)
   const [editingIndex, setEditingIndex] = React.useState<number | null>(null)
 
   const load = async (): Promise<void> => {
@@ -58,7 +63,7 @@ export function CustomerDisplaySettingsCard(): React.JSX.Element {
     setSaved(null)
     try {
       const result = await window.api.customerDisplay.saveSlides(
-        next.map((s) => ({ text: s.text }))
+        next.map((s) => ({ type: s.type, text: s.text, imageDataUrl: s.imageDataUrl }))
       )
       setSlides(result)
       setSaved('Slides updated.')
