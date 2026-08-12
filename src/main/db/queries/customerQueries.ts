@@ -246,12 +246,12 @@ export async function getCustomerDebtBreakdown(
     })
   }
 
-  const currentBalanceCents = (
-    await db.creditLedgerEntry.findFirst({
-      where: { customerId },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]
-    })
-  )?.balanceAfterCents ?? 0
+  // Derive from the same `ledgerEntries` snapshot used above (not a fresh query) so a
+  // concurrent write landing between two separate reads can't desync this check —
+  // that race was the source of an intermittent "reconstruction does not match" error.
+  const currentBalanceCents = ledgerEntries.length
+    ? ledgerEntries[ledgerEntries.length - 1].balanceAfterCents
+    : 0
   const expectedOutstanding = currentBalanceCents < 0 ? -currentBalanceCents : 0
   if (totalOutstandingCents !== expectedOutstanding) {
     throw new Error(
