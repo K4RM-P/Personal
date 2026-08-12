@@ -12,6 +12,7 @@ import {
   getAllPricingTiers,
   saveAllPricingTiers,
   createTransaction,
+  getTransactionDetail,
   voidTransaction
 } from '../db/queries/posQueries'
 import { refundTabAmount } from '../db/queries/customerQueries'
@@ -69,4 +70,5 @@ export function registerPosHandlers(db: PrismaClient): void {
   ipcMain.handle(IPC.TRANSACTION_REFUND_TAB, (_e, { id, amountCents }) =>
     refundTabAmount(db, id, amountCents)
   )
+  ipcMain.handle(IPC.TRANSACTION_GET_DETAIL, (_e, id: string) => getTransactionDetail(db, id))
 }

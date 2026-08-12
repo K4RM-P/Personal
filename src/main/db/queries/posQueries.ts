@@ -7,7 +7,7 @@ import {
   TierChangePreviewItem
 } from '../../../shared/pricingEngine'
 import { CreateTransactionPayload, BulkImportProductInput, TransactionWithItems } from '../../../shared/types'
-import { customerLedgerInternals, getCreditSettings } from './customerQueries'
+import { customerLedgerInternals, getCreditSettings, getCustomerDebtBreakdown } from './customerQueries'
 import { getCardSurchargePercent } from './settingsQueries'
 import { getSession } from '../../auth/session'
 
@@ -331,7 +331,11 @@ export async function createTransaction(
     }
     surchargeCents = expectedSurchargeCents
   }
-  const totalCents = preTaxCents + taxCents + surchargeCents
+  const debtSettlementCents = payload.debtSettlementCents ?? 0
+  if (!Number.isInteger(debtSettlementCents) || debtSettlementCents < 0) {
+    throw new Error('Invalid outstanding balance amount.')
+  }
+  const totalCents = preTaxCents + taxCents + surchargeCents + debtSettlementCents
   const cashOverageToCreditCents = payload.cashOverageToCreditCents ?? 0
   const changeCents = cashOverageToCreditCents > 0 ? 0 : Math.max(0, payload.tenderedCents - totalCents)
   const receiptNumber = `RX-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`
@@ -345,6 +349,36 @@ export async function createTransaction(
 
   if (payload.tenderType === 'PHARMACY_CREDIT' && tabAmountCents !== totalCents) {
     throw new Error('Pharmacy Credit standalone must charge the full sale total to the tab.')
+  }
+
+  // Paying off tab debt by charging it back to the same tab is circular — block it
+  // outright rather than trusting the renderer to have hidden the option.
+  if (debtSettlementCents > 0) {
+    if (!payload.customerId) throw new Error('A customer must be linked to bring in an outstanding balance.')
+    if (payload.tenderType === 'PHARMACY_CREDIT' || tabAmountCents > 0) {
+      throw new Error('Cannot use Pharmacy Credit to pay off an outstanding balance — choose another payment method.')
+    }
+  }
+
+  // Composed before the atomic transaction so the evidence trail (which original
+  // sales this settles) is fixed at the moment the cashier committed to the amount;
+  // the amount itself is re-validated against a fresh balance inside the transaction.
+  let debtSettlementNote: string | null = null
+  if (debtSettlementCents > 0 && payload.customerId) {
+    const breakdown = await getCustomerDebtBreakdown(db, payload.customerId)
+    if (debtSettlementCents > breakdown.totalOutstandingCents) {
+      throw new Error("Amount exceeds the customer's current outstanding balance.")
+    }
+    let remaining = debtSettlementCents
+    const covered: string[] = []
+    for (const entry of breakdown.entries) {
+      if (remaining <= 0) break
+      const covers = Math.min(remaining, entry.amountCents)
+      const label = entry.type === 'SALE_CHARGE' ? `sale ${entry.receiptNumber}` : 'a manual adjustment'
+      covered.push(`${label} (${(covers / 100).toFixed(2)})`)
+      remaining -= covers
+    }
+    debtSettlementNote = `Debt settled via this sale — covers ${covered.join(', ')}`
   }
 
   return db.$transaction(async (tx) => {
@@ -427,6 +461,40 @@ export async function createTransaction(
           reason: payload.billDiscountReason?.trim() || null,
           appliedByUserId: sessionUserId
         }
+      })
+    }
+
+    if (debtSettlementCents > 0 && payload.customerId) {
+      // Re-validate against a fresh balance read — the balance shown when the cashier
+      // added this line could have changed since (e.g. a manual adjustment on another
+      // terminal). Failure here rolls back the whole transaction: nothing is written.
+      const latestEntry = await tx.creditLedgerEntry.findFirst({
+        where: { customerId: payload.customerId },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]
+      })
+      const currentOutstandingCents = (latestEntry?.balanceAfterCents ?? 0) < 0 ? -(latestEntry?.balanceAfterCents ?? 0) : 0
+      if (debtSettlementCents > currentOutstandingCents) {
+        throw new Error("Outstanding balance changed and no longer covers this amount — reopen the balance breakdown.")
+      }
+
+      const debtItem = await tx.transactionItem.create({
+        data: {
+          transactionId: transaction.id,
+          productId: null,
+          lineType: 'DEBT_SETTLEMENT',
+          quantity: 1,
+          costCents: 0,
+          unitPriceCents: debtSettlementCents,
+          discountCents: 0,
+          totalCents: debtSettlementCents,
+          hstApplied: false
+        }
+      })
+      items.push({ ...debtItem, product: null })
+
+      await customerLedgerInternals.appendCreditEntry(tx, payload.customerId, 'DEBT_SETTLED', debtSettlementCents, {
+        transactionId: transaction.id,
+        note: debtSettlementNote ?? undefined
       })
     }
 

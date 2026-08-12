@@ -57,7 +57,8 @@ import type {
   SaleDateRange,
   ProcessRefundPayload,
   ProcessRefundResult,
-  UpdateStatus
+  UpdateStatus,
+  DebtBreakdown
 } from '../shared/types'
 import type {
   AutoImportResult,
@@ -124,7 +125,9 @@ const api = {
     create: (payload: CreateTransactionPayload): Promise<TransactionWithItems> =>
       ipcRenderer.invoke(IPC.TRANSACTION_CREATE, payload),
     void: (id: string, reason: string): Promise<TransactionWithItems> =>
-      ipcRenderer.invoke(IPC.TRANSACTION_VOID, { id, reason })
+      ipcRenderer.invoke(IPC.TRANSACTION_VOID, { id, reason }),
+    getDetail: (id: string): Promise<TransactionWithItems> =>
+      ipcRenderer.invoke(IPC.TRANSACTION_GET_DETAIL, id)
   },
   customer: {
     search: (query: string): Promise<Customer[]> => ipcRenderer.invoke(IPC.CUSTOMER_SEARCH, query),
@@ -177,7 +180,9 @@ const api = {
     exportData: (customerId: number): Promise<{ path: string } | null> =>
       ipcRenderer.invoke(IPC.CUSTOMER_EXPORT_DATA, customerId),
     deleteData: (customerId: number): Promise<Customer> =>
-      ipcRenderer.invoke(IPC.CUSTOMER_DELETE_DATA, customerId)
+      ipcRenderer.invoke(IPC.CUSTOMER_DELETE_DATA, customerId),
+    getDebtBreakdown: (customerId: number): Promise<DebtBreakdown> =>
+      ipcRenderer.invoke(IPC.CUSTOMER_GET_DEBT_BREAKDOWN, customerId)
   },
   receipt: {
     print: (transaction: TransactionWithItems): Promise<PrintReceiptResult> =>

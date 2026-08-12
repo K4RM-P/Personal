@@ -11,6 +11,7 @@ import {
   exportCustomerData,
   findDuplicatePhone,
   getCreditSettings,
+  getCustomerDebtBreakdown,
   getCustomerDetail,
   saveCreditSettings,
   searchCustomers,
@@ -41,6 +42,9 @@ export function registerCustomerHandlers(db: PrismaClient): void {
     requireManager()
     return adjustPoints(db, customerId, points, note, true)
   })
+  ipcMain.handle(IPC.CUSTOMER_GET_DEBT_BREAKDOWN, (_e, customerId: number) =>
+    getCustomerDebtBreakdown(db, customerId)
+  )
   ipcMain.handle(IPC.CUSTOMER_GET_CREDIT_SETTINGS, () => getCreditSettings(db))
   ipcMain.handle(IPC.CUSTOMER_SAVE_CREDIT_SETTINGS, (_e, input) => saveCreditSettings(db, input))
 

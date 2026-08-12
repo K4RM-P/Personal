@@ -78,6 +78,14 @@ export interface CreateTransactionPayload {
   /** Processor charge id + card last 4, captured from the CARD charge result — needed later for card refunds. */
   processorTransactionId?: string
   cardLast4?: string
+  /**
+   * Amount of the linked customer's outstanding Pharmacy Credit balance being brought
+   * into and paid off by this sale (never taxed, never discounted, added to totalCents
+   * on top of the product total). Requires `customerId`. Mutually exclusive with
+   * `tenderType: 'PHARMACY_CREDIT'` and `tabAmountCents > 0` — paying off tab debt by
+   * charging it back to the same tab is circular.
+   */
+  debtSettlementCents?: number
 }
 
 export interface BulkImportProductInput {
