@@ -1,6 +1,6 @@
 import type { CreditEntryType, LoyaltyEventType, Prisma, PrismaClient } from '@prisma/client'
 import { getSession } from '../../auth/session'
-import type { DebtBreakdown } from '../../../shared/types'
+import type { DebtBreakdown, DebtBreakdownEntry } from '../../../shared/types'
 
 export const normalizePhone = (phone: string): string => phone.replace(/\D/g, '')
 

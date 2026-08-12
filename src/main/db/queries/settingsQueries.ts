@@ -1,5 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import type { PrinterConfig, StoreInfo } from '../../../shared/types'
+import type { ReportEmailInterval, ReportEmailSettingsDTO } from '../../../shared/reportEmail'
+import { encryptSecret, decryptSecret } from '../../payment/credentialStore'
 
 const DEFAULTS = {
   'store.name': 'VantisPOS Rx Pharmacy',
@@ -40,7 +42,18 @@ const DEFAULTS = {
   // 2026-08-11-customer-facing-display-spec.md §6/§8.4.
   'customerDisplay.enabled': 'true',
   'customerDisplay.slideDurationSeconds': '8',
-  'customerDisplay.eTransferEmail': ''
+  'customerDisplay.eTransferEmail': '',
+  // Scheduled report-digest emails — see reportEmailScheduler.ts.
+  'reportEmail.enabled': 'false',
+  'reportEmail.recipientEmail': '',
+  'reportEmail.interval': 'DAILY',
+  'reportEmail.smtpHost': '',
+  'reportEmail.smtpPort': '587',
+  'reportEmail.smtpSecure': 'false',
+  'reportEmail.smtpUsername': '',
+  'reportEmail.smtpPasswordEnc': '',
+  'reportEmail.smtpFromAddress': '',
+  'reportEmail.lastSentAt': ''
 } as const
 
 async function getSetting(db: PrismaClient, key: string): Promise<string> {
@@ -242,4 +255,99 @@ export async function saveDisplayDensityLevel(db: PrismaClient, level: number): 
   const rounded = Math.round(level)
   await setSetting(db, 'display.densityLevel', String(rounded))
   return rounded
+}
+
+const REPORT_EMAIL_INTERVALS: ReadonlySet<string> = new Set(['DAILY', 'WEEKLY', 'MONTHLY'])
+
+/** Renderer-safe view — never includes the SMTP password, only whether one is on file. */
+export async function getReportEmailSettings(db: PrismaClient): Promise<ReportEmailSettingsDTO> {
+  const [
+    enabled,
+    recipientEmail,
+    interval,
+    smtpHost,
+    smtpPort,
+    smtpSecure,
+    smtpUsername,
+    smtpPasswordEnc,
+    smtpFromAddress,
+    lastSentAt
+  ] = await Promise.all([
+    getSetting(db, 'reportEmail.enabled'),
+    getSetting(db, 'reportEmail.recipientEmail'),
+    getSetting(db, 'reportEmail.interval'),
+    getSetting(db, 'reportEmail.smtpHost'),
+    getSetting(db, 'reportEmail.smtpPort'),
+    getSetting(db, 'reportEmail.smtpSecure'),
+    getSetting(db, 'reportEmail.smtpUsername'),
+    getSetting(db, 'reportEmail.smtpPasswordEnc'),
+    getSetting(db, 'reportEmail.smtpFromAddress'),
+    getSetting(db, 'reportEmail.lastSentAt')
+  ])
+  return {
+    enabled: enabled === 'true',
+    recipientEmail,
+    interval: REPORT_EMAIL_INTERVALS.has(interval) ? (interval as ReportEmailInterval) : 'DAILY',
+    smtpHost,
+    smtpPort: Number(smtpPort) || 587,
+    smtpSecure: smtpSecure === 'true',
+    smtpUsername,
+    smtpFromAddress,
+    hasSmtpPassword: Boolean(smtpPasswordEnc),
+    lastSentAt: lastSentAt || null
+  }
+}
+
+export async function saveReportEmailSettings(
+  db: PrismaClient,
+  input: {
+    enabled: boolean
+    recipientEmail: string
+    interval: ReportEmailInterval
+    smtpHost: string
+    smtpPort: number
+    smtpSecure: boolean
+    smtpUsername: string
+    smtpFromAddress: string
+    smtpPassword?: string
+  }
+): Promise<ReportEmailSettingsDTO> {
+  if (input.enabled && !input.recipientEmail.trim()) {
+    throw new Error('A recipient email is required to enable scheduled report emails.')
+  }
+  if (input.enabled && !input.smtpHost.trim()) {
+    throw new Error('An SMTP host is required to enable scheduled report emails.')
+  }
+  if (!REPORT_EMAIL_INTERVALS.has(input.interval)) {
+    throw new Error('Invalid report email interval.')
+  }
+  await Promise.all([
+    setSetting(db, 'reportEmail.enabled', String(input.enabled)),
+    setSetting(db, 'reportEmail.recipientEmail', input.recipientEmail.trim()),
+    setSetting(db, 'reportEmail.interval', input.interval),
+    setSetting(db, 'reportEmail.smtpHost', input.smtpHost.trim()),
+    setSetting(db, 'reportEmail.smtpPort', String(Math.round(input.smtpPort) || 587)),
+    setSetting(db, 'reportEmail.smtpSecure', String(input.smtpSecure)),
+    setSetting(db, 'reportEmail.smtpUsername', input.smtpUsername.trim()),
+    setSetting(db, 'reportEmail.smtpFromAddress', input.smtpFromAddress.trim()),
+    ...(input.smtpPassword
+      ? [setSetting(db, 'reportEmail.smtpPasswordEnc', encryptSecret(input.smtpPassword.trim()))]
+      : [])
+  ])
+  return getReportEmailSettings(db)
+}
+
+/** MAIN PROCESS ONLY (mail sender) — includes the decrypted SMTP password. */
+export async function getReportEmailSettingsInternal(db: PrismaClient): Promise<
+  ReportEmailSettingsDTO & { smtpPassword: string }
+> {
+  const [view, smtpPasswordEnc] = await Promise.all([
+    getReportEmailSettings(db),
+    getSetting(db, 'reportEmail.smtpPasswordEnc')
+  ])
+  return { ...view, smtpPassword: smtpPasswordEnc ? decryptSecret(smtpPasswordEnc) : '' }
+}
+
+export async function recordReportEmailSent(db: PrismaClient, sentAt: Date): Promise<void> {
+  await setSetting(db, 'reportEmail.lastSentAt', sentAt.toISOString())
 }

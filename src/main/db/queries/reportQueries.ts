@@ -256,11 +256,14 @@ export async function getTopItems(
     return []
   }
 
-  const productIds = grouped.map((g) => g.productId)
+  const groupedWithProduct = grouped.filter(
+    (g): g is typeof g & { productId: number } => g.productId !== null
+  )
+  const productIds = groupedWithProduct.map((g) => g.productId)
   const products = await db.product.findMany({ where: { id: { in: productIds } } })
   const productMap = new Map(products.map((p) => [p.id, p]))
 
-  const result: TopItemRow[] = grouped.map((g) => {
+  const result: TopItemRow[] = groupedWithProduct.map((g) => {
     const product = productMap.get(g.productId)
     const quantity = g._sum.quantity ?? 0
     const revenueCents = g._sum.totalCents ?? 0
@@ -323,6 +326,7 @@ export async function getSlowItems(
 
   const salesMap = new Map<number, number>()
   for (const s of salesCounts) {
+    if (s.productId === null) continue
     salesMap.set(s.productId, s._sum.quantity ?? 0)
   }
 
@@ -347,6 +351,7 @@ export async function getSlowItems(
     })
 
     for (const item of lastSales) {
+      if (item.productId === null) continue
       const existing = lastSoldMap.get(item.productId)
       const current = item.transaction.createdAt
       if (!existing || current > existing) {

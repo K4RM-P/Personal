@@ -5,6 +5,7 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { DiscountModal } from '../components/DiscountModal'
 import { CustomProductModal } from '../components/CustomProductModal'
 import { CustomerSearchPanel } from '../components/CustomerSearchPanel'
+import { BringInBalanceModal } from '../components/BringInBalanceModal'
 import { RefundsScreen } from './RefundsScreen'
 import { formatCurrency } from '@shared/formatCurrency'
 import type { Product, Customer, TransactionWithItems, ChargeResult } from '@shared/types'
@@ -31,7 +32,6 @@ import {
   AlertCircle,
   X
 } from 'lucide-react'
-import type { DebtBreakdown } from '@shared/types'
 
 type ScanFeedback = { type: 'success' | 'error'; message: string } | null
 type PaymentMethod = 'CASH' | 'E_TRANSFER' | 'CARD' | 'PHARMACY_CREDIT' | null
@@ -117,6 +117,16 @@ export function CheckoutScreen(): React.JSX.Element {
   const [customerCreationError, setCustomerCreationError] = React.useState<string | null>(null)
   const [creatingCustomer, setCreatingCustomer] = React.useState(false)
 
+  // ---- Link Customer + Bring In Outstanding Balance --------------------------
+  const [showLinkCustomerSearch, setShowLinkCustomerSearch] = React.useState(false)
+  const [showCustomerOverflowMenu, setShowCustomerOverflowMenu] = React.useState(false)
+  const [showBringInBalanceModal, setShowBringInBalanceModal] = React.useState(false)
+  const [showDebtDetailsModal, setShowDebtDetailsModal] = React.useState(false)
+  const [showCustomerProfileModal, setShowCustomerProfileModal] = React.useState(false)
+  const [debtSettlement, setDebtSettlement] = React.useState<{
+    amountCents: number
+  } | null>(null)
+
   const searchRef = React.useRef<HTMLInputElement>(null)
   const tenderRef = React.useRef<HTMLInputElement>(null)
 
@@ -148,7 +158,10 @@ export function CheckoutScreen(): React.JSX.Element {
     cardType === 'CREDIT' && applySurcharge
       ? Math.floor((preTaxCents * checkoutSettings.cardSurchargePercent) / 100)
       : 0
-  const effectiveTotal = preTaxCents + taxCents + surchargeCents
+  // Never taxed, never discounted — added on top of the product total. See
+  // debtSettlement state: represents settling old Pharmacy Credit debt, not a sale of goods.
+  const debtSettlementCents = debtSettlement?.amountCents ?? 0
+  const effectiveTotal = preTaxCents + taxCents + surchargeCents + debtSettlementCents
   const changeCents = Math.max(0, tenderedCents - effectiveTotal)
   const shortCents = Math.max(0, effectiveTotal - tenderedCents)
   const customerBalance = attachedCustomer?.ledgerEntries?.[0]?.balanceCents ?? 0
@@ -468,13 +481,15 @@ export function CheckoutScreen(): React.JSX.Element {
         billDiscountCents: effectiveBillDiscountCents,
         billDiscountReason,
         processorTransactionId: cardMeta?.processorTransactionId,
-        cardLast4: cardMeta?.cardLast4
+        cardLast4: cardMeta?.cardLast4,
+        debtSettlementCents: debtSettlementCents > 0 ? debtSettlementCents : undefined
       })
       cardOrderRefRef.current = null
       setActiveReceipt(transaction)
       setCart([])
       setTenderedDollars('')
       setAttachedCustomer(null)
+      setDebtSettlement(null)
       setPaymentMethod(null)
       setCardType(null)
       setApplySurcharge(false)
@@ -904,6 +919,124 @@ export function CheckoutScreen(): React.JSX.Element {
                   </>
                 )}
               </div>
+
+              {/* Link Customer — persistent, independent of the Pharmacy Credit tender's
+                  own conditional search (see PHARMACY_CREDIT tender: if attachedCustomer is
+                  already set here, that flow skips its own search step). */}
+              <div className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!attachedCustomer) setShowLinkCustomerSearch((v) => !v)
+                  }}
+                  className="flex min-h-11 items-center gap-1.5 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-xs font-semibold text-[var(--foreground)]"
+                >
+                  <User className="icon-4" />
+                  {attachedCustomer ? (
+                    <span className="flex items-center gap-1">
+                      {attachedCustomer.firstName} {attachedCustomer.lastName}
+                      {customerBalance < 0 && (
+                        <span
+                          className="flex items-center gap-0.5 text-[var(--error)]"
+                          title={`Owes ${formatCurrency(-customerBalance)}`}
+                        >
+                          <AlertCircle className="icon-3_5" /> {formatCurrency(-customerBalance)}
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    'Link Customer'
+                  )}
+                </button>
+
+                {showLinkCustomerSearch && !attachedCustomer && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setShowLinkCustomerSearch(false)}
+                    />
+                    <div className="absolute right-0 z-20 mt-1 w-72 rounded-[var(--radius)] border border-[var(--border)] bg-white p-2 shadow-sm">
+                      <CustomerSearchPanel
+                        query={customerSearchQuery}
+                        onQueryChange={setCustomerSearchQuery}
+                        results={customerSearchResults}
+                        onSelect={(customer) => {
+                          void attachCustomer(customer)
+                          setShowLinkCustomerSearch(false)
+                        }}
+                        onAddNew={() => {
+                          setShowAddCustomer(true)
+                          setShowLinkCustomerSearch(false)
+                        }}
+                        placeholder="Search name, phone, email, or address"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Overflow menu — visible even with no customer linked yet, so the
+                  cashier knows the option exists once they link someone. */}
+              <div className="relative shrink-0">
+                <button
+                  type="button"
+                  aria-label="Customer actions"
+                  aria-haspopup="true"
+                  aria-expanded={showCustomerOverflowMenu}
+                  onClick={() => setShowCustomerOverflowMenu((v) => !v)}
+                  className="flex h-11 w-11 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]"
+                >
+                  <MoreVertical className="icon-4" />
+                </button>
+                {showCustomerOverflowMenu && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setShowCustomerOverflowMenu(false)}
+                    />
+                    <div className="absolute right-0 z-20 mt-1 w-60 overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">
+                      <button
+                        disabled={!attachedCustomer}
+                        onClick={() => {
+                          setShowCustomerProfileModal(true)
+                          setShowCustomerOverflowMenu(false)
+                        }}
+                        className="flex min-h-9 w-full items-center gap-2 px-3 text-left text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <User className="icon-4" /> View customer profile
+                      </button>
+                      <button
+                        disabled={!attachedCustomer}
+                        onClick={() => {
+                          setAttachedCustomer(null)
+                          setDebtSettlement(null)
+                          setShowCustomerOverflowMenu(false)
+                        }}
+                        className="flex min-h-9 w-full items-center gap-2 px-3 text-left text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <X className="icon-4" /> Unlink customer
+                      </button>
+                      <button
+                        disabled={!attachedCustomer || customerBalance >= 0}
+                        title={
+                          !attachedCustomer
+                            ? 'No customer linked'
+                            : customerBalance >= 0
+                              ? 'This customer has no outstanding balance'
+                              : undefined
+                        }
+                        onClick={() => {
+                          setShowBringInBalanceModal(true)
+                          setShowCustomerOverflowMenu(false)
+                        }}
+                        className="flex min-h-9 w-full items-center gap-2 px-3 text-left text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <HeartHandshake className="icon-4" /> Bring in outstanding balance
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </Card>
 
@@ -917,7 +1050,7 @@ export function CheckoutScreen(): React.JSX.Element {
             </div>
 
             <div className="mt-1.5 max-h-[360px] space-y-1 overflow-y-auto pr-1">
-              {cart.length === 0 ? (
+              {cart.length === 0 && !debtSettlement ? (
                 <EmptyState
                   icon={ShoppingCart}
                   title="Cart is empty"
@@ -925,7 +1058,8 @@ export function CheckoutScreen(): React.JSX.Element {
                   className="p-4"
                 />
               ) : (
-                cart.map((item) => {
+                <>
+                {cart.map((item) => {
                   const lineRawCents = item.unitPriceCents * item.quantity
                   const lineDiscountCents = item.discountCents ?? 0
                   const lineTotalCents = lineRawCents - lineDiscountCents
@@ -991,7 +1125,32 @@ export function CheckoutScreen(): React.JSX.Element {
                       </div>
                     </div>
                   )
-                })
+                })}
+                {debtSettlement && attachedCustomer && (
+                  <div className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-[var(--radius)] border border-[var(--warning)]/40 bg-[var(--warning-bg)] px-2 py-1 text-sm">
+                    <div className="min-w-0 truncate font-medium text-[var(--foreground)]">
+                      Previous Balance — {attachedCustomer.firstName} {attachedCustomer.lastName}
+                    </div>
+                    <div className="flex shrink-0 flex-nowrap items-center justify-end gap-1">
+                      <button
+                        onClick={() => setShowDebtDetailsModal(true)}
+                        className="min-h-8 rounded-[var(--radius)] border border-[var(--border)] px-2 text-xs font-semibold text-[var(--muted-foreground)]"
+                      >
+                        Details
+                      </button>
+                      <button
+                        onClick={() => setDebtSettlement(null)}
+                        className="min-h-8 rounded-[var(--radius)] border border-[var(--border)] px-2 text-xs font-semibold text-[var(--error)]"
+                      >
+                        Remove
+                      </button>
+                      <div className="w-16 text-right font-semibold text-[var(--foreground)]">
+                        {formatCurrency(debtSettlement.amountCents)}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                </>
               )}
             </div>
 
@@ -1031,6 +1190,12 @@ export function CheckoutScreen(): React.JSX.Element {
                 <div className="flex items-center justify-between text-sm text-[var(--warning)]">
                   <span>Credit card fee ({checkoutSettings.cardSurchargePercent}%)</span>
                   <span>{formatCurrency(surchargeCents)}</span>
+                </div>
+              )}
+              {debtSettlementCents > 0 && (
+                <div className="flex items-center justify-between text-sm text-[var(--warning)]">
+                  <span>Previous balance</span>
+                  <span>{formatCurrency(debtSettlementCents)}</span>
                 </div>
               )}
               <div className="flex justify-between border-t border-[var(--border)] pt-2 text-base font-semibold text-[var(--foreground)]">
@@ -1107,8 +1272,13 @@ export function CheckoutScreen(): React.JSX.Element {
                   CARD (Debit/Credit)
                 </button>
                 <button
-                  onClick={() => setPaymentMethod('PHARMACY_CREDIT')}
-                  disabled={cart.length === 0}
+                  onClick={() => !(debtSettlementCents > 0) && setPaymentMethod('PHARMACY_CREDIT')}
+                  disabled={cart.length === 0 || debtSettlementCents > 0}
+                  title={
+                    debtSettlementCents > 0
+                      ? 'Cannot use Pharmacy Credit to pay off an outstanding balance — choose another payment method'
+                      : undefined
+                  }
                   className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <HeartHandshake className="icon-5 shrink-0" />
@@ -1722,6 +1892,66 @@ export function CheckoutScreen(): React.JSX.Element {
       {customProductError && (
         <div className="fixed inset-x-0 bottom-4 z-[60] flex justify-center">
           <Alert variant="error">{customProductError}</Alert>
+        </div>
+      )}
+
+      {showBringInBalanceModal && attachedCustomer && (
+        <BringInBalanceModal
+          customerId={attachedCustomer.id}
+          customerName={`${attachedCustomer.firstName} ${attachedCustomer.lastName}`}
+          readOnly={false}
+          onAdd={(amountCents) => {
+            setDebtSettlement({ amountCents })
+            setShowBringInBalanceModal(false)
+          }}
+          onClose={() => setShowBringInBalanceModal(false)}
+        />
+      )}
+
+      {showDebtDetailsModal && attachedCustomer && debtSettlement && (
+        <BringInBalanceModal
+          customerId={attachedCustomer.id}
+          customerName={`${attachedCustomer.firstName} ${attachedCustomer.lastName}`}
+          readOnly
+          fixedAmountCents={debtSettlement.amountCents}
+          onClose={() => setShowDebtDetailsModal(false)}
+        />
+      )}
+
+      {showCustomerProfileModal && attachedCustomer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <Card className="max-h-[85vh] w-[420px] max-w-full overflow-y-auto bg-[var(--card)]">
+            <CardHeader>
+              <CardTitle>
+                {attachedCustomer.firstName} {attachedCustomer.lastName}
+              </CardTitle>
+              <CardDescription>{attachedCustomer.phone}</CardDescription>
+            </CardHeader>
+            <div className="mt-3 space-y-2 text-sm">
+              {attachedCustomer.email && (
+                <div>
+                  <span className="text-[var(--muted-foreground)]">Email: </span>
+                  {attachedCustomer.email}
+                </div>
+              )}
+              <div>
+                <span className="text-[var(--muted-foreground)]">Address: </span>
+                {attachedCustomer.address}
+              </div>
+              <div>
+                <span className="text-[var(--muted-foreground)]">Pharmacy Credit balance: </span>
+                <span className={customerBalance < 0 ? 'font-semibold text-[var(--error)]' : ''}>
+                  {formatCurrency(customerBalance)}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowCustomerProfileModal(false)}
+              className="mt-4 min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--card)]"
+            >
+              Close
+            </button>
+          </Card>
         </div>
       )}
     </div>
