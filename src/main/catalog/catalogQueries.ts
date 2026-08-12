@@ -343,7 +343,7 @@ export async function promoteCatalogProduct(
     }
     const updated = await db.product.update({
       where: { id: existing.id },
-      data: { priceCents: priceCentsOverride, isPinned: true }
+      data: { priceCents: priceCentsOverride, isPinned: true, fallbackPinned: false }
     })
     return {
       productId: updated.id,
@@ -396,6 +396,7 @@ export async function promoteCatalogProduct(
       priceCents,
       barcode,
       isPinned: pricePinnedForZeroCost,
+      fallbackPinned: priceCentsOverride === undefined && pricePinnedForZeroCost,
       origin: 'CATALOG',
       sourceItemNumber: item.itemNumber,
       lastSeenBatchId: item.importBatchId,
@@ -532,6 +533,7 @@ export async function promoteAllCatalogProducts(db: PrismaClient): Promise<Promo
       priceCents,
       barcode,
       isPinned: pricePinnedForZeroCost,
+      fallbackPinned: pricePinnedForZeroCost,
       origin: 'CATALOG',
       sourceItemNumber: item.itemNumber,
       lastSeenBatchId: item.importBatchId,
