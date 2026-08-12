@@ -6,6 +6,11 @@ import type {
   CustomerDisplaySettingsDTO
 } from '../shared/customerDisplay'
 import type {
+  ReportEmailSettingsDTO,
+  SaveReportEmailSettingsInput,
+  SendTestReportEmailResult
+} from '../shared/reportEmail'
+import type {
   FeatureFlag,
   Product,
   Customer,
@@ -449,6 +454,14 @@ const api = {
       eTransferEmail: string
     }): Promise<CustomerDisplaySettingsDTO> =>
       ipcRenderer.invoke(IPC.CUSTOMER_DISPLAY_SAVE_SETTINGS, input)
+  },
+  reportEmail: {
+    getSettings: (): Promise<ReportEmailSettingsDTO> =>
+      ipcRenderer.invoke(IPC.REPORT_EMAIL_GET_SETTINGS),
+    saveSettings: (input: SaveReportEmailSettingsInput): Promise<ReportEmailSettingsDTO> =>
+      ipcRenderer.invoke(IPC.REPORT_EMAIL_SAVE_SETTINGS, input),
+    sendTest: (): Promise<SendTestReportEmailResult> =>
+      ipcRenderer.invoke(IPC.REPORT_EMAIL_SEND_TEST)
   }
 }
 

@@ -12,6 +12,7 @@ import { CheckCircle2, Circle, Search, X } from 'lucide-react'
 import { FeatureFlagCard } from '../components/FeatureFlagCard'
 import { PaymentSettingsCard } from '../components/PaymentSettingsCard'
 import { CustomerDisplaySettingsCard } from '../components/CustomerDisplaySettingsCard'
+import { ReportEmailSettingsCard } from '../components/ReportEmailSettingsCard'
 import { UpdateSettingsCard } from '../components/UpdateSettingsCard'
 import { BackupModal } from '../components/BackupModal'
 import { RestoreBackupModal } from '../components/RestoreBackupModal'
@@ -152,6 +153,15 @@ const SECTION_KEYWORDS: Record<string, string[]> = {
     'store credit'
   ],
   reportingSnapshot: ['reporting', 'reports', 'dashboard', 'csv', 'xlsx', 'export'],
+  reportEmail: [
+    'report email',
+    'scheduled reports',
+    'email reports',
+    'digest',
+    'auto email',
+    'smtp',
+    'recipient email'
+  ],
   updates: ['software update', 'update', 'auto update', 'version', 'install update'],
   testMode: ['test mode', 'ipc error', 'force reject', 'debug', 'simulate error']
 }
@@ -178,7 +188,7 @@ const TIER_LABELS: Record<SettingsTier, { title: string; description: string }> 
 const TIER_SECTIONS: Record<SettingsTier, string[]> = {
   daily: ['payment', 'printer', 'backup'],
   setup: ['storeInfo', 'receiptTemplate', 'credit', 'density', 'customerDisplay'],
-  compliance: ['compliance', 'featureFlags', 'optionalModules', 'reportingSnapshot'],
+  compliance: ['compliance', 'featureFlags', 'optionalModules', 'reportingSnapshot', 'reportEmail'],
   system: ['updates', 'testMode']
 }
 
@@ -1177,7 +1187,9 @@ export function SettingsScreen() {
             </div>
           )}
 
-          {(sectionVisible('optionalModules') || sectionVisible('reportingSnapshot')) && (
+          {(sectionVisible('optionalModules') ||
+            sectionVisible('reportingSnapshot') ||
+            sectionVisible('reportEmail')) && (
             <div className="grid gap-4 md:grid-cols-2">
               {sectionVisible('optionalModules') && (
                 <Card>
@@ -1254,6 +1266,12 @@ export function SettingsScreen() {
                       </p>
                     </div>
                   </div>
+                </Card>
+              )}
+
+              {sectionVisible('reportEmail') && (
+                <Card>
+                  <ReportEmailSettingsCard />
                 </Card>
               )}
             </div>

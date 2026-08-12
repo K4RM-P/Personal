@@ -12,6 +12,7 @@ import { resolveDbFilePath } from './backup/dbPath'
 import { initLogger, log } from './logging/logger'
 import { initAutoUpdater, setUpdateWindow } from './update/autoUpdate'
 import { initCustomerDisplayWindow, teardownCustomerDisplayWindow } from './customerDisplayWindow'
+import { initReportEmailScheduler } from './reports/reportEmailScheduler'
 import { join as joinPath } from 'path'
 
 // .env (dev-only, gitignored) is the only thing that sets DATABASE_URL under normal
@@ -169,6 +170,11 @@ app.whenReady().then(async () => {
   // (dev included) — it registers the update:* IPC handlers the renderer polls
   // unconditionally; the real autoUpdater wiring inside is itself gated on !is.dev.
   initAutoUpdater(mainWindow)
+
+  // Polls for a due scheduled report-digest email and sends it — see
+  // main/reports/reportEmailScheduler.ts. Fire-and-forget, same lifecycle as
+  // initAutoUpdater above (no explicit teardown; Electron just kills the timer on quit).
+  initReportEmailScheduler(db)
 })
 
 app.on('window-all-closed', () => {

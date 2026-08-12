@@ -347,17 +347,18 @@ export async function createTransaction(
   if (tabAmountCents > 0 && !payload.customerId) throw new Error('Attach a customer before using Pharmacy Credit.')
   if (cashOverageToCreditCents > 0 && !payload.customerId) throw new Error('Attach a customer before depositing cash to Pharmacy Credit.')
 
-  if (payload.tenderType === 'PHARMACY_CREDIT' && tabAmountCents !== totalCents) {
-    throw new Error('Pharmacy Credit standalone must charge the full sale total to the tab.')
-  }
-
   // Paying off tab debt by charging it back to the same tab is circular — block it
-  // outright rather than trusting the renderer to have hidden the option.
+  // outright rather than trusting the renderer to have hidden the option. Checked
+  // before the generic Pharmacy Credit validation below so the specific reason wins.
   if (debtSettlementCents > 0) {
     if (!payload.customerId) throw new Error('A customer must be linked to bring in an outstanding balance.')
     if (payload.tenderType === 'PHARMACY_CREDIT' || tabAmountCents > 0) {
       throw new Error('Cannot use Pharmacy Credit to pay off an outstanding balance — choose another payment method.')
     }
+  }
+
+  if (payload.tenderType === 'PHARMACY_CREDIT' && tabAmountCents !== totalCents) {
+    throw new Error('Pharmacy Credit standalone must charge the full sale total to the tab.')
   }
 
   // Composed before the atomic transaction so the evidence trail (which original

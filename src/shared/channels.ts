@@ -137,6 +137,11 @@ export const IPC = {
   REPORTS_EXPORT_CSV: 'reports:exportCsv',
   REPORTS_EXPORT_XLSX: 'reports:exportXlsx',
 
+  // Scheduled report-digest emails
+  REPORT_EMAIL_GET_SETTINGS: 'reportEmail:getSettings',
+  REPORT_EMAIL_SAVE_SETTINGS: 'reportEmail:saveSettings',
+  REPORT_EMAIL_SEND_TEST: 'reportEmail:sendTest',
+
   // Data Backup System (docs/data-backup-system-spec.md)
   BACKUP_GET_EXTERNAL_DRIVES: 'backup:getExternalDrives',
   BACKUP_PICK_FOLDER: 'backup:pickFolder',

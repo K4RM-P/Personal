@@ -338,9 +338,9 @@ export async function saveReportEmailSettings(
 }
 
 /** MAIN PROCESS ONLY (mail sender) — includes the decrypted SMTP password. */
-export async function getReportEmailSettingsInternal(db: PrismaClient): Promise<
-  ReportEmailSettingsDTO & { smtpPassword: string }
-> {
+export async function getReportEmailSettingsInternal(
+  db: PrismaClient
+): Promise<ReportEmailSettingsDTO & { smtpPassword: string }> {
   const [view, smtpPasswordEnc] = await Promise.all([
     getReportEmailSettings(db),
     getSetting(db, 'reportEmail.smtpPasswordEnc')
