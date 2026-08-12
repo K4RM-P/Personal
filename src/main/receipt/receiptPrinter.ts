@@ -35,7 +35,8 @@ export function buildEscPosReceiptBuffer(options: PrintReceiptOptions): Uint8Arr
     .line('--------------------------------')
 
   transaction.items.forEach((item) => {
-    const itemName = item.product.name.slice(0, 20).padEnd(20)
+    const displayName = item.lineType === 'DEBT_SETTLEMENT' ? 'Previous Balance' : (item.product?.name ?? '(item)')
+    const itemName = displayName.slice(0, 20).padEnd(20)
     const qtyStr = `x${item.quantity}`.padStart(3)
     const priceStr = formatCurrency(item.totalCents).padStart(8)
     encoder.line(`${itemName}${qtyStr}${priceStr}`)

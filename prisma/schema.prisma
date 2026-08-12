@@ -227,6 +227,8 @@ enum CreditEntryType {
   SALE_CHARGE
   MANUAL_ADJUSTMENT
   REFUND_CREDIT
+  /** Outstanding balance paid off via a checkout transaction (brought-in debt settlement) — distinct from FUNDS_ADDED, which is a standalone prepayment with no linked purchase. */
+  DEBT_SETTLED
 }
 
 enum LoyaltyEventType {
@@ -299,17 +301,20 @@ model TransactionItem {
   id            String      @id @default(uuid())
   transactionId String
   transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-  productId     Int
-  product       Product     @relation(fields: [productId], references: [id])
+  /** Null only for a DEBT_SETTLEMENT line (see lineType) — every PRODUCT line has one. */
+  productId     Int?
+  product       Product?    @relation(fields: [productId], references: [id])
   quantity      Int
   costCents     Int
   unitPriceCents Int
-  /** Per-item discount applied at checkout (see Discount model for the audit row). */
+  /** Per-item discount applied at checkout (see Discount model for the audit row). Must stay 0 for DEBT_SETTLEMENT lines. */
   discountCents Int?        @default(0)
   totalCents    Int
   isVoided      Boolean     @default(false)
-  /** Whether HST was charged on this line item. Defaults to true. */
+  /** Whether HST was charged on this line item. Defaults to true. Always false for DEBT_SETTLEMENT lines. */
   hstApplied    Boolean     @default(true)
+  /** "PRODUCT" (normal line) or "DEBT_SETTLEMENT" (brought-in Pharmacy Credit balance — see customer-credit debt-settlement feature). */
+  lineType      String      @default("PRODUCT")
 
   @@index([transactionId])
   @@index([productId])

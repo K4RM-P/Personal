@@ -123,7 +123,8 @@ export function CustomerDisplaySettingsCard(): React.JSX.Element {
   }
 
   const handleDelete = (slide: CustomerDisplaySlideDTO): void => {
-    if (!window.confirm(`Delete the slide “${slide.text}”?`)) return
+    const label = slide.type === 'IMAGE' ? 'this image slide' : `the slide "${slide.text}"`
+    if (!window.confirm(`Delete ${label}?`)) return
     setError(null)
     setSaved(null)
     window.api.customerDisplay
@@ -136,26 +137,53 @@ export function CustomerDisplaySettingsCard(): React.JSX.Element {
 
   const openAdd = (): void => {
     setEditingIndex(null)
+    setModalType('TEXT')
     setModalText('')
+    setModalImageDataUrl(null)
+    setModalImageError(null)
     setModalOpen(true)
   }
 
   const openEdit = (index: number): void => {
+    const slide = slides[index]
     setEditingIndex(index)
-    setModalText(slides[index].text)
+    setModalType(slide.type)
+    setModalText(slide.text)
+    setModalImageDataUrl(slide.imageDataUrl)
+    setModalImageError(null)
     setModalOpen(true)
   }
 
+  const handleUploadImage = async (): Promise<void> => {
+    setModalImageError(null)
+    setUploadingImage(true)
+    try {
+      const result = await window.api.customerDisplay.uploadSlideImage()
+      if (result) setModalImageDataUrl(result.imageDataUrl)
+    } catch (err) {
+      setModalImageError(err instanceof Error ? err.message : 'Failed to upload image')
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
   const remaining = CUSTOMER_DISPLAY_SLIDE_MAX_LENGTH - modalText.length
-  const modalValid = modalText.trim().length > 0 && remaining >= 0
+  const modalValid =
+    modalType === 'IMAGE'
+      ? modalImageDataUrl !== null
+      : modalText.trim().length > 0 && remaining >= 0
 
   const handleModalSave = (): void => {
     if (!modalValid) return
     const next = [...slides]
+    const slideData: Omit<CustomerDisplaySlideDTO, 'id' | 'sortOrder'> =
+      modalType === 'IMAGE'
+        ? { type: 'IMAGE', text: '', imageDataUrl: modalImageDataUrl }
+        : { type: 'TEXT', text: modalText.trim(), imageDataUrl: null }
     if (editingIndex === null) {
-      next.push({ id: -1, text: modalText.trim(), sortOrder: next.length })
+      next.push({ id: -1, sortOrder: next.length, ...slideData })
     } else {
-      next[editingIndex] = { ...next[editingIndex], text: modalText.trim() }
+      next[editingIndex] = { ...next[editingIndex], ...slideData }
     }
     setModalOpen(false)
     void persistSlides(next)
@@ -245,13 +273,28 @@ export function CustomerDisplaySettingsCard(): React.JSX.Element {
                   <span className="w-6 shrink-0 text-xs text-[var(--muted-foreground)]">
                     {index + 1}.
                   </span>
-                  <span className="flex-1 truncate text-sm text-[var(--foreground)]">
-                    {slide.text}
-                  </span>
+                  {slide.type === 'IMAGE' ? (
+                    <span className="flex flex-1 items-center gap-2 truncate text-sm text-[var(--foreground)]">
+                      {slide.imageDataUrl && (
+                        <img
+                          src={slide.imageDataUrl}
+                          alt="Slide"
+                          className="h-8 w-12 shrink-0 rounded object-cover"
+                        />
+                      )}
+                      <span className="flex items-center gap-1 text-[var(--muted-foreground)]">
+                        <ImageIcon className="icon-4" /> Image slide
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="flex-1 truncate text-sm text-[var(--foreground)]">
+                      {slide.text}
+                    </span>
+                  )}
                   <button
                     onClick={() => move(index, -1)}
                     disabled={index === 0}
-                    aria-label={`Move “${slide.text}” up`}
+                    aria-label={`Move slide ${index + 1} up`}
                     className="flex h-11 w-11 items-center justify-center rounded-[var(--radius)] text-[var(--muted-foreground)] hover:bg-[var(--muted)] disabled:opacity-30"
                   >
                     <ArrowUp className="icon-4" />
@@ -259,21 +302,21 @@ export function CustomerDisplaySettingsCard(): React.JSX.Element {
                   <button
                     onClick={() => move(index, 1)}
                     disabled={index === slides.length - 1}
-                    aria-label={`Move “${slide.text}” down`}
+                    aria-label={`Move slide ${index + 1} down`}
                     className="flex h-11 w-11 items-center justify-center rounded-[var(--radius)] text-[var(--muted-foreground)] hover:bg-[var(--muted)] disabled:opacity-30"
                   >
                     <ArrowDown className="icon-4" />
                   </button>
                   <button
                     onClick={() => openEdit(index)}
-                    aria-label={`Edit “${slide.text}”`}
+                    aria-label={`Edit slide ${index + 1}`}
                     className="flex h-11 w-11 items-center justify-center rounded-[var(--radius)] text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
                   >
                     <Pencil className="icon-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(slide)}
-                    aria-label={`Delete “${slide.text}”`}
+                    aria-label={`Delete slide ${index + 1}`}
                     className="flex h-11 w-11 items-center justify-center rounded-[var(--radius)] text-[var(--error)] hover:bg-[var(--error-bg)]"
                   >
                     <Trash2 className="icon-4" />
@@ -294,27 +337,78 @@ export function CustomerDisplaySettingsCard(): React.JSX.Element {
             <h3 className="text-base font-semibold text-[var(--foreground)]">
               {editingIndex === null ? 'Add slide' : 'Edit slide'}
             </h3>
-            <label className="mt-3 mb-1 block text-xs text-[var(--muted-foreground)]">
-              Slide text
-            </label>
-            <input
-              type="text"
-              autoFocus
-              value={modalText}
-              maxLength={CUSTOMER_DISPLAY_SLIDE_MAX_LENGTH}
-              onChange={(e) => setModalText(e.target.value)}
-              placeholder="FREE DELIVERY"
-              className="input"
-            />
-            <p
-              className={
-                remaining < 0
-                  ? 'mt-1 text-[11px] text-[var(--error)]'
-                  : 'mt-1 text-[11px] text-[var(--muted-foreground)]'
-              }
-            >
-              {remaining} characters remaining
-            </p>
+
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={() => setModalType('TEXT')}
+                className={
+                  modalType === 'TEXT'
+                    ? 'min-h-11 flex-1 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-medium text-[var(--primary-foreground)]'
+                    : 'min-h-11 flex-1 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]'
+                }
+              >
+                Text
+              </button>
+              <button
+                onClick={() => setModalType('IMAGE')}
+                className={
+                  modalType === 'IMAGE'
+                    ? 'min-h-11 flex-1 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-medium text-[var(--primary-foreground)]'
+                    : 'min-h-11 flex-1 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]'
+                }
+              >
+                Image
+              </button>
+            </div>
+
+            {modalType === 'TEXT' ? (
+              <>
+                <label className="mt-3 mb-1 block text-xs text-[var(--muted-foreground)]">
+                  Slide text
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={modalText}
+                  maxLength={CUSTOMER_DISPLAY_SLIDE_MAX_LENGTH}
+                  onChange={(e) => setModalText(e.target.value)}
+                  placeholder="FREE DELIVERY"
+                  className="input"
+                />
+                <p
+                  className={
+                    remaining < 0
+                      ? 'mt-1 text-[11px] text-[var(--error)]'
+                      : 'mt-1 text-[11px] text-[var(--muted-foreground)]'
+                  }
+                >
+                  {remaining} characters remaining
+                </p>
+              </>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {modalImageDataUrl && (
+                  <img
+                    src={modalImageDataUrl}
+                    alt="Slide preview"
+                    className="max-h-40 w-full rounded-[var(--radius)] border border-[var(--border)] object-contain"
+                  />
+                )}
+                <button
+                  onClick={() => void handleUploadImage()}
+                  disabled={uploadingImage}
+                  className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--primary)]/30 px-3 text-sm text-[var(--primary)] hover:bg-[var(--muted)] disabled:opacity-50"
+                >
+                  {uploadingImage
+                    ? 'Uploading…'
+                    : modalImageDataUrl
+                      ? 'Replace image'
+                      : 'Upload image (PNG, JPG, GIF, WebP — max 2MB)'}
+                </button>
+                {modalImageError && <Alert variant="error">{modalImageError}</Alert>}
+              </div>
+            )}
+
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setModalOpen(false)}

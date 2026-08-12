@@ -253,6 +253,27 @@ export async function saveAllPricingTiers(
   return getAllPricingTiers(db)
 }
 
+/**
+ * Read-only fetch of a single past transaction's product line items, for the debt
+ * breakdown's [View] action and the cart's [Details] action on a brought-in-balance
+ * line — deliberately not the refund system's getSaleDetailsForRefund, which carries
+ * refund-specific fields (refunds, refundedCents, refundableCents) this view has no
+ * use for.
+ */
+export async function getTransactionDetail(
+  db: PrismaClient,
+  transactionId: string
+): Promise<TransactionWithItems> {
+  return db.transaction.findUniqueOrThrow({
+    where: { id: transactionId },
+    include: {
+      items: { include: { product: true } },
+      customer: true,
+      user: { select: { id: true, fullName: true, role: true } }
+    }
+  })
+}
+
 // Transaction & Checkout Queries
 export async function createTransaction(
   db: PrismaClient,

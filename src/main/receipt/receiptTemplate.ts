@@ -35,9 +35,10 @@ function buildLineItemsHtml(transaction: TransactionWithItems): string {
       </tr>`
           : ''
       const hstLabel = item.hstApplied === false ? ' (HST exempt)' : ''
+      const displayName = item.lineType === 'DEBT_SETTLEMENT' ? 'Previous Balance' : (item.product?.name ?? '(item)')
       return `
       <tr>
-        <td>${escapeHtml(item.product.name)}${hstLabel}</td>
+        <td>${escapeHtml(displayName)}${hstLabel}</td>
         <td class="qty">x${item.quantity}</td>
         <td class="price">${formatCurrency(lineRawCents)}</td>
       </tr>${discountRow}`

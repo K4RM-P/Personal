@@ -46,7 +46,7 @@ export async function exportSales(db: PrismaClient): Promise<{ sales: unknown[] 
       saleType: tx.saleType,
       lineItems: tx.items.map((item) => ({
         productId: item.productId,
-        productName: item.product.name,
+        productName: item.lineType === 'DEBT_SETTLEMENT' ? 'Previous Balance' : (item.product?.name ?? '(item)'),
         quantity: item.quantity,
         costCents: item.costCents,
         unitPriceCents: item.unitPriceCents,

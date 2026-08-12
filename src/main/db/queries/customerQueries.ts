@@ -142,6 +142,148 @@ export async function deleteCustomerData(db: PrismaClient, id: number) {
   })
 }
 
+export interface DebtBreakdownEntry {
+  ledgerEntryId: number
+  type: 'SALE_CHARGE' | 'MANUAL_ADJUSTMENT'
+  /** Positive cents this entry still contributes to the customer's current outstanding balance. */
+  amountCents: number
+  createdAt: Date
+  note: string | null
+  // Populated only for type === 'SALE_CHARGE'.
+  transactionId?: string
+  receiptNumber?: string
+  transactionDate?: Date
+  transactionTotalCents?: number
+  tabAmountCents?: number
+  chargeKind?: 'FULL_CHARGE' | 'SHORT_PAY'
+  items?: { productName: string; quantity: number }[]
+}
+
+export interface DebtBreakdown {
+  customerId: number
+  totalOutstandingCents: number
+  entries: DebtBreakdownEntry[]
+}
+
+/**
+ * Reconstructs exactly which SALE_CHARGE / debit MANUAL_ADJUSTMENT entries make up a
+ * customer's current outstanding (owed) balance, so a pharmacist can show concrete
+ * proof of what a debt is for. Walks the full ledger chronologically and offsets each
+ * debit FIFO against later credits (FUNDS_ADDED, DEBT_SETTLED, REFUND_CREDIT, or a
+ * positive MANUAL_ADJUSTMENT) — the same order the running `balanceAfterCents` was
+ * built in, just attributed per-entry instead of only tracked as a running total.
+ *
+ * Never time-bounded: truncating history risks silently dropping an entry that is
+ * still part of the current balance, and the entries actually returned are already
+ * bounded to whatever remains unpaid (typically small), not the customer's full history.
+ */
+export async function getCustomerDebtBreakdown(
+  db: PrismaClient,
+  customerId: number
+): Promise<DebtBreakdown> {
+  const customer = await db.customer.findUniqueOrThrow({ where: { id: customerId } })
+  const ledgerEntries = await db.creditLedgerEntry.findMany({
+    where: { customerId },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }]
+  })
+
+  type DebitRecord = {
+    ledgerEntryId: number
+    type: 'SALE_CHARGE' | 'MANUAL_ADJUSTMENT'
+    remainingCents: number
+    createdAt: Date
+    note: string | null
+    transactionId: string | null
+  }
+  const outstanding: DebitRecord[] = []
+
+  for (const entry of ledgerEntries) {
+    if (entry.amountCents < 0) {
+      if (entry.type === 'SALE_CHARGE' || entry.type === 'MANUAL_ADJUSTMENT') {
+        outstanding.push({
+          ledgerEntryId: entry.id,
+          type: entry.type,
+          remainingCents: -entry.amountCents,
+          createdAt: entry.createdAt,
+          note: entry.note,
+          transactionId: entry.transactionId
+        })
+      }
+      // REFUND_CREDIT and FUNDS_ADDED/DEBT_SETTLED are never negative in practice;
+      // any other negative type is not debt this breakdown reconstructs.
+      continue
+    }
+    // A credit (positive amountCents) pays down the oldest outstanding debits first.
+    let creditRemaining = entry.amountCents
+    for (const debit of outstanding) {
+      if (creditRemaining <= 0) break
+      if (debit.remainingCents <= 0) continue
+      const offset = Math.min(creditRemaining, debit.remainingCents)
+      debit.remainingCents -= offset
+      creditRemaining -= offset
+    }
+  }
+
+  const remaining = outstanding.filter((d) => d.remainingCents > 0)
+  const totalOutstandingCents = remaining.reduce((sum, d) => sum + d.remainingCents, 0)
+
+  const entries: DebtBreakdownEntry[] = []
+  for (const debit of remaining) {
+    if (debit.type === 'MANUAL_ADJUSTMENT') {
+      entries.push({
+        ledgerEntryId: debit.ledgerEntryId,
+        type: 'MANUAL_ADJUSTMENT',
+        amountCents: debit.remainingCents,
+        createdAt: debit.createdAt,
+        note: debit.note
+      })
+      continue
+    }
+    // SALE_CHARGE — trace back to the originating transaction's items and whether it
+    // was a short-pay or a full charge to the tab.
+    if (!debit.transactionId) {
+      throw new Error(`SALE_CHARGE ledger entry ${debit.ledgerEntryId} is missing its transactionId.`)
+    }
+    const transaction = await db.transaction.findUniqueOrThrow({
+      where: { id: debit.transactionId },
+      include: { items: { where: { lineType: 'PRODUCT' }, include: { product: true } } }
+    })
+    const tabAmountCents = transaction.tabAmountCents ?? 0
+    entries.push({
+      ledgerEntryId: debit.ledgerEntryId,
+      type: 'SALE_CHARGE',
+      amountCents: debit.remainingCents,
+      createdAt: debit.createdAt,
+      note: debit.note,
+      transactionId: transaction.id,
+      receiptNumber: transaction.receiptNumber,
+      transactionDate: transaction.createdAt,
+      transactionTotalCents: transaction.totalCents,
+      tabAmountCents,
+      chargeKind: tabAmountCents >= transaction.totalCents ? 'FULL_CHARGE' : 'SHORT_PAY',
+      items: transaction.items.map((item) => ({
+        productName: item.product?.name ?? '(item)',
+        quantity: item.quantity
+      }))
+    })
+  }
+
+  const currentBalanceCents = (
+    await db.creditLedgerEntry.findFirst({
+      where: { customerId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]
+    })
+  )?.balanceAfterCents ?? 0
+  const expectedOutstanding = currentBalanceCents < 0 ? -currentBalanceCents : 0
+  if (totalOutstandingCents !== expectedOutstanding) {
+    throw new Error(
+      `Debt breakdown reconstruction (${totalOutstandingCents}) does not match customer ${customerId}'s current outstanding balance (${expectedOutstanding}). This is a bug in the reconstruction logic.`
+    )
+  }
+
+  return { customerId: customer.id, totalOutstandingCents, entries }
+}
+
 export async function getCustomerDetail(db: PrismaClient, id: number) {
   const customer = await db.customer.findUniqueOrThrow({
     where: { id },

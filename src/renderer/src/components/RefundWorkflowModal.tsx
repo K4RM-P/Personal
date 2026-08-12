@@ -246,7 +246,8 @@ export function RefundWorkflowModal({
                     onChange={() => toggleItem(item.id)}
                     className="icon-4 shrink-0"
                   />
-                  {item.product.name} (qty {item.quantity}) @ {formatCurrency(item.unitPriceCents)}{' '}
+                  {item.lineType === 'DEBT_SETTLEMENT' ? 'Previous Balance' : (item.product?.name ?? '(item)')} (qty{' '}
+                  {item.quantity}) @ {formatCurrency(item.unitPriceCents)}{' '}
                   ea
                 </span>
                 <span className="font-semibold text-[var(--foreground)]">

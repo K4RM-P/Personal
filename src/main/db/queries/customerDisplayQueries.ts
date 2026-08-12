@@ -34,7 +34,12 @@ export async function getCustomerDisplaySlides(
  */
 export async function saveCustomerDisplaySlides(
   db: PrismaClient,
-  slides: Array<{ id?: number; type?: 'TEXT' | 'IMAGE'; text: string; imageDataUrl?: string | null }>
+  slides: Array<{
+    id?: number
+    type?: 'TEXT' | 'IMAGE'
+    text: string
+    imageDataUrl?: string | null
+  }>
 ): Promise<CustomerDisplaySlideDTO[]> {
   for (const s of slides) {
     const type = s.type === 'IMAGE' ? 'IMAGE' : 'TEXT'

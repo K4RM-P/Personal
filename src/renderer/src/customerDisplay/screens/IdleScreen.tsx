@@ -21,7 +21,17 @@ export function IdleScreen({
   // single fallback slide (spec §2.2).
   const effectiveSlides = React.useMemo<CustomerDisplaySlideDTO[]>(
     () =>
-      slides.length > 0 ? slides : [{ id: -1, text: pharmacyName || 'Welcome', sortOrder: 0 }],
+      slides.length > 0
+        ? slides
+        : [
+            {
+              id: -1,
+              type: 'TEXT',
+              text: pharmacyName || 'Welcome',
+              imageDataUrl: null,
+              sortOrder: 0
+            }
+          ],
     [slides, pharmacyName]
   )
 
@@ -51,8 +61,10 @@ export function IdleScreen({
     return () => clearInterval(timer)
   }, [durationSeconds])
 
+  const isImage = current?.type === 'IMAGE'
   const text = current?.text ?? pharmacyName
-  const fontSize = useFitText(text, containerRef)
+  // Hooks must run unconditionally; fit-text sizing is simply unused for image slides.
+  const fontSize = useFitText(isImage ? '' : text, containerRef)
 
   return (
     <div
@@ -63,7 +75,7 @@ export function IdleScreen({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '8vh 8vw',
+        padding: isImage ? 0 : '8vh 8vw',
         boxSizing: 'border-box',
         background: 'var(--background)',
         color: 'var(--primary)',
@@ -71,18 +83,34 @@ export function IdleScreen({
         overflow: 'hidden'
       }}
     >
-      <div
-        key={`${current?.id ?? 'fallback'}:${text}`}
-        style={{
-          fontSize,
-          fontWeight: 700,
-          lineHeight: 1.15,
-          maxWidth: '100%',
-          animation: 'cd-fade-in 400ms ease'
-        }}
-      >
-        {text}
-      </div>
+      {isImage && current?.imageDataUrl ? (
+        <img
+          key={current.id}
+          src={current.imageDataUrl}
+          alt=""
+          style={{
+            maxHeight: '100vh',
+            maxWidth: '100vw',
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            animation: 'cd-fade-in 400ms ease'
+          }}
+        />
+      ) : (
+        <div
+          key={`${current?.id ?? 'fallback'}:${text}`}
+          style={{
+            fontSize,
+            fontWeight: 700,
+            lineHeight: 1.15,
+            maxWidth: '100%',
+            animation: 'cd-fade-in 400ms ease'
+          }}
+        >
+          {text}
+        </div>
+      )}
     </div>
   )
 }

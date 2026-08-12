@@ -90,7 +90,8 @@ export interface BulkImportProductInput {
 }
 
 export type TransactionWithItems = DBTransaction & {
-  items: (DBTransactionItem & { product: Product })[]
+  /** `product` is null only for a DEBT_SETTLEMENT line (see DBTransactionItem.lineType). */
+  items: (DBTransactionItem & { product: Product | null })[]
   customer?: Customer | null
   user?: { id: number; fullName: string; role: string } | null
 }
