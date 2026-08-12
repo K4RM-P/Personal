@@ -174,24 +174,38 @@ export async function getCustomerDebtBreakdown(
     transactionId: string | null
   }
   const outstanding: DebitRecord[] = []
+  // Credit that outlives every outstanding debit at the time it's applied (e.g. funds
+  // added, or a manual credit, while the customer owed nothing) is real store credit and
+  // must be banked here rather than discarded — otherwise a later charge is recorded as
+  // full new debt instead of being offset by that surplus, overstating totalOutstandingCents.
+  let creditBalance = 0
 
   for (const entry of ledgerEntries) {
     if (entry.amountCents < 0) {
       if (entry.type === 'SALE_CHARGE' || entry.type === 'MANUAL_ADJUSTMENT') {
-        outstanding.push({
-          ledgerEntryId: entry.id,
-          type: entry.type,
-          remainingCents: -entry.amountCents,
-          createdAt: entry.createdAt,
-          note: entry.note,
-          transactionId: entry.transactionId
-        })
+        let debitRemaining = -entry.amountCents
+        if (creditBalance > 0) {
+          const offset = Math.min(creditBalance, debitRemaining)
+          creditBalance -= offset
+          debitRemaining -= offset
+        }
+        if (debitRemaining > 0) {
+          outstanding.push({
+            ledgerEntryId: entry.id,
+            type: entry.type,
+            remainingCents: debitRemaining,
+            createdAt: entry.createdAt,
+            note: entry.note,
+            transactionId: entry.transactionId
+          })
+        }
       }
       // REFUND_CREDIT and FUNDS_ADDED/DEBT_SETTLED are never negative in practice;
       // any other negative type is not debt this breakdown reconstructs.
       continue
     }
-    // A credit (positive amountCents) pays down the oldest outstanding debits first.
+    // A credit (positive amountCents) pays down the oldest outstanding debits first;
+    // any surplus left over is banked as creditBalance for future debits to draw on.
     let creditRemaining = entry.amountCents
     for (const debit of outstanding) {
       if (creditRemaining <= 0) break
@@ -200,6 +214,7 @@ export async function getCustomerDebtBreakdown(
       debit.remainingCents -= offset
       creditRemaining -= offset
     }
+    creditBalance += creditRemaining
   }
 
   const remaining = outstanding.filter((d) => d.remainingCents > 0)
