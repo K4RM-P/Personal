@@ -112,8 +112,17 @@ describe('debt settlement (bring in outstanding balance)', () => {
     expect(breakdown.entries.find((e) => e.transactionId === sale1.id)).toBeUndefined()
   })
 
-  it('brings in a partial amount, excludes it from tax and bill discount, and writes a DEBT_SETTLED entry atomically', async () => {
+  it('brings in exactly one selected item out of several, excludes it from tax and bill discount, and writes a DEBT_SETTLED entry atomically', async () => {
     const c = await customer()
+    // Two separate outstanding sales — the cashier will only select one of them.
+    const saleA = await createTransaction(db, {
+      items: [{ productId, quantity: 1, costCents: 2000, unitPriceCents: 4000 }],
+      taxRatePercent: 0,
+      tenderType: 'PHARMACY_CREDIT',
+      tenderedCents: 0,
+      customerId: c.id,
+      tabAmountCents: 4000
+    })
     await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 2000, unitPriceCents: 4000 }],
       taxRatePercent: 0,
@@ -122,35 +131,79 @@ describe('debt settlement (bring in outstanding balance)', () => {
       customerId: c.id,
       tabAmountCents: 4000
     })
+
+    const breakdownBefore = await getCustomerDebtBreakdown(db, c.id)
+    expect(breakdownBefore.totalOutstandingCents).toBe(8000)
+    const entryForSaleA = breakdownBefore.entries.find((e) => e.transactionId === saleA.id)!
 
     const sale = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 2000, unitPriceCents: 4000, hstApplied: true }],
       taxRatePercent: 13,
       tenderType: 'CASH',
-      tenderedCents: 6520, // 4000 product + 520 tax (13% of 4000) + 2000 partial debt settlement
+      tenderedCents: 8520, // 4000 product + 520 tax (13% of 4000) + 4000 for the one selected item
       customerId: c.id,
-      debtSettlementCents: 2000
+      debtSettlementLedgerEntryIds: [entryForSaleA.ledgerEntryId]
     })
 
     // Tax computed only on the product line, not the debt line.
     expect(sale.taxCents).toBe(520)
-    expect(sale.totalCents).toBe(4000 + 520 + 2000)
+    expect(sale.totalCents).toBe(4000 + 520 + 4000)
 
     const debtItem = sale.items.find((i) => i.lineType === 'DEBT_SETTLEMENT')
-    expect(debtItem).toMatchObject({ totalCents: 2000, hstApplied: false, discountCents: 0, productId: null })
+    expect(debtItem).toMatchObject({ totalCents: 4000, hstApplied: false, discountCents: 0, productId: null })
 
     const ledgerEntry = await db.creditLedgerEntry.findFirst({
       where: { transactionId: sale.id, type: 'DEBT_SETTLED' }
     })
-    expect(ledgerEntry).toMatchObject({ amountCents: 2000 })
+    expect(ledgerEntry).toMatchObject({ amountCents: 4000 })
     expect(ledgerEntry?.note).toMatch(/covers/)
+    expect(ledgerEntry?.note).toContain(saleA.receiptNumber)
 
-    // $4000 owed, $2000 brought in → $2000 remains.
-    const breakdown = await getCustomerDebtBreakdown(db, c.id)
-    expect(breakdown.totalOutstandingCents).toBe(2000)
+    // $8000 owed, only saleA's $4000 brought in → the other sale's $4000 remains.
+    const breakdownAfter = await getCustomerDebtBreakdown(db, c.id)
+    expect(breakdownAfter.totalOutstandingCents).toBe(4000)
+    expect(breakdownAfter.entries.find((e) => e.transactionId === saleA.id)).toBeUndefined()
   })
 
-  it('rejects bringing in more than the customers current outstanding balance', async () => {
+  it('brings in multiple selected items (a sale plus a manual adjustment) in a single sale', async () => {
+    const c = await customer()
+    const sale1 = await createTransaction(db, {
+      items: [{ productId, quantity: 1, costCents: 2000, unitPriceCents: 4000 }],
+      taxRatePercent: 0,
+      tenderType: 'PHARMACY_CREDIT',
+      tenderedCents: 0,
+      customerId: c.id,
+      tabAmountCents: 4000
+    })
+    await adjustCredit(db, c.id, -1500, 'Owed from a paper invoice', true)
+
+    const breakdown = await getCustomerDebtBreakdown(db, c.id)
+    expect(breakdown.totalOutstandingCents).toBe(5500)
+    const ids = breakdown.entries.map((e) => e.ledgerEntryId)
+    expect(ids).toHaveLength(2)
+
+    const settlingSale = await createTransaction(db, {
+      items: [{ productId, quantity: 1, costCents: 2000, unitPriceCents: 4000 }],
+      taxRatePercent: 0,
+      tenderType: 'CASH',
+      tenderedCents: 4000 + 5500,
+      customerId: c.id,
+      debtSettlementLedgerEntryIds: ids
+    })
+
+    expect(settlingSale.totalCents).toBe(4000 + 5500)
+    const ledgerEntry = await db.creditLedgerEntry.findFirst({
+      where: { transactionId: settlingSale.id, type: 'DEBT_SETTLED' }
+    })
+    expect(ledgerEntry).toMatchObject({ amountCents: 5500 })
+    expect(ledgerEntry?.note).toContain(sale1.receiptNumber)
+    expect(ledgerEntry?.note).toContain('manual adjustment')
+
+    const breakdownAfter = await getCustomerDebtBreakdown(db, c.id)
+    expect(breakdownAfter.totalOutstandingCents).toBe(0)
+  })
+
+  it('rejects a selected item that is no longer outstanding (e.g. already settled elsewhere)', async () => {
     const c = await customer()
     await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 2000, unitPriceCents: 4000 }],
@@ -160,6 +213,11 @@ describe('debt settlement (bring in outstanding balance)', () => {
       customerId: c.id,
       tabAmountCents: 4000
     })
+    const breakdown = await getCustomerDebtBreakdown(db, c.id)
+    const staleId = breakdown.entries[0].ledgerEntryId
+
+    // Fully pay it off through an unrelated channel first.
+    await addFunds(db, c.id, 4000, 'paid off before the stale selection was used')
 
     await expect(
       createTransaction(db, {
@@ -168,16 +226,12 @@ describe('debt settlement (bring in outstanding balance)', () => {
         tenderType: 'CASH',
         tenderedCents: 9000,
         customerId: c.id,
-        debtSettlementCents: 5000 // only $4000 owed
+        debtSettlementLedgerEntryIds: [staleId]
       })
-    ).rejects.toThrow(/outstanding balance/i)
-
-    // Nothing partial was written — rejected before the transaction, no ledger row, no sale.
-    const breakdown = await getCustomerDebtBreakdown(db, c.id)
-    expect(breakdown.totalOutstandingCents).toBe(4000)
+    ).rejects.toThrow(/no longer outstanding/i)
   })
 
-  it('blocks Pharmacy Credit as the tender when a debt-settlement amount is present', async () => {
+  it('blocks Pharmacy Credit as the tender when a debt-settlement selection is present', async () => {
     const c = await customer()
     await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 2000, unitPriceCents: 4000 }],
@@ -187,6 +241,7 @@ describe('debt settlement (bring in outstanding balance)', () => {
       customerId: c.id,
       tabAmountCents: 4000
     })
+    const breakdown = await getCustomerDebtBreakdown(db, c.id)
 
     await expect(
       createTransaction(db, {
@@ -195,7 +250,7 @@ describe('debt settlement (bring in outstanding balance)', () => {
         tenderType: 'PHARMACY_CREDIT',
         tenderedCents: 0,
         customerId: c.id,
-        debtSettlementCents: 2000
+        debtSettlementLedgerEntryIds: [breakdown.entries[0].ledgerEntryId]
       })
     ).rejects.toThrow(/Cannot use Pharmacy Credit/i)
   })
@@ -210,6 +265,7 @@ describe('debt settlement (bring in outstanding balance)', () => {
       customerId: c.id,
       tabAmountCents: 4000
     })
+    const breakdown = await getCustomerDebtBreakdown(db, c.id)
 
     // Invalid item discount forces createTransaction to throw before the $transaction commits.
     await expect(
@@ -221,7 +277,7 @@ describe('debt settlement (bring in outstanding balance)', () => {
         tenderType: 'CASH',
         tenderedCents: 6000,
         customerId: c.id,
-        debtSettlementCents: 2000
+        debtSettlementLedgerEntryIds: [breakdown.entries[0].ledgerEntryId]
       })
     ).rejects.toThrow()
 
