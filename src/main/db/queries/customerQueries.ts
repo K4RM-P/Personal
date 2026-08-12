@@ -268,13 +268,6 @@ export async function getCreditSettings(db: Pick<PrismaClient, 'setting'>) {
   return { loyaltyPointsPerDollar: Number(await read('customer.loyaltyPointsPerDollar', '1')) || 0 }
 }
 
-export async function getAllowShortPayToTab(db: Pick<PrismaClient, 'setting'>): Promise<boolean> {
-  return (
-    (await db.setting.findUnique({ where: { key: 'customer.allowShortPayToTab' } }))?.value ===
-    'true'
-  )
-}
-
 export async function saveCreditSettings(
   db: PrismaClient,
   input: { loyaltyPointsPerDollar: number }

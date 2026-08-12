@@ -22,10 +22,8 @@ import {
   setUseCustomReceiptTemplate,
   getAllowCreditCardSurcharge,
   getCardSurchargePercent,
-  getAllowShortPayToTab,
   saveAllowCreditCardSurcharge,
   saveCardSurchargePercent,
-  saveAllowShortPayToTab,
   getIdleTimeoutMinutes,
   saveIdleTimeoutMinutes,
   getDisplayDensityLevel,
@@ -320,26 +318,22 @@ export function registerReceiptHandlers(db: PrismaClient): void {
   )
 
   ipcMain.handle(IPC.SETTINGS_GET_CHECKOUT, async (): Promise<CheckoutSettings> => {
-    const [allowSurcharge, surchargePercent, allowShortPay] = await Promise.all([
+    const [allowSurcharge, surchargePercent] = await Promise.all([
       getAllowCreditCardSurcharge(db),
-      getCardSurchargePercent(db),
-      getAllowShortPayToTab(db)
+      getCardSurchargePercent(db)
     ])
     return {
       allowCreditCardSurcharge: allowSurcharge,
-      cardSurchargePercent: surchargePercent,
-      allowShortPayToTab: allowShortPay
+      cardSurchargePercent: surchargePercent
     }
   })
 
-  // Only reachable from Settings (manager-only nav) — also affects card surcharge % and
-  // whether short cash payments can go to a customer's tab, both money-relevant.
+  // Only reachable from Settings (manager-only nav) — also affects card surcharge %, money-relevant.
   ipcMain.handle(IPC.SETTINGS_SAVE_CHECKOUT, async (_e, input: CheckoutSettings) => {
     requireManager()
     await Promise.all([
       saveAllowCreditCardSurcharge(db, input.allowCreditCardSurcharge),
-      saveCardSurchargePercent(db, input.cardSurchargePercent),
-      saveAllowShortPayToTab(db, input.allowShortPayToTab)
+      saveCardSurchargePercent(db, input.cardSurchargePercent)
     ])
     return input
   })

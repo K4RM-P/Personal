@@ -391,7 +391,6 @@ export interface InventoryValuation {
 export interface CheckoutSettings {
   allowCreditCardSurcharge: boolean
   cardSurchargePercent: number
-  allowShortPayToTab: boolean
 }
 
 export interface CreditHealthSummary {

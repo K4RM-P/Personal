@@ -98,8 +98,7 @@ export function CheckoutScreen(): React.JSX.Element {
   const [eTransferConfirmed, setETransferConfirmed] = React.useState(false)
   const [checkoutSettings, setCheckoutSettings] = React.useState({
     allowCreditCardSurcharge: false,
-    cardSurchargePercent: 2,
-    allowShortPayToTab: false
+    cardSurchargePercent: 2
   })
 
   const [showAddCustomer, setShowAddCustomer] = React.useState(false)
@@ -591,13 +590,6 @@ export function CheckoutScreen(): React.JSX.Element {
     if (cart.length === 0) return
     if (!attachedCustomer) {
       setScanFeedback({ type: 'error', message: 'Attach a customer before using Pharmacy Credit.' })
-      return
-    }
-    if (customerBalance < effectiveTotal && !checkoutSettings.allowShortPayToTab) {
-      setScanFeedback({
-        type: 'error',
-        message: 'Balance insufficient for full Pharmacy Credit payment. Add another tender.'
-      })
       return
     }
     void completeSale('PHARMACY_CREDIT', effectiveTotal)
@@ -1240,9 +1232,6 @@ export function CheckoutScreen(): React.JSX.Element {
                     {tenderedCents > 0 && tenderedCents < effectiveTotal && attachedCustomer && (
                       <button
                         onClick={() => void completeSale('CASH', shortCents)}
-                        disabled={
-                          customerBalance < shortCents && !checkoutSettings.allowShortPayToTab
-                        }
                         className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-2 text-xs font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
                       >
                         Put {formatCurrency(shortCents)} on {attachedCustomer.firstName}&apos;s tab
@@ -1438,21 +1427,13 @@ export function CheckoutScreen(): React.JSX.Element {
                           {formatCurrency(effectiveTotal)}
                         </div>
                         {customerBalance < effectiveTotal && (
-                          <Alert
-                            variant={checkoutSettings.allowShortPayToTab ? 'warning' : 'error'}
-                          >
-                            {checkoutSettings.allowShortPayToTab
-                              ? `Balance is short by ${formatCurrency(effectiveTotal - customerBalance)}; this will push the tab negative.`
-                              : 'Balance insufficient; short-pay to tab is disabled. Add another tender.'}
+                          <Alert variant="warning">
+                            {`Balance is short by ${formatCurrency(effectiveTotal - customerBalance)}; this will push the tab negative.`}
                           </Alert>
                         )}
                         <button
                           onClick={handlePharmacyCreditCheckout}
-                          disabled={
-                            cardProcessing ||
-                            (customerBalance < effectiveTotal &&
-                              !checkoutSettings.allowShortPayToTab)
-                          }
+                          disabled={cardProcessing}
                           className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
                         >
                           Pay with Pharmacy Credit

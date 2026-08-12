@@ -26,7 +26,6 @@ const DEFAULTS = {
   // Payment configuration
   'payment.allowCreditCardSurcharge': 'false',
   'payment.cardSurchargePercent': '2',
-  'customer.allowShortPayToTab': 'false',
   'backup.promptOnLogout': 'true',
   'backup.drivePath': '',
   'backup.driveName': '',
@@ -177,10 +176,6 @@ export async function getCardSurchargePercent(db: PrismaClient): Promise<number>
   return parseInt(raw, 10) || 2
 }
 
-export async function getAllowShortPayToTab(db: PrismaClient): Promise<boolean> {
-  return (await getSetting(db, 'customer.allowShortPayToTab')) === 'true'
-}
-
 export async function saveAllowCreditCardSurcharge(
   db: PrismaClient,
   enabled: boolean
@@ -190,10 +185,6 @@ export async function saveAllowCreditCardSurcharge(
 
 export async function saveCardSurchargePercent(db: PrismaClient, percent: number): Promise<void> {
   await setSetting(db, 'payment.cardSurchargePercent', String(percent))
-}
-
-export async function saveAllowShortPayToTab(db: PrismaClient, enabled: boolean): Promise<void> {
-  await setSetting(db, 'customer.allowShortPayToTab', String(enabled))
 }
 
 export async function getBackupPromptOnLogout(db: PrismaClient): Promise<boolean> {

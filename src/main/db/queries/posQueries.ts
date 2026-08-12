@@ -314,16 +314,6 @@ export async function createTransaction(
       await tx.customer.findUniqueOrThrow({ where: { id: payload.customerId } })
     }
 
-    if (payload.tenderType === 'PHARMACY_CREDIT' && payload.customerId) {
-      const settings = await db.setting.findUnique({ where: { key: 'customer.allowShortPayToTab' } })
-      const allowShortPay = settings?.value === 'true'
-      const detail = await tx.customer.findUniqueOrThrow({ where: { id: payload.customerId }, select: { id: true, ledgerEntries: { orderBy: { createdAt: 'desc' }, take: 1 } } })
-      const currentBalance = detail.ledgerEntries[0]?.balanceAfterCents ?? 0
-      if (currentBalance < totalCents && !allowShortPay) {
-        throw new Error('Balance insufficient for full Pharmacy Credit payment. Add another tender or enable short-pay to tab in settings.')
-      }
-    }
-
     const transaction = await tx.transaction.create({
       data: {
         receiptNumber,

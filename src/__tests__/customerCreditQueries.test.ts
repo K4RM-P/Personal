@@ -27,11 +27,6 @@ describe('customer credit ledger', () => {
 
   beforeAll(async () => {
     execSync('npx prisma migrate deploy', { stdio: 'ignore' })
-    await db.setting.upsert({
-      where: { key: 'customer.allowShortPayToTab' },
-      update: { value: 'true' },
-      create: { key: 'customer.allowShortPayToTab', value: 'true' }
-    })
     const product = await db.product.upsert({
       where: { sku: 'CUSTOMER-TEST' },
       update: { priceCents: 1000, costCents: 500, name: 'Customer test item' },
@@ -201,37 +196,7 @@ describe('customer credit ledger', () => {
     ).rejects.toThrow('full sale total')
   })
 
-  it('blocks an insufficient-balance Pharmacy Credit sale when short-pay to tab is off', async () => {
-    await db.setting.upsert({
-      where: { key: 'customer.allowShortPayToTab' },
-      update: { value: 'false' },
-      create: { key: 'customer.allowShortPayToTab', value: 'false' }
-    })
-    const c = await customer()
-    await addFunds(db, c.id, 200)
-    await expect(
-      createTransaction(db, {
-        items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
-        taxRatePercent: 0,
-        tenderType: 'PHARMACY_CREDIT',
-        tenderedCents: 0,
-        customerId: c.id,
-        tabAmountCents: 1000
-      })
-    ).rejects.toThrow('Balance insufficient')
-    await db.setting.upsert({
-      where: { key: 'customer.allowShortPayToTab' },
-      update: { value: 'true' },
-      create: { key: 'customer.allowShortPayToTab', value: 'true' }
-    })
-  })
-
-  it('allows an insufficient-balance Pharmacy Credit sale (negative tab) when short-pay is on', async () => {
-    await db.setting.upsert({
-      where: { key: 'customer.allowShortPayToTab' },
-      update: { value: 'true' },
-      create: { key: 'customer.allowShortPayToTab', value: 'true' }
-    })
+  it('allows an insufficient-balance Pharmacy Credit sale (negative tab)', async () => {
     const c = await customer()
     await addFunds(db, c.id, 200)
     const sale = await createTransaction(db, {
