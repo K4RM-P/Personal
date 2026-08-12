@@ -137,6 +137,7 @@ function buildSampleTransaction(): TransactionWithItems {
         discountCents: 0,
         isVoided: false,
         hstApplied: true,
+        lineType: 'PRODUCT',
         product: buildSampleProduct(
           {
             id: 1,
@@ -160,6 +161,7 @@ function buildSampleTransaction(): TransactionWithItems {
         discountCents: 0,
         isVoided: false,
         hstApplied: false,
+        lineType: 'PRODUCT',
         product: buildSampleProduct(
           {
             id: 2,

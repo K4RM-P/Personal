@@ -26,12 +26,8 @@ import {
   Trash2,
   MoreVertical,
   Plus,
-  Check,
-  User,
-  AlertCircle,
-  X
+  Check
 } from 'lucide-react'
-import type { DebtBreakdown } from '@shared/types'
 
 type ScanFeedback = { type: 'success' | 'error'; message: string } | null
 type PaymentMethod = 'CASH' | 'E_TRANSFER' | 'CARD' | 'PHARMACY_CREDIT' | null

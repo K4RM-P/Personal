@@ -177,17 +177,22 @@ export async function buildDashboardSummary(db: PrismaClient): Promise<any> {
     db.product.count({ where: { costCents: { lte: 0 } } })
   ])
 
-  const topProductIds = topItems.map((row) => row.productId)
+  // DEBT_SETTLEMENT lines have no productId — nothing to rank there.
+  const topProductIds = topItems
+    .map((row) => row.productId)
+    .filter((id): id is number => id !== null)
   const productNames = await db.product.findMany({ where: { id: { in: topProductIds } } })
   const productLookup = Object.fromEntries(productNames.map((product) => [product.id, product.name]))
 
   return {
     totalSalesCents: totals._sum.totalCents ?? 0,
     transactionCount: totals._count._all,
-    topProducts: topItems.map((row) => ({
-      name: productLookup[row.productId] ?? 'Unknown',
-      quantity: row._sum.quantity ?? 0
-    })),
+    topProducts: topItems
+      .filter((row) => row.productId !== null)
+      .map((row) => ({
+        name: productLookup[row.productId as number] ?? 'Unknown',
+        quantity: row._sum.quantity ?? 0
+      })),
     categorySales: [],
     cashierSales: [],
     lowStockCount

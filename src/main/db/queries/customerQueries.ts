@@ -1,6 +1,6 @@
 import type { CreditEntryType, LoyaltyEventType, Prisma, PrismaClient } from '@prisma/client'
 import { getSession } from '../../auth/session'
-import type { DebtBreakdown } from '../../../shared/types'
+import type { DebtBreakdown, DebtBreakdownEntry } from '../../../shared/types'
 
 export const normalizePhone = (phone: string): string => phone.replace(/\D/g, '')
 
@@ -385,19 +385,37 @@ export async function adjustPoints(
 export async function getCreditSettings(db: Pick<PrismaClient, 'setting'>) {
   const read = async (key: string, fallback: string) =>
     (await db.setting.findUnique({ where: { key } }))?.value ?? fallback
-  return { loyaltyPointsPerDollar: Number(await read('customer.loyaltyPointsPerDollar', '1')) || 0 }
+  return {
+    loyaltyPointsPerDollar: Number(await read('customer.loyaltyPointsPerDollar', '1')) || 0,
+    debtWarningThresholdDays:
+      Number(await read('customer.debtWarningThresholdDays', '30')) || 30
+  }
 }
 
 export async function saveCreditSettings(
   db: PrismaClient,
-  input: { loyaltyPointsPerDollar: number }
+  input: { loyaltyPointsPerDollar: number; debtWarningThresholdDays: number }
 ) {
   if (!Number.isFinite(input.loyaltyPointsPerDollar) || input.loyaltyPointsPerDollar < 0)
     throw new Error('Loyalty rate must be non-negative.')
+  if (
+    !Number.isFinite(input.debtWarningThresholdDays) ||
+    !Number.isInteger(input.debtWarningThresholdDays) ||
+    input.debtWarningThresholdDays < 1
+  )
+    throw new Error('Debt warning threshold must be a whole number of days, at least 1.')
   await db.setting.upsert({
     where: { key: 'customer.loyaltyPointsPerDollar' },
     update: { value: String(input.loyaltyPointsPerDollar) },
     create: { key: 'customer.loyaltyPointsPerDollar', value: String(input.loyaltyPointsPerDollar) }
+  })
+  await db.setting.upsert({
+    where: { key: 'customer.debtWarningThresholdDays' },
+    update: { value: String(input.debtWarningThresholdDays) },
+    create: {
+      key: 'customer.debtWarningThresholdDays',
+      value: String(input.debtWarningThresholdDays)
+    }
   })
   return getCreditSettings(db)
 }

@@ -47,6 +47,8 @@ import type {
   CreditHealthSummary,
   AlertsSummary,
   DashboardData,
+  CustomerActivityRow,
+  CustomerDebtReport,
   CheckoutSettings,
   AuthUser,
   LoginResult,
@@ -171,11 +173,14 @@ const api = {
       }),
     adjustPoints: (customerId: number, points: number, note: string, managerGranted: boolean) =>
       ipcRenderer.invoke(IPC.CUSTOMER_ADJUST_POINTS, { customerId, points, note, managerGranted }),
-    getCreditSettings: (): Promise<{ loyaltyPointsPerDollar: number }> =>
-      ipcRenderer.invoke(IPC.CUSTOMER_GET_CREDIT_SETTINGS),
+    getCreditSettings: (): Promise<{
+      loyaltyPointsPerDollar: number
+      debtWarningThresholdDays: number
+    }> => ipcRenderer.invoke(IPC.CUSTOMER_GET_CREDIT_SETTINGS),
     saveCreditSettings: (input: {
       loyaltyPointsPerDollar: number
-    }): Promise<{ loyaltyPointsPerDollar: number }> =>
+      debtWarningThresholdDays: number
+    }): Promise<{ loyaltyPointsPerDollar: number; debtWarningThresholdDays: number }> =>
       ipcRenderer.invoke(IPC.CUSTOMER_SAVE_CREDIT_SETTINGS, input),
     exportData: (customerId: number): Promise<{ path: string } | null> =>
       ipcRenderer.invoke(IPC.CUSTOMER_EXPORT_DATA, customerId),
@@ -345,6 +350,14 @@ const api = {
     getCreditHealth: (): Promise<CreditHealthSummary> =>
       ipcRenderer.invoke(IPC.REPORTS_GET_CREDIT_HEALTH),
     getAlerts: (): Promise<AlertsSummary> => ipcRenderer.invoke(IPC.REPORTS_GET_ALERTS),
+    getCustomerActivity: (
+      fromDate: string,
+      toDate: string,
+      limit?: number
+    ): Promise<CustomerActivityRow[]> =>
+      ipcRenderer.invoke(IPC.REPORTS_GET_CUSTOMER_ACTIVITY, { fromDate, toDate, limit }),
+    getCustomerDebtReport: (): Promise<CustomerDebtReport> =>
+      ipcRenderer.invoke(IPC.REPORTS_GET_CUSTOMER_DEBT),
     exportCsv: (): Promise<{ path: string }> => ipcRenderer.invoke(IPC.REPORTS_EXPORT_CSV),
     exportXlsx: (): Promise<{ path: string }> => ipcRenderer.invoke(IPC.REPORTS_EXPORT_XLSX)
   },

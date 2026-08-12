@@ -443,6 +443,27 @@ export interface AlertsSummary {
   overdueTabCount: number
 }
 
+export interface CustomerActivityRow {
+  customerId: number
+  customerName: string
+  transactionCount: number
+  totalSpentCents: number
+}
+
+export interface CustomerDebtRow {
+  customerId: number
+  customerName: string
+  balanceOwedCents: number // positive: amount owed
+  oldestDebtDate: string // YYYY-MM-DD local date of the oldest still-unpaid debit
+  daysOverdue: number
+}
+
+export interface CustomerDebtReport {
+  thresholdDays: number
+  byBalance: CustomerDebtRow[] // every debtor, sorted balance desc
+  warnings: CustomerDebtRow[] // byBalance filtered to daysOverdue >= thresholdDays, oldest first
+}
+
 export interface DashboardData {
   today: {
     sales: SalesSummary

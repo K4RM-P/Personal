@@ -134,6 +134,8 @@ export const IPC = {
   REPORTS_GET_INVENTORY_VALUATION: 'reports:getInventoryValuation',
   REPORTS_GET_CREDIT_HEALTH: 'reports:getCreditHealth',
   REPORTS_GET_ALERTS: 'reports:getAlerts',
+  REPORTS_GET_CUSTOMER_ACTIVITY: 'reports:getCustomerActivity',
+  REPORTS_GET_CUSTOMER_DEBT: 'reports:getCustomerDebt',
   REPORTS_EXPORT_CSV: 'reports:exportCsv',
   REPORTS_EXPORT_XLSX: 'reports:exportXlsx',
 
