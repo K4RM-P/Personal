@@ -331,9 +331,31 @@ export async function createTransaction(
     }
     surchargeCents = expectedSurchargeCents
   }
-  const debtSettlementCents = payload.debtSettlementCents ?? 0
-  if (!Number.isInteger(debtSettlementCents) || debtSettlementCents < 0) {
-    throw new Error('Invalid outstanding balance amount.')
+  const debtSettlementLedgerEntryIds = payload.debtSettlementLedgerEntryIds ?? []
+
+  // Resolve the selected entries against a fresh breakdown up front so totalCents
+  // (needed for every downstream validation below) reflects the real, current
+  // contribution of exactly what the cashier picked — never a client-supplied amount.
+  let debtSettlementCents = 0
+  let debtSettlementNote: string | null = null
+  if (debtSettlementLedgerEntryIds.length > 0) {
+    if (!payload.customerId) throw new Error('A customer must be linked to bring in an outstanding balance.')
+    const breakdown = await getCustomerDebtBreakdown(db, payload.customerId)
+    const selected = debtSettlementLedgerEntryIds.map((id) => {
+      const entry = breakdown.entries.find((e) => e.ledgerEntryId === id)
+      if (!entry) {
+        throw new Error(
+          "One or more selected balance items are no longer outstanding — reopen the balance breakdown."
+        )
+      }
+      return entry
+    })
+    debtSettlementCents = selected.reduce((sum, e) => sum + e.amountCents, 0)
+    const covered = selected.map((entry) => {
+      const label = entry.type === 'SALE_CHARGE' ? `sale ${entry.receiptNumber}` : 'a manual adjustment'
+      return `${label} (${(entry.amountCents / 100).toFixed(2)})`
+    })
+    debtSettlementNote = `Debt settled via this sale — covers ${covered.join(', ')}`
   }
   const totalCents = preTaxCents + taxCents + surchargeCents + debtSettlementCents
   const cashOverageToCreditCents = payload.cashOverageToCreditCents ?? 0
@@ -359,27 +381,6 @@ export async function createTransaction(
 
   if (payload.tenderType === 'PHARMACY_CREDIT' && tabAmountCents !== totalCents) {
     throw new Error('Pharmacy Credit standalone must charge the full sale total to the tab.')
-  }
-
-  // Composed before the atomic transaction so the evidence trail (which original
-  // sales this settles) is fixed at the moment the cashier committed to the amount;
-  // the amount itself is re-validated against a fresh balance inside the transaction.
-  let debtSettlementNote: string | null = null
-  if (debtSettlementCents > 0 && payload.customerId) {
-    const breakdown = await getCustomerDebtBreakdown(db, payload.customerId)
-    if (debtSettlementCents > breakdown.totalOutstandingCents) {
-      throw new Error("Amount exceeds the customer's current outstanding balance.")
-    }
-    let remaining = debtSettlementCents
-    const covered: string[] = []
-    for (const entry of breakdown.entries) {
-      if (remaining <= 0) break
-      const covers = Math.min(remaining, entry.amountCents)
-      const label = entry.type === 'SALE_CHARGE' ? `sale ${entry.receiptNumber}` : 'a manual adjustment'
-      covered.push(`${label} (${(covers / 100).toFixed(2)})`)
-      remaining -= covers
-    }
-    debtSettlementNote = `Debt settled via this sale — covers ${covered.join(', ')}`
   }
 
   return db.$transaction(async (tx) => {

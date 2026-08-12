@@ -12,6 +12,8 @@ import {
   getCurrentInventoryValuation,
   getCreditHealth,
   getAlerts,
+  getCustomerActivityReport,
+  getCustomerDebtReport,
   clearReportCache
 } from '../db/queries/reportQueries'
 
@@ -66,6 +68,14 @@ export function registerReportHandlers(db: PrismaClient): void {
   ipcMain.handle(IPC.REPORTS_GET_CREDIT_HEALTH, () => getCreditHealth(db))
 
   ipcMain.handle(IPC.REPORTS_GET_ALERTS, () => getAlerts(db))
+
+  ipcMain.handle(
+    IPC.REPORTS_GET_CUSTOMER_ACTIVITY,
+    (_e, { fromDate, toDate, limit }: { fromDate: string; toDate: string; limit?: number }) =>
+      getCustomerActivityReport(db, fromDate, toDate, limit ?? 25)
+  )
+
+  ipcMain.handle(IPC.REPORTS_GET_CUSTOMER_DEBT, () => getCustomerDebtReport(db))
 
   // CSV export is handled in the renderer (file save dialog); the main process
   // just clears the cache so the next query is fresh. The actual CSV generation

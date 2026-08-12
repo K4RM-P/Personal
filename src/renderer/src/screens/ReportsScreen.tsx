@@ -13,10 +13,13 @@ import type {
   DailySalesRow,
   TenderBreakdownRow,
   CashierTotalRow,
-  InventoryValuation
+  InventoryValuation,
+  CustomerActivityRow,
+  CustomerDebtReport,
+  CustomerDebtRow
 } from '@shared/types'
 
-type ReportTab = 'dashboard' | 'sales' | 'inventory' | 'cashiers'
+type ReportTab = 'dashboard' | 'sales' | 'inventory' | 'cashiers' | 'customers'
 
 // Shared focus-visible treatment for interactive elements in this screen —
 // matches the ring style already used by the Switch primitive.
@@ -1118,6 +1121,269 @@ function CashierTotalsTable({ rows }: { rows: CashierTotalRow[] }): React.JSX.El
 }
 
 // ---------------------------------------------------------------------------
+// Customer Reports page
+// ---------------------------------------------------------------------------
+
+function DebtWarningBanner({ report }: { report: CustomerDebtReport | null }): React.JSX.Element | null {
+  if (!report || report.warnings.length === 0) return null
+  const VISIBLE_CAP = 5
+  const visible = report.warnings.slice(0, VISIBLE_CAP)
+  const overflow = report.warnings.length - visible.length
+
+  return (
+    <div className="space-y-2">
+      {visible.map((row) => (
+        <Alert key={row.customerId} variant="warning">
+          <span className="font-semibold">{row.customerName}</span> owes{' '}
+          <span className="font-semibold">{formatCurrency(row.balanceOwedCents)}</span> — unpaid
+          for {row.daysOverdue} day{row.daysOverdue === 1 ? '' : 's'} (threshold:{' '}
+          {report.thresholdDays} days)
+        </Alert>
+      ))}
+      {overflow > 0 && (
+        <Alert variant="warning">+{overflow} more customer{overflow === 1 ? '' : 's'} overdue</Alert>
+      )}
+    </div>
+  )
+}
+
+function CustomerActivityTable({ rows }: { rows: CustomerActivityRow[] }): React.JSX.Element {
+  const { sorted, sortKey, sortDir, toggleSort } = useSort(rows, 'transactionCount', 'desc')
+  const th = (label: string, key: keyof CustomerActivityRow, align: 'left' | 'right' = 'left') => (
+    <SortableTh
+      label={label}
+      sortKeyName={key}
+      active={sortKey === key}
+      dir={sortDir}
+      onSort={toggleSort}
+      align={align}
+    />
+  )
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Most Active Customers</CardTitle>
+        <CardDescription>Ranked by transaction count in the selected date range.</CardDescription>
+      </CardHeader>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--border)] text-left text-[var(--muted-foreground)]">
+              {th('Customer', 'customerName')}
+              {th('Transactions', 'transactionCount', 'right')}
+              {th('Total Spent', 'totalSpentCents', 'right')}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((row) => (
+              <tr
+                key={row.customerId}
+                className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30"
+              >
+                <td className="py-3 pr-3 font-medium">{row.customerName}</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{row.transactionCount}</td>
+                <td className="py-3 text-right tabular-nums">
+                  {formatCurrency(row.totalSpentCents)}
+                </td>
+              </tr>
+            ))}
+            {sorted.length === 0 && (
+              <tr>
+                <td colSpan={3} className="py-6 text-center text-[var(--muted-foreground)]">
+                  No customer transactions in this period.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}
+
+function CustomerDebtTable({ rows }: { rows: CustomerDebtRow[] }): React.JSX.Element {
+  const { sorted, sortKey, sortDir, toggleSort } = useSort(rows, 'balanceOwedCents', 'desc')
+  const th = (label: string, key: keyof CustomerDebtRow, align: 'left' | 'right' = 'left') => (
+    <SortableTh
+      label={label}
+      sortKeyName={key}
+      active={sortKey === key}
+      dir={sortDir}
+      onSort={toggleSort}
+      align={align}
+    />
+  )
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Customers Who Owe the Most</CardTitle>
+        <CardDescription>
+          Current outstanding tab balance, all-time. Click a column to sort.
+        </CardDescription>
+      </CardHeader>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--border)] text-left text-[var(--muted-foreground)]">
+              {th('Customer', 'customerName')}
+              {th('Balance Owed', 'balanceOwedCents', 'right')}
+              {th('Oldest Debt', 'oldestDebtDate', 'right')}
+              {th('Days Overdue', 'daysOverdue', 'right')}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((row) => (
+              <tr
+                key={row.customerId}
+                className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30"
+              >
+                <td className="py-3 pr-3 font-medium">{row.customerName}</td>
+                <td className="py-3 pr-3 text-right tabular-nums text-[var(--owed)]">
+                  {formatCurrency(row.balanceOwedCents)}
+                </td>
+                <td className="py-3 pr-3 text-right tabular-nums">{row.oldestDebtDate}</td>
+                <td className="py-3 text-right tabular-nums">{row.daysOverdue}</td>
+              </tr>
+            ))}
+            {sorted.length === 0 && (
+              <tr>
+                <td colSpan={4} className="py-6 text-center text-[var(--muted-foreground)]">
+                  No customers currently owe money.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}
+
+function CustomerReportsPage(): React.JSX.Element {
+  const [fromDate, setFromDate] = React.useState(thirtyDaysAgoStr)
+  const [toDate, setToDate] = React.useState(todayStr)
+  const [activity, setActivity] = React.useState<CustomerActivityRow[]>([])
+  const [debtReport, setDebtReport] = React.useState<CustomerDebtReport | null>(null)
+  const [loading, setLoading] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+  const [subTab, setSubTab] = React.useState<'active' | 'debt'>('active')
+
+  // Debt balances are a current-balance snapshot, not date-ranged — loaded
+  // once on mount, independent of the activity date-range picker.
+  React.useEffect(() => {
+    window.api.reports
+      .getCustomerDebtReport()
+      .then(setDebtReport)
+      .catch((err: Error) => setError(err.message))
+  }, [])
+
+  const loadActivity = React.useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await window.api.reports.getCustomerActivity(fromDate, toDate, 25)
+      setActivity(data)
+    } catch (err: any) {
+      console.error(err)
+      setError(err instanceof Error ? err.message : 'Failed to load customer reports.')
+    } finally {
+      setLoading(false)
+    }
+  }, [fromDate, toDate])
+
+  React.useEffect(() => {
+    void loadActivity()
+  }, [loadActivity])
+
+  const presets = [
+    { label: 'Today', from: todayStr(), to: todayStr() },
+    { label: 'This Month', from: monthStartStr(), to: todayStr() },
+    { label: 'Last 30 Days', from: thirtyDaysAgoStr(), to: todayStr() }
+  ]
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Customer Reports</h1>
+          <p className="text-sm text-[var(--muted-foreground)]">
+            Activity and outstanding tab balances.
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            if (subTab === 'active') {
+              downloadCsv(
+                'customers-active',
+                ['Customer', 'Transactions', 'Total Spent'],
+                activity.map((r) => [r.customerName, String(r.transactionCount), String(r.totalSpentCents)])
+              )
+            } else {
+              downloadCsv(
+                'customers-debt',
+                ['Customer', 'Balance Owed', 'Oldest Debt', 'Days Overdue'],
+                (debtReport?.byBalance ?? []).map((r) => [
+                  r.customerName,
+                  String(r.balanceOwedCents),
+                  r.oldestDebtDate,
+                  String(r.daysOverdue)
+                ])
+              )
+            }
+          }}
+          className={cn(
+            'min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)] hover:bg-[var(--primary-hover)]',
+            FOCUS_RING
+          )}
+        >
+          Export CSV
+        </button>
+      </div>
+
+      <DebtWarningBanner report={debtReport} />
+
+      {error && <Alert variant="error">{error}</Alert>}
+
+      <div className="flex flex-wrap gap-1 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-1">
+        {(['active', 'debt'] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setSubTab(tab)}
+            className={cn(
+              'min-h-11 rounded-[var(--radius)] px-4 text-xs font-semibold',
+              subTab === tab
+                ? 'bg-[var(--primary)] text-[var(--primary-foreground)]'
+                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]',
+              FOCUS_RING
+            )}
+          >
+            {tab === 'active' ? 'Most Active' : 'Owe the Most'}
+          </button>
+        ))}
+      </div>
+
+      {subTab === 'active' && (
+        <>
+          <DateRangePicker
+            fromDate={fromDate}
+            toDate={toDate}
+            onChange={(f, t) => {
+              setFromDate(f)
+              setToDate(t)
+            }}
+            presets={presets}
+          />
+          {loading && <Alert variant="pending">Loading…</Alert>}
+          {!loading && <CustomerActivityTable rows={activity} />}
+        </>
+      )}
+
+      {subTab === 'debt' && <CustomerDebtTable rows={debtReport?.byBalance ?? []} />}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main ReportsScreen — sub-nav controller
 // ---------------------------------------------------------------------------
 
@@ -1128,7 +1394,7 @@ export function ReportsScreen(): React.JSX.Element {
     <div className="space-y-6">
       {/* Sub-navigation */}
       <div className="flex flex-wrap gap-1 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-1">
-        {(['dashboard', 'sales', 'inventory', 'cashiers'] as const).map((tab) => (
+        {(['dashboard', 'sales', 'inventory', 'cashiers', 'customers'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -1146,7 +1412,9 @@ export function ReportsScreen(): React.JSX.Element {
                 ? 'Sales'
                 : tab === 'inventory'
                   ? 'Inventory'
-                  : 'Cashiers'}
+                  : tab === 'cashiers'
+                    ? 'Cashiers'
+                    : 'Customers'}
           </button>
         ))}
       </div>
@@ -1155,6 +1423,7 @@ export function ReportsScreen(): React.JSX.Element {
       {activeTab === 'sales' && <SalesReportsPage />}
       {activeTab === 'inventory' && <InventoryReportsPage />}
       {activeTab === 'cashiers' && <CashierReportsPage />}
+      {activeTab === 'customers' && <CustomerReportsPage />}
     </div>
   )
 }

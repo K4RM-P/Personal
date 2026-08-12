@@ -10,8 +10,12 @@ import type {
   InventoryValuationRow,
   CreditHealthSummary,
   AlertsSummary,
-  DashboardData
+  DashboardData,
+  CustomerActivityRow,
+  CustomerDebtReport,
+  CustomerDebtRow
 } from '../../../shared/types'
+import { getCreditSettings } from './customerQueries'
 
 // ---------------------------------------------------------------------------
 // In-memory cache (spec §10): 30s TTL, configurable via REPORTS_CACHE_TTL_MS.
@@ -236,6 +240,8 @@ export async function getTopItems(
     by: ['productId'],
     where: {
       isVoided: false,
+      // DEBT_SETTLEMENT lines have no productId — not a real item to rank.
+      productId: { not: null },
       transaction: {
         createdAt: { gte: from, lte: to },
         status: { in: ['COMPLETED', 'REFUNDED'] }
@@ -316,6 +322,7 @@ export async function getSlowItems(
     by: ['productId'],
     where: {
       isVoided: false,
+      productId: { not: null },
       transaction: {
         createdAt: { gte: from, lte: to },
         status: { in: ['COMPLETED', 'REFUNDED'] }
@@ -713,12 +720,14 @@ export async function getCreditHealth(db: PrismaClient): Promise<CreditHealthSum
     include: { customer: true }
   })
 
+  const { debtWarningThresholdDays } = await getCreditSettings(db)
+
   const seenCustomers = new Set<number>()
   let activeAccounts = 0
   let totalOutstandingCents = 0
   let overdueAccounts = 0
   let overdueCents = 0
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000)
+  const thresholdCutoff = new Date(Date.now() - debtWarningThresholdDays * 86400000)
 
   for (const entry of latestEntries) {
     if (seenCustomers.has(entry.customerId)) continue
@@ -727,8 +736,9 @@ export async function getCreditHealth(db: PrismaClient): Promise<CreditHealthSum
     if (entry.balanceAfterCents !== 0) {
       activeAccounts++
       totalOutstandingCents += entry.balanceAfterCents
-      // Overdue: negative balance (customer owes) and not updated in >30 days
-      if (entry.balanceAfterCents < 0 && entry.createdAt < thirtyDaysAgo) {
+      // Overdue: negative balance (customer owes) and not updated since the
+      // manager-configured threshold (Settings › Customer Credit & Loyalty).
+      if (entry.balanceAfterCents < 0 && entry.createdAt < thresholdCutoff) {
         overdueAccounts++
         overdueCents += entry.balanceAfterCents
       }
@@ -745,6 +755,147 @@ export async function getCreditHealth(db: PrismaClient): Promise<CreditHealthSum
     overdueCents
   }
 
+  setCached(cacheKey, result)
+  return result
+}
+
+/**
+ * Most active customers by transaction count within a date range (spec:
+ * Customers report subtab). Zero-transaction customers are omitted — nothing
+ * to rank.
+ */
+export async function getCustomerActivityReport(
+  db: PrismaClient,
+  fromDate: string,
+  toDate: string,
+  limit = 25
+): Promise<CustomerActivityRow[]> {
+  const cacheKey = `customerActivity:${fromDate}:${toDate}:${limit}`
+  const cached = getCached<CustomerActivityRow[]>(cacheKey)
+  if (cached) return cached
+
+  const from = startOfDay(parseDate(fromDate))
+  const to = endOfDay(parseDate(toDate))
+
+  const transactions = await db.transaction.findMany({
+    where: {
+      createdAt: { gte: from, lte: to },
+      status: { in: ['COMPLETED', 'REFUNDED'] },
+      customerId: { not: null }
+    },
+    select: { customerId: true, totalCents: true }
+  })
+
+  const byCustomer = new Map<number, { transactionCount: number; totalSpentCents: number }>()
+  for (const tx of transactions) {
+    if (tx.customerId === null) continue
+    const existing = byCustomer.get(tx.customerId) ?? { transactionCount: 0, totalSpentCents: 0 }
+    existing.transactionCount++
+    existing.totalSpentCents += tx.totalCents
+    byCustomer.set(tx.customerId, existing)
+  }
+
+  const customerIds = Array.from(byCustomer.keys())
+  const customers = customerIds.length
+    ? await db.customer.findMany({
+        where: { id: { in: customerIds } },
+        select: { id: true, firstName: true, lastName: true }
+      })
+    : []
+  const nameById = new Map(customers.map((c) => [c.id, `${c.firstName} ${c.lastName}`]))
+
+  const result: CustomerActivityRow[] = customerIds
+    .map((customerId) => ({
+      customerId,
+      customerName: nameById.get(customerId) ?? '(unknown customer)',
+      ...byCustomer.get(customerId)!
+    }))
+    .sort((a, b) => b.transactionCount - a.transactionCount)
+    .slice(0, limit)
+
+  setCached(cacheKey, result)
+  return result
+}
+
+/**
+ * Customers who owe money on their pharmacy-credit tab, with how long their
+ * oldest unpaid debit has been outstanding. Same FIFO-against-later-credits
+ * reconstruction as `getCustomerDebtBreakdown`, but ledger-entries-only (no
+ * transaction/item join) since this report only needs the oldest remaining
+ * debit's date and the total owed, not line-item detail.
+ */
+export async function getCustomerDebtReport(db: PrismaClient): Promise<CustomerDebtReport> {
+  const cacheKey = 'customerDebt'
+  const cached = getCached<CustomerDebtReport>(cacheKey)
+  if (cached) return cached
+
+  const { debtWarningThresholdDays } = await getCreditSettings(db)
+
+  const latestEntries = await db.creditLedgerEntry.findMany({
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    include: { customer: { select: { id: true, firstName: true, lastName: true } } }
+  })
+
+  const seenCustomers = new Set<number>()
+  const debtorIds: number[] = []
+  const nameById = new Map<number, string>()
+  for (const entry of latestEntries) {
+    if (seenCustomers.has(entry.customerId)) continue
+    seenCustomers.add(entry.customerId)
+    if (entry.balanceAfterCents < 0) {
+      debtorIds.push(entry.customerId)
+      nameById.set(entry.customerId, `${entry.customer.firstName} ${entry.customer.lastName}`)
+    }
+  }
+
+  const now = Date.now()
+  const byBalance: CustomerDebtRow[] = []
+  for (const customerId of debtorIds) {
+    const ledgerEntries = await db.creditLedgerEntry.findMany({
+      where: { customerId },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }]
+    })
+
+    const outstanding: { remainingCents: number; createdAt: Date }[] = []
+    for (const entry of ledgerEntries) {
+      if (entry.amountCents < 0) {
+        if (entry.type === 'SALE_CHARGE' || entry.type === 'MANUAL_ADJUSTMENT') {
+          outstanding.push({ remainingCents: -entry.amountCents, createdAt: entry.createdAt })
+        }
+        continue
+      }
+      let creditRemaining = entry.amountCents
+      for (const debit of outstanding) {
+        if (creditRemaining <= 0) break
+        if (debit.remainingCents <= 0) continue
+        const offset = Math.min(creditRemaining, debit.remainingCents)
+        debit.remainingCents -= offset
+        creditRemaining -= offset
+      }
+    }
+
+    const remaining = outstanding.filter((d) => d.remainingCents > 0)
+    const balanceOwedCents = remaining.reduce((sum, d) => sum + d.remainingCents, 0)
+    if (balanceOwedCents <= 0) continue // fully offsetting entries — not a debtor after all
+
+    const oldest = remaining.reduce((min, d) => (d.createdAt < min ? d.createdAt : min), remaining[0].createdAt)
+    const daysOverdue = Math.floor((now - oldest.getTime()) / 86400000)
+
+    byBalance.push({
+      customerId,
+      customerName: nameById.get(customerId) ?? '(unknown customer)',
+      balanceOwedCents,
+      oldestDebtDate: localDateString(oldest),
+      daysOverdue
+    })
+  }
+
+  byBalance.sort((a, b) => b.balanceOwedCents - a.balanceOwedCents)
+  const warnings = byBalance
+    .filter((row) => row.daysOverdue >= debtWarningThresholdDays)
+    .sort((a, b) => b.daysOverdue - a.daysOverdue)
+
+  const result: CustomerDebtReport = { thresholdDays: debtWarningThresholdDays, byBalance, warnings }
   setCached(cacheKey, result)
   return result
 }

@@ -134,6 +134,8 @@ export const IPC = {
   REPORTS_GET_INVENTORY_VALUATION: 'reports:getInventoryValuation',
   REPORTS_GET_CREDIT_HEALTH: 'reports:getCreditHealth',
   REPORTS_GET_ALERTS: 'reports:getAlerts',
+  REPORTS_GET_CUSTOMER_ACTIVITY: 'reports:getCustomerActivity',
+  REPORTS_GET_CUSTOMER_DEBT: 'reports:getCustomerDebt',
   REPORTS_EXPORT_CSV: 'reports:exportCsv',
   REPORTS_EXPORT_XLSX: 'reports:exportXlsx',
 
@@ -155,6 +157,9 @@ export const IPC = {
   BACKUP_LIST_RESTORABLE: 'backup:listRestorable',
   BACKUP_RESTORE: 'backup:restore',
   BACKUP_RELAUNCH: 'backup:relaunch',
+
+  // Danger zone — irreversible full-store reset (Settings, very bottom of page)
+  DANGER_ZONE_DELETE_ALL_DATA: 'dangerZone:deleteAllData',
 
   // Auto-update (B4/B5)
   UPDATE_CHECK_NOW: 'update:checkNow',

@@ -79,13 +79,17 @@ export interface CreateTransactionPayload {
   processorTransactionId?: string
   cardLast4?: string
   /**
-   * Amount of the linked customer's outstanding Pharmacy Credit balance being brought
-   * into and paid off by this sale (never taxed, never discounted, added to totalCents
-   * on top of the product total). Requires `customerId`. Mutually exclusive with
-   * `tenderType: 'PHARMACY_CREDIT'` and `tabAmountCents > 0` — paying off tab debt by
-   * charging it back to the same tab is circular.
+   * `ledgerEntryId`s (see DebtBreakdownEntry) of specific outstanding debt items the
+   * cashier chose to bring into and pay off with this sale — the cashier can select
+   * one, several, or all of a customer's outstanding items, not just the full balance.
+   * The dollar amount is always derived server-side from these entries' current
+   * contribution (see getCustomerDebtBreakdown) — never trust a client-supplied cents
+   * amount. Never taxed, never discounted, added to totalCents on top of the product
+   * total. Requires `customerId`. Mutually exclusive with `tenderType: 'PHARMACY_CREDIT'`
+   * and `tabAmountCents > 0` — paying off tab debt by charging it back to the same tab
+   * is circular.
    */
-  debtSettlementCents?: number
+  debtSettlementLedgerEntryIds?: number[]
 }
 
 // ------------------------------------------------- Pharmacy Credit debt settlement
@@ -441,6 +445,27 @@ export interface AlertsSummary {
   lowStockCount: number
   outOfStockCount: number
   overdueTabCount: number
+}
+
+export interface CustomerActivityRow {
+  customerId: number
+  customerName: string
+  transactionCount: number
+  totalSpentCents: number
+}
+
+export interface CustomerDebtRow {
+  customerId: number
+  customerName: string
+  balanceOwedCents: number // positive: amount owed
+  oldestDebtDate: string // YYYY-MM-DD local date of the oldest still-unpaid debit
+  daysOverdue: number
+}
+
+export interface CustomerDebtReport {
+  thresholdDays: number
+  byBalance: CustomerDebtRow[] // every debtor, sorted balance desc
+  warnings: CustomerDebtRow[] // byBalance filtered to daysOverdue >= thresholdDays, oldest first
 }
 
 export interface DashboardData {

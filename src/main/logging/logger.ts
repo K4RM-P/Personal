@@ -23,6 +23,7 @@ export type LogEventType =
   | 'RESTORE_STAGED'
   | 'CUSTOMER_DATA_EXPORTED'
   | 'CUSTOMER_DATA_DELETED'
+  | 'ALL_DATA_DELETED'
   | 'ERROR'
 
 const RETENTION_DAYS = 90

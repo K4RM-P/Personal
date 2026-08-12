@@ -213,7 +213,10 @@ export function SettingsScreen() {
   const [testResult, setTestResult] = React.useState<{ ok: boolean; message: string } | null>(null)
   const [testing, setTesting] = React.useState(false)
   const [systemPrinters, setSystemPrinters] = React.useState<SystemPrinterInfo[]>([])
-  const [creditSettings, setCreditSettings] = React.useState({ loyaltyPointsPerDollar: 1 })
+  const [creditSettings, setCreditSettings] = React.useState({
+    loyaltyPointsPerDollar: 1,
+    debtWarningThresholdDays: 30
+  })
   const [lastBackup, setLastBackup] = React.useState<BackupLogSummary | null>(null)
   const [promptOnLogout, setPromptOnLogout] = React.useState(true)
   const [showBackupModal, setShowBackupModal] = React.useState(false)
@@ -1095,6 +1098,28 @@ export function SettingsScreen() {
                     }
                     className="input w-24"
                   />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
+                    Warn if a customer&apos;s debt is older than (days)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={creditSettings.debtWarningThresholdDays}
+                    onChange={(e) =>
+                      setCreditSettings((s) => ({
+                        ...s,
+                        debtWarningThresholdDays: Number(e.target.value)
+                      }))
+                    }
+                    className="input w-24"
+                  />
+                  <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+                    Customers with an unpaid tab older than this show up as warnings in Reports ›
+                    Customers, and count toward the Dashboard&apos;s overdue-tabs alert.
+                  </p>
                 </div>
                 <button
                   onClick={() => void saveCreditSettings()}

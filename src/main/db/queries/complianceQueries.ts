@@ -177,6 +177,7 @@ export async function buildDashboardSummary(db: PrismaClient): Promise<any> {
     db.product.count({ where: { costCents: { lte: 0 } } })
   ])
 
+  // DEBT_SETTLEMENT lines have no productId — nothing to rank there.
   const topProductIds = topItems
     .map((row) => row.productId)
     .filter((id): id is number => id !== null)
