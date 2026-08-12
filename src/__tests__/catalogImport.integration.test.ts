@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { PrismaClient } from '@prisma/client'
 import { commitImport, startImport } from '../main/catalog/importService'
 import { promoteCatalogProduct, scanLookup, searchCatalog } from '../main/catalog/catalogQueries'
+import { saveAllPricingTiers } from '../main/db/queries/posQueries'
 import { RECORD_LEN } from '../main/catalog/webcatParser'
 import { DEFAULT_PRICING_TIERS } from '../shared/pricingEngine'
 
@@ -231,10 +232,35 @@ describe('promote to product', () => {
 
       const product = await db.product.findUniqueOrThrow({ where: { id: promoted.productId } })
       expect(product.isPinned).toBe(true)
+      expect(product.fallbackPinned).toBe(true)
     } finally {
       await db.pricingTier.deleteMany()
       await db.pricingTier.createMany({ data: savedTiers })
     }
+  })
+
+  it('re-enters the tier engine once a matching tier is later configured', async () => {
+    // Charlie ($5.00 cost) was fallback-pinned to McKesson's list price by the
+    // previous test. The default tiers were already restored in its `finally`
+    // block, and tier-2 ($3.01-$10.00, 100%) covers Charlie's cost — so simply
+    // re-saving the (unchanged) tier table should now un-pin it and reprice it
+    // off supplier cost, not silently leave it stuck on the old list price.
+    let product = await db.product.findFirstOrThrow({ where: { sourceItemNumber: '000003' } })
+    expect(product.isPinned).toBe(true)
+    expect(product.fallbackPinned).toBe(true)
+
+    const currentTiers = await db.pricingTier.findMany({ orderBy: { orderIndex: 'asc' } })
+    await saveAllPricingTiers(db, currentTiers)
+
+    product = await db.product.findUniqueOrThrow({ where: { id: product.id } })
+    expect(product.isPinned).toBe(false)
+    expect(product.fallbackPinned).toBe(false)
+    // $5.00 cost -> tier-2 (100% markup) -> $10.00 retail.
+    expect(product.priceCents).toBe(1000)
+
+    // Alpha (already tier-priced, never pinned) must be untouched by the resave.
+    const alpha = await db.product.findFirstOrThrow({ where: { sourceItemNumber: '000001' } })
+    expect(alpha.priceCents).toBe(2000)
   })
 
   it('an explicit price override pins the product at that price on create', async () => {

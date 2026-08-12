@@ -1,6 +1,7 @@
 import { PrismaClient, Product, Transaction } from '@prisma/client'
 import {
   calculateRetailPriceCents,
+  findPricingTier,
   previewTierChangeImpact,
   PricingTier as EnginePricingTier,
   TierChangePreviewItem
@@ -221,9 +222,25 @@ export async function saveAllPricingTiers(
     })
   }
 
-  // Recalculate prices for non-pinned products
-  const products = await db.product.findMany({ where: { isPinned: false } })
+  // Recalculate prices for non-pinned products, plus catalogue items that were
+  // pinned only because no tier matched their cost at promote time (fallbackPinned) —
+  // those should re-enter the tier engine the moment a matching tier exists.
+  const products = await db.product.findMany({
+    where: { OR: [{ isPinned: false }, { fallbackPinned: true }] }
+  })
+
   for (const p of products) {
+    if (p.fallbackPinned) {
+      const tierNowMatches = findPricingTier(p.costCents, tiers) !== undefined
+      if (!tierNowMatches) continue // still nothing to compute from — stays pinned to McKesson list price
+      const newPriceCents = calculateRetailPriceCents(p.costCents, tiers)
+      await db.product.update({
+        where: { id: p.id },
+        data: { priceCents: newPriceCents, isPinned: false, fallbackPinned: false }
+      })
+      continue
+    }
+
     const newPriceCents = calculateRetailPriceCents(p.costCents, tiers)
     if (newPriceCents !== p.priceCents) {
       await db.product.update({

@@ -76,6 +76,7 @@ function buildSampleProduct(
   return {
     ...overrides,
     isPinned: false,
+    fallbackPinned: false,
     createdAt: now,
     updatedAt: now,
     currentOnHand: 0,

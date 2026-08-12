@@ -40,6 +40,11 @@ model Product {
   priceCents Int
   barcode    String?           @unique
   isPinned   Boolean           @default(false) // If true, ignore pricing tier auto-calculation
+  // True only when isPinned was set automatically (zero cost / no matching tier at
+  // promote time), not by a pharmacist's explicit price override. Lets the tier
+  // engine re-evaluate these once new tiers are configured, while leaving genuine
+  // manual overrides (isPinned=true, fallbackPinned=false) untouched forever.
+  fallbackPinned Boolean @default(false)
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
   orderItems TransactionItem[]
