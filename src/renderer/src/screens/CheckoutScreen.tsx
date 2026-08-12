@@ -4,6 +4,7 @@ import { Alert } from '../components/ui/Alert'
 import { EmptyState } from '../components/ui/EmptyState'
 import { DiscountModal } from '../components/DiscountModal'
 import { CustomProductModal } from '../components/CustomProductModal'
+import { CustomerSearchPanel } from '../components/CustomerSearchPanel'
 import { RefundsScreen } from './RefundsScreen'
 import { formatCurrency } from '@shared/formatCurrency'
 import type { Product, Customer, TransactionWithItems, ChargeResult } from '@shared/types'
@@ -639,16 +640,6 @@ export function CheckoutScreen(): React.JSX.Element {
     setParkedCarts((prev) => prev.filter((p) => p.id !== parkId))
   }
 
-  const handleCustomerSearch = async (): Promise<void> => {
-    if (!window.api?.customer) return
-    try {
-      const results = await window.api.customer.search(customerSearchQuery)
-      setCustomerSearchResults(results)
-    } catch {
-      setCustomerSearchResults([])
-    }
-  }
-
   const attachCustomer = async (customer: Customer): Promise<void> => {
     if (!window.api?.customer) return
     try {
@@ -1185,51 +1176,15 @@ export function CheckoutScreen(): React.JSX.Element {
                         <label className="mb-1 block font-semibold text-[var(--foreground)]">
                           Attach a customer to put {formatCurrency(shortCents)} on their tab
                         </label>
-                        <div className="relative">
-                          <input
-                            ref={searchRef}
-                            value={customerSearchQuery}
-                            onChange={(e) => setCustomerSearchQuery(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') void handleCustomerSearch()
-                            }}
-                            placeholder="Search name or phone, then Enter"
-                            className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm"
-                          />
-                          {customerSearchResults.length > 0 && (
-                            <div className="relative z-20 mt-1 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">
-                              {customerSearchResults.map((customer) => (
-                                <button
-                                  key={customer.id}
-                                  onClick={() => void attachCustomer(customer)}
-                                  className="block min-h-11 w-full border-b border-[var(--border)] px-3 text-left text-sm last:border-0"
-                                >
-                                  <b>
-                                    {customer.firstName} {customer.lastName}
-                                  </b>{' '}
-                                  · {customer.phone}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                          {/* No results → offer to add a new customer */}
-                          {customerSearchQuery.trim() !== '' &&
-                            customerSearchResults.length === 0 && (
-                              <div className="relative z-20 mt-1 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white p-3 text-center text-sm shadow-sm">
-                                <div className="mb-2 text-[var(--muted-foreground)]">
-                                  Customer not found
-                                </div>
-                                <button
-                                  onClick={() => {
-                                    setShowAddCustomer(true)
-                                  }}
-                                  className="min-h-11 w-full rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
-                                >
-                                  + Add new customer
-                                </button>
-                              </div>
-                            )}
-                        </div>
+                        <CustomerSearchPanel
+                          inputRef={searchRef}
+                          query={customerSearchQuery}
+                          onQueryChange={setCustomerSearchQuery}
+                          results={customerSearchResults}
+                          onSelect={(customer) => void attachCustomer(customer)}
+                          onAddNew={() => setShowAddCustomer(true)}
+                          placeholder="Search name or phone"
+                        />
                       </div>
                     )}
 
@@ -1350,51 +1305,15 @@ export function CheckoutScreen(): React.JSX.Element {
                         <label className="mb-1 block font-semibold text-[var(--foreground)]">
                           Attach a customer for Pharmacy Credit
                         </label>
-                        <div className="relative">
-                          <input
-                            ref={searchRef}
-                            value={customerSearchQuery}
-                            onChange={(e) => setCustomerSearchQuery(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') void handleCustomerSearch()
-                            }}
-                            placeholder="Search name or phone, then Enter"
-                            className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm"
-                          />
-                          {customerSearchResults.length > 0 && (
-                            <div className="relative z-20 mt-1 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">
-                              {customerSearchResults.map((customer) => (
-                                <button
-                                  key={customer.id}
-                                  onClick={() => void attachCustomer(customer)}
-                                  className="block min-h-11 w-full border-b border-[var(--border)] px-3 text-left text-sm last:border-0"
-                                >
-                                  <b>
-                                    {customer.firstName} {customer.lastName}
-                                  </b>{' '}
-                                  · {customer.phone}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                          {/* No results → offer to add a new customer */}
-                          {customerSearchQuery.trim() !== '' &&
-                            customerSearchResults.length === 0 && (
-                              <div className="relative z-20 mt-1 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white p-3 text-center text-sm shadow-sm">
-                                <div className="mb-2 text-[var(--muted-foreground)]">
-                                  Customer not found
-                                </div>
-                                <button
-                                  onClick={() => {
-                                    setShowAddCustomer(true)
-                                  }}
-                                  className="min-h-11 w-full rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
-                                >
-                                  + Add new customer
-                                </button>
-                              </div>
-                            )}
-                        </div>
+                        <CustomerSearchPanel
+                          inputRef={searchRef}
+                          query={customerSearchQuery}
+                          onQueryChange={setCustomerSearchQuery}
+                          results={customerSearchResults}
+                          onSelect={(customer) => void attachCustomer(customer)}
+                          onAddNew={() => setShowAddCustomer(true)}
+                          placeholder="Search name or phone"
+                        />
                       </div>
                     ) : (
                       <>
