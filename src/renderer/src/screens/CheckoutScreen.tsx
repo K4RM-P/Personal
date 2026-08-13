@@ -8,7 +8,13 @@ import { CustomerSearchPanel } from '../components/CustomerSearchPanel'
 import { BringInBalanceModal } from '../components/BringInBalanceModal'
 import { RefundsScreen } from './RefundsScreen'
 import { formatCurrency } from '@shared/formatCurrency'
-import type { Product, Customer, TransactionWithItems, ChargeResult } from '@shared/types'
+import type {
+  Product,
+  Customer,
+  TransactionWithItems,
+  ChargeResult,
+  DebtBreakdownEntry
+} from '@shared/types'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
 import { buildCustomerDisplayState } from '../lib/customerDisplayState'
 import {
@@ -126,6 +132,7 @@ export function CheckoutScreen(): React.JSX.Element {
   const [debtSettlement, setDebtSettlement] = React.useState<{
     amountCents: number
     ledgerEntryIds: number[]
+    entries: DebtBreakdownEntry[]
   } | null>(null)
 
   const searchRef = React.useRef<HTMLInputElement>(null)
@@ -1128,26 +1135,50 @@ export function CheckoutScreen(): React.JSX.Element {
                   )
                 })}
                 {debtSettlement && attachedCustomer && (
-                  <div className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-[var(--radius)] border border-[var(--warning)]/40 bg-[var(--warning-bg)] px-2 py-1 text-sm">
-                    <div className="min-w-0 truncate font-medium text-[var(--foreground)]">
-                      Previous Balance — {attachedCustomer.firstName} {attachedCustomer.lastName}
-                    </div>
-                    <div className="flex shrink-0 flex-nowrap items-center justify-end gap-1">
-                      <button
-                        onClick={() => setShowDebtDetailsModal(true)}
-                        className="min-h-8 rounded-[var(--radius)] border border-[var(--border)] px-2 text-xs font-semibold text-[var(--muted-foreground)]"
-                      >
-                        Details
-                      </button>
-                      <button
-                        onClick={() => setDebtSettlement(null)}
-                        className="min-h-8 rounded-[var(--radius)] border border-[var(--border)] px-2 text-xs font-semibold text-[var(--error)]"
-                      >
-                        Remove
-                      </button>
-                      <div className="w-16 text-right font-semibold text-[var(--foreground)]">
-                        {formatCurrency(debtSettlement.amountCents)}
+                  <div className="rounded-[var(--radius)] border border-[var(--warning)]/40 bg-[var(--warning-bg)] px-2 py-1.5 text-sm">
+                    <div className="grid grid-cols-[1fr_auto] items-center gap-2">
+                      <div className="min-w-0 truncate font-medium text-[var(--foreground)]">
+                        {attachedCustomer.firstName} {attachedCustomer.lastName} — brought in from tab
                       </div>
+                      <div className="flex shrink-0 flex-nowrap items-center justify-end gap-1">
+                        <button
+                          onClick={() => setShowDebtDetailsModal(true)}
+                          className="min-h-8 rounded-[var(--radius)] border border-[var(--border)] px-2 text-xs font-semibold text-[var(--muted-foreground)]"
+                        >
+                          Details
+                        </button>
+                        <button
+                          onClick={() => setDebtSettlement(null)}
+                          className="min-h-8 rounded-[var(--radius)] border border-[var(--border)] px-2 text-xs font-semibold text-[var(--error)]"
+                        >
+                          Remove
+                        </button>
+                        <div className="w-16 text-right font-semibold text-[var(--foreground)]">
+                          {formatCurrency(debtSettlement.amountCents)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-1 space-y-0.5">
+                      {debtSettlement.entries.map((entry) => (
+                        <div
+                          key={entry.ledgerEntryId}
+                          className="flex items-center justify-between gap-2 text-xs text-[var(--muted-foreground)]"
+                        >
+                          <span className="min-w-0 truncate">
+                            {new Date(
+                              entry.type === 'SALE_CHARGE'
+                                ? (entry.transactionDate ?? entry.createdAt)
+                                : entry.createdAt
+                            ).toLocaleDateString()}{' '}
+                            —{' '}
+                            {entry.type === 'SALE_CHARGE'
+                              ? entry.items?.map((i) => `${i.productName} (${i.quantity})`).join(', ') ||
+                                `Sale ${entry.receiptNumber ?? ''}`
+                              : entry.note || 'Manual adjustment'}
+                          </span>
+                          <span className="shrink-0">{formatCurrency(entry.amountCents)}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -1901,8 +1932,8 @@ export function CheckoutScreen(): React.JSX.Element {
           customerId={attachedCustomer.id}
           customerName={`${attachedCustomer.firstName} ${attachedCustomer.lastName}`}
           readOnly={false}
-          onAdd={(ledgerEntryIds, amountCents) => {
-            setDebtSettlement({ amountCents, ledgerEntryIds })
+          onAdd={(ledgerEntryIds, amountCents, entries) => {
+            setDebtSettlement({ amountCents, ledgerEntryIds, entries })
             setShowBringInBalanceModal(false)
           }}
           onClose={() => setShowBringInBalanceModal(false)}
