@@ -2,7 +2,7 @@ import * as React from 'react'
 import { Card, CardHeader, CardTitle, CardDescription } from './ui/Card'
 import { TransactionDetailView } from './TransactionDetailView'
 import { formatCurrency } from '@shared/formatCurrency'
-import type { DebtBreakdown } from '@shared/types'
+import type { DebtBreakdown, DebtBreakdownEntry } from '@shared/types'
 
 /**
  * Itemized "bring in outstanding balance" breakdown. In interactive mode (readOnly
@@ -24,7 +24,7 @@ export function BringInBalanceModal({
   readOnly: boolean
   /** When readOnly, the ledger entry ids already brought in — used to mark them as checked for display. */
   fixedLedgerEntryIds?: number[]
-  onAdd?: (ledgerEntryIds: number[], amountCents: number) => void
+  onAdd?: (ledgerEntryIds: number[], amountCents: number, entries: DebtBreakdownEntry[]) => void
   onClose: () => void
 }): React.JSX.Element {
   const [breakdown, setBreakdown] = React.useState<DebtBreakdown | null>(null)
@@ -54,9 +54,8 @@ export function BringInBalanceModal({
   }, [customerId])
 
   const totalOutstandingCents = breakdown?.totalOutstandingCents ?? 0
-  const selectedAmountCents = (breakdown?.entries ?? [])
-    .filter((e) => selected.has(e.ledgerEntryId))
-    .reduce((sum, e) => sum + e.amountCents, 0)
+  const selectedEntries = (breakdown?.entries ?? []).filter((e) => selected.has(e.ledgerEntryId))
+  const selectedAmountCents = selectedEntries.reduce((sum, e) => sum + e.amountCents, 0)
   const isValid = selected.size > 0
 
   const toggle = (ledgerEntryId: number): void => {
@@ -200,7 +199,9 @@ export function BringInBalanceModal({
                     Cancel
                   </button>
                   <button
-                    onClick={() => isValid && onAdd?.(Array.from(selected), selectedAmountCents)}
+                    onClick={() =>
+                      isValid && onAdd?.(Array.from(selected), selectedAmountCents, selectedEntries)
+                    }
                     disabled={!isValid}
                     className="min-h-11 flex-1 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
                   >
