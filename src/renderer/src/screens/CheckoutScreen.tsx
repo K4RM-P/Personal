@@ -1443,7 +1443,7 @@ export function CheckoutScreen(): React.JSX.Element {
                   </span>
                 </div>
 
-                {remainingCents > 0 && (
+                {remainingCents > 0 && tenderLines.length === 0 && (
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => openAddTender('CASH')}
