@@ -114,7 +114,6 @@ export function CheckoutScreen(): React.JSX.Element {
   const [showRefunds, setShowRefunds] = React.useState(false)
   const [showPayModal, setShowPayModal] = React.useState(false)
   const [customProductMode, setCustomProductMode] = React.useState<'RX' | 'NONRX' | null>(null)
-  const [showHeaderMenu, setShowHeaderMenu] = React.useState(false)
   const [customProductError, setCustomProductError] = React.useState<string | null>(null)
 
   // `paymentMethod` now doubles as "which tender line's amount-entry screen is
@@ -935,34 +934,13 @@ export function CheckoutScreen(): React.JSX.Element {
     <div className="mx-auto max-w-7xl space-y-4 p-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-[var(--foreground)]">Checkout</h1>
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setShowHeaderMenu((v) => !v)}
-            aria-label="More actions"
-            aria-haspopup="true"
-            aria-expanded={showHeaderMenu}
-            className="flex h-9 w-9 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)] hover:bg-[var(--card)]"
-          >
-            <MoreVertical className="icon-4" />
-          </button>
-          {showHeaderMenu && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setShowHeaderMenu(false)} />
-              <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">
-                <button
-                  onClick={() => {
-                    setShowRefunds(true)
-                    setShowHeaderMenu(false)
-                  }}
-                  className="flex min-h-9 w-full items-center gap-2 px-3 text-left text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted)]"
-                >
-                  <RotateCcw className="icon-4" /> Refunds
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowRefunds(true)}
+          className="flex min-h-9 items-center gap-2 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--card)]"
+        >
+          <RotateCcw className="icon-4" /> Refunds
+        </button>
       </div>
 
       {/* Scan feedback — errors only; a successful add is already visible in the cart. */}
