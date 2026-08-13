@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { FileBarChart2, PackageSearch, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
+import { FileBarChart2, PackageSearch, Search, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
 import { Alert } from '../components/ui/Alert'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -649,7 +649,17 @@ function CompleteProductSalesTable({
 }: {
   rows: CompleteProductSaleRow[]
 }): React.JSX.Element {
-  const { sorted, sortKey, sortDir, toggleSort } = useSort(rows, 'date', 'desc')
+  const [search, setSearch] = React.useState('')
+  const filtered = React.useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return rows
+    return rows.filter((row) =>
+      [row.date, row.receiptNumber, row.productName].some((field) =>
+        field.toLowerCase().includes(q)
+      )
+    )
+  }, [rows, search])
+  const { sorted, sortKey, sortDir, toggleSort } = useSort(filtered, 'date', 'desc')
   const th = (
     label: string,
     key: keyof CompleteProductSaleRow,
@@ -673,6 +683,19 @@ function CompleteProductSalesTable({
           their tab was fully paid off, not the original sale date. Click a column to sort.
         </CardDescription>
       </CardHeader>
+      <div className="relative mb-3">
+        <Search
+          className="icon-4 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]"
+          aria-hidden="true"
+        />
+        <input
+          type="text"
+          placeholder="Search by date, receipt #, or product…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className={cn('input pl-9', FOCUS_RING)}
+        />
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -720,7 +743,9 @@ function CompleteProductSalesTable({
             {sorted.length === 0 && (
               <tr>
                 <td colSpan={10} className="py-6 text-center text-[var(--muted-foreground)]">
-                  No product sales in this period.
+                  {search.trim()
+                    ? 'No product sales match your search.'
+                    : 'No product sales in this period.'}
                 </td>
               </tr>
             )}

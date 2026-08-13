@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { CheckCircle2, Loader2, Receipt, XCircle } from 'lucide-react'
+import { CheckCircle2, Copy, Loader2, Receipt, XCircle } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
 import { RefundWorkflowModal } from '../components/RefundWorkflowModal'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -20,6 +20,32 @@ function startOfDay(dateStr: string): Date {
 
 function endOfDay(dateStr: string): Date {
   return new Date(`${dateStr}T23:59:59.999`)
+}
+
+/** Click-to-copy button for a receipt number — briefly shows a check mark on success. */
+function CopyReceiptButton({ receiptNumber }: { receiptNumber: string }): React.JSX.Element {
+  const [copied, setCopied] = React.useState(false)
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation()
+        void navigator.clipboard.writeText(receiptNumber).then(() => {
+          setCopied(true)
+          setTimeout(() => setCopied(false), 1500)
+        })
+      }}
+      title="Copy receipt number"
+      aria-label="Copy receipt number"
+      className="inline-flex min-h-6 min-w-6 items-center justify-center rounded-[var(--radius)] text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+    >
+      {copied ? (
+        <CheckCircle2 className="icon-3_5 shrink-0 text-[var(--success)]" aria-hidden="true" />
+      ) : (
+        <Copy className="icon-3_5 shrink-0" aria-hidden="true" />
+      )}
+    </button>
+  )
 }
 
 /**
@@ -176,7 +202,12 @@ export function SalesHistoryScreen(): React.JSX.Element {
                     className="flex min-h-11 items-center justify-between gap-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] p-3 text-xs"
                   >
                     <div>
-                      <div className="font-bold text-[var(--foreground)]">{sale.receiptNumber}</div>
+                      <div className="flex items-center gap-1">
+                        <span className="font-bold text-[var(--foreground)]">
+                          {sale.receiptNumber}
+                        </span>
+                        <CopyReceiptButton receiptNumber={sale.receiptNumber} />
+                      </div>
                       <div className="flex flex-wrap items-center gap-x-1 text-[var(--muted-foreground)]">
                         <span>
                           {new Date(sale.createdAt).toLocaleString()} • {sale.itemCount} items •{' '}
