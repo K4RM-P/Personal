@@ -20,6 +20,15 @@ model FeatureFlag {
   description String?
 }
 
+/// Tracks the last-used receipt sequence number per calendar month (local time,
+/// "YYYYMM" key), so receipt numbers can be generated as YYYYMM + a 5-digit
+/// counter that resets each month. Incremented atomically inside the same
+/// transaction that creates the Transaction row.
+model ReceiptSequence {
+  yearMonth  String @id
+  lastNumber Int    @default(0)
+}
+
 model User {
   id           Int           @id @default(autoincrement())
   fullName     String        @unique
