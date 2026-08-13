@@ -54,8 +54,8 @@ const PROVIDERS: ProviderMeta[] = [
     label: 'Moneris',
     category: 'Semi-integrated PIN pad',
     needsKey: true,
-    keyHint: 'store_id:api_token',
-    terminalHint: 'Terminal / ECR id'
+    keyHint: 'store_id:api_token:ist_config_code — ist_config_code comes from your Moneris Client Consultant',
+    terminalHint: 'Terminal id (TID) — from Merchant Direct or the device settings screen'
   },
   {
     value: 'globalpayments',
