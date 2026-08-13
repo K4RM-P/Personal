@@ -185,6 +185,24 @@ export function registerReceiptHandlers(db: PrismaClient): void {
   })
 
   ipcMain.handle(
+    IPC.RECEIPT_SAVE_PDF,
+    guard('Save receipt as PDF', async (_e, transaction: TransactionWithItems) => {
+      const storeInfo = await getStoreInfo(db)
+      const html = buildReceiptHtml({ transaction, storeInfo })
+      const saveResult = await dialog.showSaveDialog({
+        title: 'Save receipt as PDF',
+        defaultPath: `receipt-${transaction.receiptNumber}.pdf`,
+        filters: [{ name: 'PDF', extensions: ['pdf'] }]
+      })
+      if (saveResult.canceled || !saveResult.filePath) return null
+      const { pdfDataUrl } = await printToPdf(html, transaction.receiptNumber)
+      const base64 = pdfDataUrl.split(',')[1]
+      await writeFile(saveResult.filePath, Buffer.from(base64, 'base64'))
+      return { path: saveResult.filePath }
+    })
+  )
+
+  ipcMain.handle(
     IPC.RECEIPT_TEST_NETWORK,
     async (_e, { ipAddress, port }: { ipAddress: string; port?: number }) => {
       return testNetworkPrinter(ipAddress, port ?? 9100)

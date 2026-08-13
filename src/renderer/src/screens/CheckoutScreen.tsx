@@ -103,6 +103,7 @@ export function CheckoutScreen(): React.JSX.Element {
   const [printStatus, setPrintStatus] = React.useState<string | null>(null)
   const [receiptPdfUrl, setReceiptPdfUrl] = React.useState<string | null>(null)
   const [receiptError, setReceiptError] = React.useState(false)
+  const [savingPdf, setSavingPdf] = React.useState(false)
   const [parkedCarts, setParkedCarts] = React.useState<ParkedCart[]>([])
   const [showParkModal, setShowParkModal] = React.useState(false)
   const [parkCustomerQuery, setParkCustomerQuery] = React.useState('')
@@ -918,6 +919,23 @@ export function CheckoutScreen(): React.JSX.Element {
     } catch (err) {
       setPrintStatus(err instanceof Error ? err.message : 'Printer unavailable')
       setReceiptError(true)
+    }
+  }
+
+  const handleSaveReceiptPdf = async (): Promise<void> => {
+    if (!activeReceipt || !window.api?.receipt?.savePdf) return
+    setSavingPdf(true)
+    try {
+      const result = await window.api.receipt.savePdf(activeReceipt)
+      if (result) {
+        setPrintStatus(`Saved to ${result.path} ✓`)
+        setReceiptError(false)
+      }
+    } catch (err) {
+      setPrintStatus(err instanceof Error ? err.message : 'Failed to save PDF')
+      setReceiptError(true)
+    } finally {
+      setSavingPdf(false)
     }
   }
 
@@ -2066,12 +2084,19 @@ export function CheckoutScreen(): React.JSX.Element {
             )}
 
             {!receiptError ? (
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={() => void handlePrintReceipt()}
                   className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
                 >
                   Print Receipt
+                </button>
+                <button
+                  onClick={() => void handleSaveReceiptPdf()}
+                  disabled={savingPdf}
+                  className="min-h-11 rounded-[var(--radius)] border border-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary)] disabled:opacity-50"
+                >
+                  {savingPdf ? 'Saving…' : 'Save as PDF'}
                 </button>
                 <button
                   onClick={dismissReceipt}
