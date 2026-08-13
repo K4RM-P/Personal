@@ -393,6 +393,19 @@ export interface DailySalesRow {
   marginPercent: number
 }
 
+export interface CompleteProductSaleRow {
+  date: string // YYYY-MM-DD local — sale date, or debt payoff date if debt-attributed
+  receiptNumber: string
+  productName: string
+  quantity: number
+  supplierCostCents: number // per-unit
+  retailCostCents: number // per-unit
+  discountCents: number // line total
+  hstCents: number // line total, apportioned
+  totalPriceCents: number // line total, excludes tax
+  profitCents: number
+}
+
 export interface TenderBreakdownRow {
   tender: string // CASH | CARD | PHARMACY_CREDIT | POINTS
   amountCents: number

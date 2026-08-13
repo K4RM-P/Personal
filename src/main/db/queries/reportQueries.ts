@@ -13,8 +13,10 @@ import type {
   DashboardData,
   CustomerActivityRow,
   CustomerDebtReport,
-  CustomerDebtRow
+  CustomerDebtRow,
+  CompleteProductSaleRow
 } from '../../../shared/types'
+import type { Transaction, TransactionItem } from '@prisma/client'
 import { getCreditSettings } from './customerQueries'
 
 // ---------------------------------------------------------------------------

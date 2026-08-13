@@ -32,7 +32,6 @@ import {
   PackagePlus,
   Trash2,
   MoreVertical,
-  Plus,
   Check,
   User,
   AlertCircle,
@@ -99,7 +98,6 @@ export function CheckoutScreen(): React.JSX.Element {
   const [showPayModal, setShowPayModal] = React.useState(false)
   const [customProductMode, setCustomProductMode] = React.useState<'RX' | 'NONRX' | null>(null)
   const [showHeaderMenu, setShowHeaderMenu] = React.useState(false)
-  const [showAddMenu, setShowAddMenu] = React.useState(false)
   const [customProductError, setCustomProductError] = React.useState<string | null>(null)
 
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod>(null)
@@ -137,6 +135,7 @@ export function CheckoutScreen(): React.JSX.Element {
 
   const searchRef = React.useRef<HTMLInputElement>(null)
   const tenderRef = React.useRef<HTMLInputElement>(null)
+  const productSearchRef = React.useRef<HTMLInputElement>(null)
 
   const tenderedCents = Math.round(parseFloat(tenderedDollars || '0') * 100)
 
@@ -270,6 +269,12 @@ export function CheckoutScreen(): React.JSX.Element {
     }, 150)
     return () => clearTimeout(timer)
   }, [searchQuery])
+
+  // Keep the product search bar focused by default so a cashier can scan a
+  // barcode immediately without clicking into it first.
+  React.useEffect(() => {
+    productSearchRef.current?.focus()
+  }, [])
 
   const addProductToCart = (product: Product): void => {
     setCart((prev) => {
@@ -506,6 +511,7 @@ export function CheckoutScreen(): React.JSX.Element {
       setBillDiscountCents(0)
       setBillDiscountReason(undefined)
       setShowPayModal(false)
+      productSearchRef.current?.focus()
     } catch (err) {
       setScanFeedback({
         type: 'error',
@@ -851,13 +857,14 @@ export function CheckoutScreen(): React.JSX.Element {
           taller than ~4 rows. */}
           <Card className="relative overflow-visible p-2">
             <div className="flex items-center gap-2">
-              <div className="relative flex-1">
+              <div className="relative min-w-0 flex-1">
                 <input
+                  ref={productSearchRef}
                   type="text"
                   placeholder="Search products by SKU, name, or barcode"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-4 text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
+                  className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
                 />
                 {searchQuery.trim() !== '' && filteredProducts.length > 0 && (
                   <div className="absolute z-20 mt-1 max-h-[190px] w-full overflow-y-auto rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">
@@ -888,45 +895,24 @@ export function CheckoutScreen(): React.JSX.Element {
                   </div>
                 )}
               </div>
-              {/* Single "+" menu replaces the separate RX / Non-RX buttons to save header width. */}
-              <div className="relative shrink-0">
-                <button
-                  type="button"
-                  title="Add custom item"
-                  aria-label="Add custom item"
-                  aria-haspopup="true"
-                  aria-expanded={showAddMenu}
-                  onClick={() => setShowAddMenu((v) => !v)}
-                  className="flex h-11 w-11 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]"
-                >
-                  <Plus className="icon-5" />
-                </button>
-                {showAddMenu && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setShowAddMenu(false)} />
-                    <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-sm">
-                      <button
-                        onClick={() => {
-                          setCustomProductMode('RX')
-                          setShowAddMenu(false)
-                        }}
-                        className="flex min-h-9 w-full items-center gap-2 px-3 text-left text-sm font-medium text-[var(--warning)] hover:bg-[var(--muted)]"
-                      >
-                        <Pill className="icon-4" /> Add RX Item
-                      </button>
-                      <button
-                        onClick={() => {
-                          setCustomProductMode('NONRX')
-                          setShowAddMenu(false)
-                        }}
-                        className="flex min-h-9 w-full items-center gap-2 px-3 text-left text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted)]"
-                      >
-                        <PackagePlus className="icon-4" /> Add Non-RX Item
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
+              <button
+                type="button"
+                title="Add RX item"
+                aria-label="Add RX item"
+                onClick={() => setCustomProductMode('RX')}
+                className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-xs font-semibold text-[var(--warning)]"
+              >
+                <Pill className="icon-4" /> Add Rx
+              </button>
+              <button
+                type="button"
+                title="Add non-RX item"
+                aria-label="Add non-RX item"
+                onClick={() => setCustomProductMode('NONRX')}
+                className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-xs font-semibold text-[var(--foreground)]"
+              >
+                <PackagePlus className="icon-4" /> Add Non-Rx
+              </button>
 
               {/* Link Customer — persistent, independent of the Pharmacy Credit tender's
                   own conditional search (see PHARMACY_CREDIT tender: if attachedCustomer is
