@@ -44,10 +44,11 @@ describe('customer credit ledger', () => {
     const sale = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
       taxRatePercent: 0,
-      tenderType: 'SPLIT',
-      tenderedCents: 500,
-      customerId: c.id,
-      tabAmountCents: 500
+      tenders: [
+        { method: 'PHARMACY_CREDIT', amountCents: 500 },
+        { method: 'CASH', amountCents: 500 }
+      ],
+      customerId: c.id
     })
     const after = await getCustomerDetail(db, c.id)
     expect(after.currentBalanceCents).toBe(250)
@@ -62,10 +63,11 @@ describe('customer credit ledger', () => {
     const sale = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
       taxRatePercent: 0,
-      tenderType: 'SPLIT',
-      tenderedCents: 600,
-      customerId: c.id,
-      tabAmountCents: 400
+      tenders: [
+        { method: 'PHARMACY_CREDIT', amountCents: 400 },
+        { method: 'CASH', amountCents: 600 }
+      ],
+      customerId: c.id
     })
     const entries = await db.creditLedgerEntry.findMany({ where: { transactionId: sale.id } })
     expect(entries).toHaveLength(1)
@@ -78,10 +80,8 @@ describe('customer credit ledger', () => {
     const sale = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
       taxRatePercent: 0,
-      tenderType: 'SPLIT',
-      tenderedCents: 0,
-      customerId: c.id,
-      tabAmountCents: 1000
+      tenders: [{ method: 'PHARMACY_CREDIT', amountCents: 1000 }],
+      customerId: c.id
     })
     await refundTabAmount(db, sale.id)
     const entries = await db.creditLedgerEntry.findMany({
@@ -117,9 +117,9 @@ describe('customer credit ledger', () => {
     const sale = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
       taxRatePercent: 0,
-      tenderType: 'CARD',
-      tenderedCents: 1020,
-      surchargeCents: 20
+      tenders: [
+        { method: 'CARD', amountCents: 1020, surchargeCents: 20, processorTransactionId: 'test-txn-1' }
+      ]
     })
     expect(sale.surchargeCents).toBe(20)
     expect(sale.totalCents).toBe(1020)
@@ -131,11 +131,9 @@ describe('customer credit ledger', () => {
       createTransaction(db, {
         items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
         taxRatePercent: 0,
-        tenderType: 'CASH',
-        tenderedCents: 1020,
-        surchargeCents: 20
+        tenders: [{ method: 'CASH', amountCents: 1020, surchargeCents: 20 } as never]
       })
-    ).rejects.toThrow('Card surcharge cannot be applied to a non-card tender.')
+    ).rejects.toThrow('Surcharge can only be applied to a card tender line.')
   })
 
   it('rejects a card surcharge that does not match the configured rate', async () => {
@@ -144,9 +142,9 @@ describe('customer credit ledger', () => {
       createTransaction(db, {
         items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
         taxRatePercent: 0,
-        tenderType: 'CARD',
-        tenderedCents: 1999,
-        surchargeCents: 999
+        tenders: [
+          { method: 'CARD', amountCents: 1999, surchargeCents: 999, processorTransactionId: 'test-txn-2' }
+        ]
       })
     ).rejects.toThrow('Card surcharge does not match the configured rate.')
   })
@@ -155,9 +153,14 @@ describe('customer credit ledger', () => {
     const sale = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
       taxRatePercent: 0,
-      tenderType: 'E_TRANSFER',
-      tenderedCents: 1000,
-      email: 'buyer@example.com'
+      tenders: [
+        {
+          method: 'E_TRANSFER',
+          amountCents: 1000,
+          eTransferEmail: 'buyer@example.com',
+          eTransferConfirmed: true
+        }
+      ]
     })
     expect(sale.tenderType).toBe('E_TRANSFER')
     expect(sale.email).toBe('buyer@example.com')
@@ -170,10 +173,8 @@ describe('customer credit ledger', () => {
     const sale = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
       taxRatePercent: 0,
-      tenderType: 'PHARMACY_CREDIT',
-      tenderedCents: 0,
-      customerId: c.id,
-      tabAmountCents: 1000
+      tenders: [{ method: 'PHARMACY_CREDIT', amountCents: 1000 }],
+      customerId: c.id
     })
     const entries = await db.creditLedgerEntry.findMany({ where: { transactionId: sale.id } })
     expect(entries).toHaveLength(1)
@@ -181,19 +182,17 @@ describe('customer credit ledger', () => {
     expect((await getCustomerDetail(db, c.id)).currentBalanceCents).toBe(4000)
   })
 
-  it('rejects a Pharmacy Credit standalone tender whose amount is not the full total', async () => {
+  it('rejects a Pharmacy Credit tender whose amount does not sum to the sale total', async () => {
     const c = await customer()
     await addFunds(db, c.id, 5000)
     await expect(
       createTransaction(db, {
         items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
         taxRatePercent: 0,
-        tenderType: 'PHARMACY_CREDIT',
-        tenderedCents: 0,
-        customerId: c.id,
-        tabAmountCents: 400
+        tenders: [{ method: 'PHARMACY_CREDIT', amountCents: 400 }],
+        customerId: c.id
       })
-    ).rejects.toThrow('full sale total')
+    ).rejects.toThrow('sale total is')
   })
 
   it('allows an insufficient-balance Pharmacy Credit sale (negative tab)', async () => {
@@ -202,10 +201,8 @@ describe('customer credit ledger', () => {
     const sale = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
       taxRatePercent: 0,
-      tenderType: 'PHARMACY_CREDIT',
-      tenderedCents: 0,
-      customerId: c.id,
-      tabAmountCents: 1000
+      tenders: [{ method: 'PHARMACY_CREDIT', amountCents: 1000 }],
+      customerId: c.id
     })
     expect(sale.tenderType).toBe('PHARMACY_CREDIT')
     expect((await getCustomerDetail(db, c.id)).currentBalanceCents).toBe(-800)
@@ -218,8 +215,7 @@ describe('customer credit ledger', () => {
     const sale = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
       taxRatePercent: 0,
-      tenderType: 'CASH',
-      tenderedCents: 1000,
+      tenders: [{ method: 'CASH', amountCents: 1000 }],
       customerId: c.id
     })
     const exported = await exportCustomerData(db, c.id)
@@ -235,8 +231,7 @@ describe('customer credit ledger', () => {
     const sale = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
       taxRatePercent: 0,
-      tenderType: 'CASH',
-      tenderedCents: 1000,
+      tenders: [{ method: 'CASH', amountCents: 1000 }],
       customerId: c.id
     })
 

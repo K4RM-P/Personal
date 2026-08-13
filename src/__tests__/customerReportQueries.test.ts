@@ -50,22 +50,19 @@ describe('customer reports — activity and debt-age warnings', () => {
     await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
       taxRatePercent: 0,
-      tenderType: 'CASH',
-      tenderedCents: 1000,
+      tenders: [{ method: 'CASH', amountCents: 1000 }],
       customerId: c.id
     })
     await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
       taxRatePercent: 0,
-      tenderType: 'CASH',
-      tenderedCents: 1000,
+      tenders: [{ method: 'CASH', amountCents: 1000 }],
       customerId: c.id
     })
     const outOfRangeTx = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
       taxRatePercent: 0,
-      tenderType: 'CASH',
-      tenderedCents: 1000,
+      tenders: [{ method: 'CASH', amountCents: 1000 }],
       customerId: c.id
     })
     // Backdate one sale outside the report's date range.
@@ -92,10 +89,8 @@ describe('customer reports — activity and debt-age warnings', () => {
     const sale = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
       taxRatePercent: 0,
-      tenderType: 'SPLIT',
-      tenderedCents: 0,
-      customerId: c.id,
-      tabAmountCents: 1000
+      tenders: [{ method: 'PHARMACY_CREDIT', amountCents: 1000 }],
+      customerId: c.id
     })
     // Backdate the SALE_CHARGE ledger entry to simulate a debt that's been open a while.
     const entry = await db.creditLedgerEntry.findFirstOrThrow({ where: { transactionId: sale.id } })
@@ -173,10 +168,8 @@ describe('getCreditHealth — configurable overdue threshold', () => {
     const sale = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
       taxRatePercent: 0,
-      tenderType: 'SPLIT',
-      tenderedCents: 0,
       customerId,
-      tabAmountCents: 1000
+      tenders: [{ method: 'PHARMACY_CREDIT', amountCents: 1000 }]
     })
     const entry = await db.creditLedgerEntry.findFirstOrThrow({ where: { transactionId: sale.id } })
     const fortyDaysAgo = new Date(Date.now() - 40 * 86400000)

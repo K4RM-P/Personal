@@ -1,5 +1,5 @@
 import { formatCurrency } from '../../shared/formatCurrency'
-import type { StoreInfo, TransactionWithItems } from '../../shared/types'
+import type { StoreInfo, TransactionWithItems, DBTransactionTender } from '../../shared/types'
 
 export const DEFAULT_STORE_INFO: StoreInfo = {
   name: 'VantisPOS Rx Pharmacy',
@@ -44,6 +44,54 @@ function buildLineItemsHtml(transaction: TransactionWithItems): string {
       </tr>${discountRow}`
     })
     .join('')
+}
+
+/** Human label for one TransactionTender row, e.g. "Card (Credit) •••• 4242". */
+function tenderLineLabel(tender: DBTransactionTender): string {
+  switch (tender.method) {
+    case 'CASH':
+      return 'Cash'
+    case 'CARD':
+      return `Card${tender.cardType ? ` (${tender.cardType === 'CREDIT' ? 'Credit' : 'Debit'})` : ''}${tender.cardLastFour ? ` •••• ${tender.cardLastFour}` : ''}`
+    case 'E_TRANSFER':
+      return 'E-Transfer'
+    case 'PHARMACY_CREDIT':
+      return 'Pharmacy Credit'
+    default:
+      return tender.method
+  }
+}
+
+/**
+ * Itemizes every tender line on the sale (§6: "the receipt must now show every
+ * tender line, not just one payment method") instead of a single collapsed
+ * `Tender: X` row. Falls back to the legacy single-line summary for historical
+ * transactions with no `tenders` relation loaded/populated.
+ */
+function buildTenderLinesHtml(transaction: TransactionWithItems): string {
+  const tenders = transaction.tenders
+  if (!tenders || tenders.length === 0) {
+    return `<div>Tender: ${escapeHtml(transaction.tenderType)}</div>`
+  }
+  const rows = tenders
+    .slice()
+    .sort((a, b) => a.sequence - b.sequence)
+    .map((t) => `<div>${escapeHtml(tenderLineLabel(t))}: ${formatCurrency(t.amountCents)}</div>`)
+    .join('')
+  return rows
+}
+
+/** Plain-text (no HTML) version of the same itemization, for the `{{tenders}}` custom-template token. */
+function buildTenderLinesText(transaction: TransactionWithItems): string {
+  const tenders = transaction.tenders
+  if (!tenders || tenders.length === 0) {
+    return `Tender: ${escapeHtml(transaction.tenderType)}`
+  }
+  return tenders
+    .slice()
+    .sort((a, b) => a.sequence - b.sequence)
+    .map((t) => `${escapeHtml(tenderLineLabel(t))}: ${formatCurrency(t.amountCents)}`)
+    .join(', ')
 }
 
 function buildLogoHtml(store: StoreInfo): string {
@@ -113,7 +161,7 @@ function buildDefaultReceiptHtml(
   <div class="divider"></div>
   <div>Receipt: #${escapeHtml(transaction.receiptNumber)}</div>
   <div>Date: ${escapeHtml(dateStr)}</div>
-  <div>Tender: ${escapeHtml(transaction.tenderType)}</div>
+  ${buildTenderLinesHtml(transaction)}
   <div class="divider"></div>
   <table>
     ${lineItems}
@@ -146,6 +194,7 @@ export const RECEIPT_TEMPLATE_TOKENS = [
   'receiptNumber',
   'date',
   'tenderType',
+  'tenders',
   'items',
   'subtotal',
   'billDiscount',
@@ -172,6 +221,7 @@ function buildCustomReceiptHtml(
     receiptNumber: escapeHtml(transaction.receiptNumber),
     date: escapeHtml(dateStr),
     tenderType: escapeHtml(transaction.tenderType),
+    tenders: buildTenderLinesText(transaction),
     items: buildLineItemsHtml(transaction),
     subtotal: formatCurrency(transaction.subtotalCents),
     billDiscount: transaction.billDiscountCents ? formatCurrency(transaction.billDiscountCents) : '',

@@ -61,8 +61,7 @@ describe('refund system', () => {
     createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
       taxRatePercent: 0,
-      tenderType: 'CASH',
-      tenderedCents: 1000,
+      tenders: [{ method: 'CASH', amountCents: 1000 }],
       ...overrides
     })
 
@@ -84,14 +83,30 @@ describe('refund system', () => {
   })
 
   it('processes a card refund through the payment adapter using the stored processor transaction id', async () => {
-    const tx = await sale({ tenderType: 'CARD', processorTransactionId: 'proc_abc123', cardLast4: '4242' })
+    const tx = await sale({
+      tenders: [{ method: 'CARD', amountCents: 1000, processorTransactionId: 'proc_abc123', cardLastFour: '4242' }]
+    })
     const refund = await processRefund(db, { transactionId: tx.id, type: 'CARD', amountCents: 1000, refundedByUserId: managerId })
     expect(refund.status).toBe('COMPLETED')
     expect(refund.providerRefundId).toBeTruthy()
   })
 
   it('rejects a card refund when the sale has no processor transaction id on file', async () => {
-    const tx = await sale({ tenderType: 'CARD' })
+    // createTransaction now requires a processorTransactionId on every CARD line (it must
+    // have actually been charged before being added), so this legacy/data-integrity edge
+    // case — a CARD sale somehow missing it — is simulated with a direct fixture insert
+    // rather than through createTransaction.
+    const tx = await db.transaction.create({
+      data: {
+        receiptNumber: `RFND-NOPROC-${Date.now()}`,
+        subtotalCents: 1000,
+        taxCents: 0,
+        totalCents: 1000,
+        tenderType: 'CARD',
+        tenderedCents: 1000,
+        changeCents: 0
+      }
+    })
     await expect(
       processRefund(db, { transactionId: tx.id, type: 'CARD', amountCents: 1000, refundedByUserId: managerId })
     ).rejects.toThrow(/card charge on file/)
