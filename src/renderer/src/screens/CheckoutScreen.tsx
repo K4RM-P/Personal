@@ -41,6 +41,28 @@ import {
 type ScanFeedback = { type: 'success' | 'error'; message: string } | null
 type PaymentMethod = 'CASH' | 'E_TRANSFER' | 'CARD' | 'PHARMACY_CREDIT' | null
 type CardType = 'DEBIT' | 'CREDIT' | null
+
+/**
+ * One line of the tender ledger being built in the PAY popup. Every line here is
+ * already fully processed (cash counted, card actually charged through the
+ * terminal, e-transfer confirmed, or a Pharmacy Credit amount validated) — a card
+ * charge that fails is never added here at all (see startCardLineCharge), so this
+ * array only ever holds the equivalent of a COMPLETED TransactionTender row.
+ */
+type TenderLine = {
+  id: string
+  method: 'CASH' | 'CARD' | 'E_TRANSFER' | 'PHARMACY_CREDIT'
+  amountCents: number
+  cashGivenCents?: number
+  changeCents?: number
+  depositedToTabCents?: number
+  cardType?: 'DEBIT' | 'CREDIT'
+  surchargeCents?: number
+  processorTransactionId?: string
+  cardLastFour?: string
+  eTransferEmail?: string
+  eTransferConfirmed?: boolean
+}
 type CartItem = {
   product: Product
   quantity: number
@@ -89,22 +111,29 @@ export function CheckoutScreen(): React.JSX.Element {
     'idle' | 'awaiting' | 'processing' | 'approved' | 'declined' | 'timeout'
   >('idle')
   const [paymentMessage, setPaymentMessage] = React.useState<string | null>(null)
-  const [manualPrompt, setManualPrompt] = React.useState<{
-    amountCents: number
-    orderRef: string
-  } | null>(null)
-  const [manualRef, setManualRef] = React.useState('')
   const [showRefunds, setShowRefunds] = React.useState(false)
   const [showPayModal, setShowPayModal] = React.useState(false)
   const [customProductMode, setCustomProductMode] = React.useState<'RX' | 'NONRX' | null>(null)
   const [showHeaderMenu, setShowHeaderMenu] = React.useState(false)
   const [customProductError, setCustomProductError] = React.useState<string | null>(null)
 
+  // `paymentMethod` now doubles as "which tender line's amount-entry screen is
+  // currently open" — null means the tender-building list (§2.1) is showing.
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod>(null)
   const [cardType, setCardType] = React.useState<CardType>(null)
   const [applySurcharge, setApplySurcharge] = React.useState(false)
   const [eTransferEmail, setETransferEmail] = React.useState('')
   const [eTransferConfirmed, setETransferConfirmed] = React.useState(false)
+  const [cashGivenDollars, setCashGivenDollars] = React.useState('')
+  const [cashOverageChoice, setCashOverageChoice] = React.useState<'change' | 'deposit'>('change')
+  const [tenderLines, setTenderLines] = React.useState<TenderLine[]>([])
+  const [failedLineNotice, setFailedLineNotice] = React.useState<{
+    method: string
+    amountCents: number
+    reason: string
+  } | null>(null)
+  const [showCancelWarning, setShowCancelWarning] = React.useState(false)
+  const [reversingCancel, setReversingCancel] = React.useState(false)
   const [checkoutSettings, setCheckoutSettings] = React.useState({
     allowCreditCardSurcharge: false,
     cardSurchargePercent: 2
@@ -137,7 +166,13 @@ export function CheckoutScreen(): React.JSX.Element {
   const tenderRef = React.useRef<HTMLInputElement>(null)
   const productSearchRef = React.useRef<HTMLInputElement>(null)
 
-  const tenderedCents = Math.round(parseFloat(tenderedDollars || '0') * 100)
+  // Reused across every tender-line entry screen (§2.2) — the amount-to-apply for
+  // whichever line is currently being built, not a whole-sale figure.
+  const lineAmountCents = Math.round(parseFloat(tenderedDollars || '0') * 100)
+  const cashGivenCents = cashGivenDollars.trim()
+    ? Math.round(parseFloat(cashGivenDollars) * 100)
+    : lineAmountCents
+  const cashOverageCents = Math.max(0, cashGivenCents - lineAmountCents)
 
   const rawSubtotalCents = cart.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0)
   const itemDiscountTotalCents = cart.reduce((sum, item) => sum + (item.discountCents ?? 0), 0)
@@ -161,16 +196,25 @@ export function CheckoutScreen(): React.JSX.Element {
       ? taxableSubtotalCents - (effectiveBillDiscountCents * taxableSubtotalCents) / subtotalCents
       : 0
   const taxCents = Math.round((taxableAfterBillDiscountCents * taxRatePercent) / 100)
-  const surchargeCents =
-    cardType === 'CREDIT' && applySurcharge
-      ? Math.floor((preTaxCents * checkoutSettings.cardSurchargePercent) / 100)
+  // Surcharge is realized per completed CARD tender line (§3.2), not per sale —
+  // this sums whatever's already been charged, so `effectiveTotal` grows live as
+  // each surcharged card line is added, exactly like the customer sees before the
+  // charge is sent to the terminal.
+  const surchargeCents = tenderLines
+    .filter((l) => l.method === 'CARD')
+    .reduce((sum, l) => sum + (l.surchargeCents ?? 0), 0)
+  // The surcharge a CARD line being built right now would add, if confirmed —
+  // used to show the exact charge-inclusive amount before it's sent to the terminal.
+  const pendingSurchargeCents =
+    paymentMethod === 'CARD' && cardType === 'CREDIT' && applySurcharge
+      ? Math.floor((lineAmountCents * checkoutSettings.cardSurchargePercent) / 100)
       : 0
   // Never taxed, never discounted — added on top of the product total. See
   // debtSettlement state: represents settling old Pharmacy Credit debt, not a sale of goods.
   const debtSettlementCents = debtSettlement?.amountCents ?? 0
   const effectiveTotal = preTaxCents + taxCents + surchargeCents + debtSettlementCents
-  const changeCents = Math.max(0, tenderedCents - effectiveTotal)
-  const shortCents = Math.max(0, effectiveTotal - tenderedCents)
+  const appliedCents = tenderLines.reduce((sum, l) => sum + l.amountCents, 0)
+  const remainingCents = Math.max(0, effectiveTotal - appliedCents)
   const customerBalance = attachedCustomer?.ledgerEntries?.[0]?.balanceCents ?? 0
 
   React.useEffect(() => {
@@ -227,8 +271,11 @@ export function CheckoutScreen(): React.JSX.Element {
       taxCents,
       // effectiveTotal is surcharge-inclusive — the exact amount charged.
       totalCents: effectiveTotal,
-      tenderedCents,
-      changeCents,
+      // Aggregate across every completed tender line so far, not a single cash field.
+      tenderedCents: appliedCents,
+      changeCents: tenderLines
+        .filter((l) => l.method === 'CASH')
+        .reduce((sum, l) => sum + (l.changeCents ?? 0), 0),
       customerBalanceCents: customerBalance
     })
     const serialized = JSON.stringify(state)
@@ -241,17 +288,17 @@ export function CheckoutScreen(): React.JSX.Element {
     }
   }, [
     activeReceipt,
+    appliedCents,
     cart,
     customerBalance,
     customerDisplayInfo,
-    changeCents,
     effectiveBillDiscountCents,
     effectiveTotal,
     paymentMethod,
     showPayModal,
     subtotalCents,
     taxCents,
-    tenderedCents
+    tenderLines
   ])
 
   React.useEffect(() => {
@@ -379,10 +426,9 @@ export function CheckoutScreen(): React.JSX.Element {
       if (customProductMode) setCustomProductMode(null)
       else if (discountItemTarget !== null) setDiscountItemTarget(null)
       else if (showBillDiscountModal) setShowBillDiscountModal(false)
-      else if (manualPrompt) setManualPrompt(null)
       else if (showAddCustomer) setShowAddCustomer(false)
       else if (showParkModal) setShowParkModal(false)
-      else if (paymentMethod) resetPaymentMethod()
+      else if (paymentMethod) backToTenderList()
       else if (showRefunds) setShowRefunds(false)
     }
     window.addEventListener('keydown', onKeyDown)
@@ -391,7 +437,6 @@ export function CheckoutScreen(): React.JSX.Element {
     customProductMode,
     discountItemTarget,
     showBillDiscountModal,
-    manualPrompt,
     showAddCustomer,
     showParkModal,
     paymentMethod,
@@ -457,22 +502,242 @@ export function CheckoutScreen(): React.JSX.Element {
     )
   }
 
-  const completeSale = async (
-    tenderType: 'CASH' | 'CARD' | 'E_TRANSFER' | 'PHARMACY_CREDIT' | 'SPLIT',
-    tabAmountCents?: number,
-    cashOverageToCreditCents?: number,
-    surchargeCentsArg?: number,
-    email?: string,
-    cardMeta?: { processorTransactionId?: string; cardLast4?: string }
-  ): Promise<void> => {
-    if (cart.length === 0 && !debtSettlement) return
+  // ---- Tender-line builder (general split tender, §1-§6) --------------------
+
+  const resetTenderEntryFields = (): void => {
+    setTenderedDollars('')
+    setCashGivenDollars('')
+    setCashOverageChoice('change')
+    setCardType(null)
+    setApplySurcharge(false)
+    setETransferEmail(attachedCustomer?.email || '')
+    setETransferConfirmed(false)
+    setPaymentMessage(null)
+    setPaymentState('idle')
+  }
+
+  /** Opens a method's amount-entry screen, prefilled to the exact current Remaining
+   *  (still editable) — this is what backs both "+ Add [Method]" and "Pay Rest
+   *  with [Method]", which are the same action, just surfaced twice per §2.1. */
+  const openAddTender = (method: NonNullable<PaymentMethod>): void => {
+    resetTenderEntryFields()
+    setTenderedDollars(remainingCents > 0 ? (remainingCents / 100).toFixed(2) : '')
+    setPaymentMethod(method)
+  }
+
+  const backToTenderList = (): void => {
+    setPaymentMethod(null)
+    setPaymentMessage(null)
+    setPaymentState('idle')
+  }
+
+  const addLine = (line: TenderLine): void => {
+    setTenderLines((prev) => [...prev, line])
+    backToTenderList()
+  }
+
+  const confirmCashLine = (): void => {
+    if (lineAmountCents <= 0 || lineAmountCents > remainingCents) return
+    if (cashGivenCents < lineAmountCents) return
+    const changeCents = cashOverageChoice === 'change' ? cashOverageCents : 0
+    const depositedToTabCents = cashOverageChoice === 'deposit' ? cashOverageCents : 0
+    addLine({
+      id: crypto.randomUUID(),
+      method: 'CASH',
+      amountCents: lineAmountCents,
+      cashGivenCents,
+      changeCents,
+      depositedToTabCents
+    })
+  }
+
+  const confirmETransferLine = (): void => {
+    if (lineAmountCents <= 0 || lineAmountCents > remainingCents || !eTransferConfirmed) return
+    addLine({
+      id: crypto.randomUUID(),
+      method: 'E_TRANSFER',
+      amountCents: lineAmountCents,
+      eTransferEmail: eTransferEmail || undefined,
+      eTransferConfirmed: true
+    })
+  }
+
+  const confirmPharmacyCreditLine = (): void => {
+    if (!attachedCustomer || lineAmountCents <= 0 || lineAmountCents > remainingCents) return
+    addLine({
+      id: crypto.randomUUID(),
+      method: 'PHARMACY_CREDIT',
+      amountCents: lineAmountCents
+    })
+  }
+
+  /** Charges exactly this line's amount through the payment adapter the moment
+   *  it's confirmed — never batched to sale completion (§3, non-negotiable #1).
+   *  Two "+ Add Card" lines are two independent calls here, each its own real
+   *  terminal authorization — this is how two physical cards get supported. */
+  const startCardLineCharge = async (): Promise<void> => {
+    if (!cardType || cardProcessing) return
+    if (lineAmountCents <= 0 || lineAmountCents > remainingCents) return
+    const lineSurchargeCents = pendingSurchargeCents
+    const chargeCents = lineAmountCents + lineSurchargeCents
+    setPaymentState('awaiting')
+    setPaymentMessage('Waiting for terminal response…')
+    if (!cardOrderRefRef.current) {
+      cardOrderRefRef.current = `SALE-${Date.now()}-${tenderLines.length}`
+    }
+    const orderRef = cardOrderRefRef.current
+    if (!window.api?.payment) {
+      setPaymentState('timeout')
+      setPaymentMessage('Payment service unavailable.')
+      return
+    }
+    setCardProcessing(true)
+    try {
+      const result: ChargeResult = await window.api.payment.charge(chargeCents, orderRef)
+      if (result.status === 'approved') {
+        cardOrderRefRef.current = null
+        addLine({
+          id: crypto.randomUUID(),
+          method: 'CARD',
+          amountCents: chargeCents,
+          cardType,
+          surchargeCents: lineSurchargeCents,
+          processorTransactionId: result.transactionId,
+          cardLastFour: result.cardLast4
+        })
+      } else {
+        // Partial-failure handling (§3.1, non-negotiable #2): this line simply
+        // never gets added — every already-COMPLETED line above is untouched,
+        // Remaining still reflects only what's genuinely uncovered, and the
+        // cashier lands back on the tender list to retry or pick another method.
+        cardOrderRefRef.current = null
+        setFailedLineNotice({
+          method: 'Card',
+          amountCents: chargeCents,
+          reason: result.message || (result.status === 'error' ? 'Payment timed out' : 'Card was not approved')
+        })
+        backToTenderList()
+      }
+    } catch (err) {
+      cardOrderRefRef.current = null
+      setFailedLineNotice({
+        method: 'Card',
+        amountCents: chargeCents,
+        reason: err instanceof Error ? err.message : 'Payment timed out'
+      })
+      backToTenderList()
+    } finally {
+      setCardProcessing(false)
+    }
+  }
+
+  /** Edit is only offered for CASH/PHARMACY_CREDIT lines — nothing external
+   *  happened yet for those (no charge, no ledger write until sale completion),
+   *  so it's safe to pull the line back out and reopen its entry screen. CARD
+   *  and E_TRANSFER lines have no in-place edit — see removeLine for why. */
+  const editLine = (line: TenderLine): void => {
+    if (line.method === 'CARD' || line.method === 'E_TRANSFER') return
+    setTenderLines((prev) => prev.filter((l) => l.id !== line.id))
+    resetTenderEntryFields()
+    setTenderedDollars((line.amountCents / 100).toFixed(2))
+    if (line.method === 'CASH') {
+      setCashGivenDollars(((line.cashGivenCents ?? line.amountCents) / 100).toFixed(2))
+      setCashOverageChoice(line.depositedToTabCents ? 'deposit' : 'change')
+    }
+    setPaymentMethod(line.method)
+  }
+
+  /** Removing a CASH/PHARMACY_CREDIT line is free (nothing external happened).
+   *  Removing a CARD/E_TRANSFER line means undoing a charge that already
+   *  happened in the world — §7's reversal requirement applies per-line here
+   *  too, not just on a full popup cancel. */
+  const removeLine = async (line: TenderLine): Promise<void> => {
+    if (line.method === 'CARD' || line.method === 'E_TRANSFER') {
+      const kind = line.method === 'CARD' ? 'card charge' : 'e-transfer'
+      if (
+        !window.confirm(
+          `This will reverse the ${formatCurrency(line.amountCents)} ${kind}. Continue?`
+        )
+      ) {
+        return
+      }
+      if (line.method === 'CARD' && line.processorTransactionId && window.api?.payment?.refund) {
+        try {
+          await window.api.payment.refund(line.processorTransactionId, line.amountCents)
+        } catch (err) {
+          setScanFeedback({
+            type: 'error',
+            message: err instanceof Error ? err.message : 'Failed to reverse card charge'
+          })
+          return
+        }
+      }
+      // No processor-side reversal exists for E-Transfer — removing it here only
+      // un-counts it toward Remaining; the cashier still owes the customer that
+      // amount back by hand, which the confirm() copy above makes explicit.
+    }
+    setTenderLines((prev) => prev.filter((l) => l.id !== line.id))
+  }
+
+  const hasCompletedExternalLines = tenderLines.some(
+    (l) => l.method === 'CARD' || l.method === 'E_TRANSFER'
+  )
+  const chargedExternalCents = tenderLines
+    .filter((l) => l.method === 'CARD' || l.method === 'E_TRANSFER')
+    .reduce((sum, l) => sum + l.amountCents, 0)
+
+  const closePayModalReset = (): void => {
+    setShowPayModal(false)
+    setPaymentMethod(null)
+    setTenderLines([])
+    setShowCancelWarning(false)
+    setFailedLineNotice(null)
+    cardOrderRefRef.current = null
+    resetTenderEntryFields()
+  }
+
+  /** §7: a silent cancel that leaves a charged-but-unrecorded card/e-transfer
+   *  payment orphaned is exactly the failure mode this guards against. */
+  const requestCancelPay = (): void => {
+    if (hasCompletedExternalLines) {
+      setShowCancelWarning(true)
+    } else {
+      closePayModalReset()
+    }
+  }
+
+  const confirmCancelWithReversal = async (): Promise<void> => {
+    setReversingCancel(true)
+    try {
+      for (const line of tenderLines) {
+        if (line.method === 'CARD' && line.processorTransactionId && window.api?.payment?.refund) {
+          await window.api.payment.refund(line.processorTransactionId, line.amountCents)
+        }
+      }
+      closePayModalReset()
+    } catch (err) {
+      setScanFeedback({
+        type: 'error',
+        message:
+          err instanceof Error
+            ? err.message
+            : 'Failed to reverse a charge — resolve manually before leaving this sale.'
+      })
+    } finally {
+      setReversingCancel(false)
+    }
+  }
+
+  /** Finalizes the sale — gated client-side on Remaining === 0 (also re-validated
+   *  server-side in createTransaction; see posQueries.ts, non-negotiable #3). */
+  const completeSale = async (): Promise<void> => {
+    if (remainingCents !== 0 || tenderLines.length === 0 || cardProcessing) return
     setCardProcessing(true)
     try {
       if (!window.api?.transaction) {
         setScanFeedback({ type: 'error', message: 'API not available' })
         return
       }
-      const finalTendered = tenderType === 'E_TRANSFER' ? effectiveTotal : tenderedCents
       const transaction = await window.api.transaction.create({
         items: cart.map((item) => ({
           productId: item.product.id,
@@ -484,35 +749,42 @@ export function CheckoutScreen(): React.JSX.Element {
           hstApplied: item.hstApplied !== false
         })),
         taxRatePercent,
-        tenderedCents: finalTendered,
-        tenderType,
+        tenders: tenderLines.map((l) => ({
+          method: l.method,
+          amountCents: l.amountCents,
+          cashGivenCents: l.cashGivenCents,
+          changeCents: l.changeCents,
+          depositedToTabCents: l.depositedToTabCents,
+          cardType: l.cardType,
+          surchargeCents: l.surchargeCents,
+          processorTransactionId: l.processorTransactionId,
+          cardLastFour: l.cardLastFour,
+          eTransferEmail: l.eTransferEmail,
+          eTransferConfirmed: l.eTransferConfirmed
+        })),
         customerId: attachedCustomer?.id,
-        tabAmountCents: tabAmountCents ?? 0,
-        cashOverageToCreditCents: cashOverageToCreditCents ?? 0,
-        surchargeCents: surchargeCentsArg ?? 0,
-        email: email || undefined,
+        email: tenderLines.find((l) => l.method === 'E_TRANSFER')?.eTransferEmail || undefined,
         billDiscountCents: effectiveBillDiscountCents,
         billDiscountReason,
-        processorTransactionId: cardMeta?.processorTransactionId,
-        cardLast4: cardMeta?.cardLast4,
         debtSettlementLedgerEntryIds: debtSettlement ? debtSettlement.ledgerEntryIds : undefined
       })
       cardOrderRefRef.current = null
       setActiveReceipt(transaction)
       setCart([])
-      setTenderedDollars('')
       setAttachedCustomer(null)
       setDebtSettlement(null)
-      setPaymentMethod(null)
-      setCardType(null)
-      setApplySurcharge(false)
-      setETransferEmail('')
-      setETransferConfirmed(false)
+      setTenderLines([])
+      setFailedLineNotice(null)
       setBillDiscountCents(0)
       setBillDiscountReason(undefined)
       setShowPayModal(false)
+      resetTenderEntryFields()
       productSearchRef.current?.focus()
     } catch (err) {
+      // Deliberately do NOT clear tenderLines here — any card/e-transfer charges
+      // already happened in the world and must stay visible so the cashier can
+      // retry completion or fall back to the cancel/reversal path, never silently
+      // lose track of money that already moved (§8 non-negotiable).
       setScanFeedback({
         type: 'error',
         message: err instanceof Error ? err.message : 'Transaction failed'
@@ -520,113 +792,6 @@ export function CheckoutScreen(): React.JSX.Element {
     } finally {
       setCardProcessing(false)
     }
-  }
-
-  const handleCashCheckout = (): void => {
-    if (cart.length === 0 && !debtSettlement) return
-    if (tenderedCents < effectiveTotal && !attachedCustomer) {
-      setScanFeedback({
-        type: 'error',
-        message: 'Not enough cash. Attach a customer to put the shortfall on their tab.'
-      })
-      return
-    }
-    if (
-      tenderedCents +
-        (attachedCustomer
-          ? Math.max(0, attachedCustomer.ledgerEntries?.[0]?.balanceCents ?? 0)
-          : 0) <
-      effectiveTotal
-    ) {
-      setScanFeedback({ type: 'error', message: 'Tendered amount is less than the total due.' })
-      return
-    }
-    if (tenderedCents >= effectiveTotal) {
-      void completeSale('CASH')
-    } else if (attachedCustomer) {
-      void completeSale('CASH', shortCents)
-    }
-  }
-
-  const applyChargeResult = (result: ChargeResult): void => {
-    if (result.status === 'approved') {
-      setPaymentState('approved')
-      setPaymentMessage(
-        `Card approved${result.cardLast4 ? ` (card •••• ${result.cardLast4})` : ''}`
-      )
-      void completeSale('CARD', undefined, undefined, surchargeCents, undefined, {
-        processorTransactionId: result.transactionId,
-        cardLast4: result.cardLast4
-      })
-    } else if (result.status === 'error') {
-      setPaymentState('timeout')
-      setPaymentMessage(result.message || 'Payment timed out.')
-    } else {
-      setPaymentState('declined')
-      setPaymentMessage(result.message || 'Card was not approved')
-    }
-  }
-
-  const startCardCheckout = async (): Promise<void> => {
-    if ((cart.length === 0 && !debtSettlement) || cardProcessing) return
-    setPaymentState('awaiting')
-    setPaymentMessage('Waiting for terminal response…')
-    if (!cardOrderRefRef.current) {
-      cardOrderRefRef.current = `SALE-${Date.now()}`
-    }
-    const orderRef = cardOrderRefRef.current
-    const cardAmount = effectiveTotal
-
-    if (!window.api?.payment) {
-      setPaymentState('timeout')
-      setPaymentMessage('Payment service unavailable.')
-      return
-    }
-
-    setCardProcessing(true)
-    try {
-      const result = await window.api.payment.charge(cardAmount, orderRef)
-      applyChargeResult(result)
-    } catch (err) {
-      setPaymentState('timeout')
-      setPaymentMessage(err instanceof Error ? err.message : 'Payment timed out')
-    } finally {
-      setCardProcessing(false)
-    }
-  }
-
-  const confirmManualPayment = async (outcome: 'approved' | 'declined'): Promise<void> => {
-    if (!manualPrompt || !window.api?.payment) return
-    const { amountCents, orderRef } = manualPrompt
-    setPaymentState(outcome === 'approved' ? 'processing' : 'declined')
-    setCardProcessing(true)
-    try {
-      const result = await window.api.payment.charge(amountCents, orderRef, {
-        manualOutcome: outcome,
-        manualReference: manualRef.trim() || undefined
-      })
-      setManualPrompt(null)
-      applyChargeResult(result)
-    } catch (err) {
-      setPaymentState('timeout')
-      setPaymentMessage(err instanceof Error ? err.message : 'Payment timed out')
-    } finally {
-      setCardProcessing(false)
-    }
-  }
-
-  const handleETransferComplete = (): void => {
-    if ((cart.length === 0 && !debtSettlement) || !eTransferConfirmed) return
-    void completeSale('E_TRANSFER', undefined, undefined, 0, eTransferEmail || undefined)
-  }
-
-  const handlePharmacyCreditCheckout = (): void => {
-    if (cart.length === 0) return
-    if (!attachedCustomer) {
-      setScanFeedback({ type: 'error', message: 'Attach a customer before using Pharmacy Credit.' })
-      return
-    }
-    void completeSale('PHARMACY_CREDIT', effectiveTotal)
   }
 
   const handleParkSale = (): void => {
@@ -751,16 +916,6 @@ export function CheckoutScreen(): React.JSX.Element {
     setPrintStatus(null)
     setReceiptPdfUrl(null)
     setReceiptError(false)
-  }
-
-  const resetPaymentMethod = (): void => {
-    setPaymentMethod(null)
-    setCardType(null)
-    setApplySurcharge(false)
-    setETransferEmail('')
-    setETransferConfirmed(false)
-    setPaymentMessage(null)
-    setPaymentState('idle')
   }
 
   const filteredProducts = products
@@ -1239,6 +1394,15 @@ export function CheckoutScreen(): React.JSX.Element {
                   Disc.
                 </button>
                 <button
+                  onClick={handleParkSale}
+                  disabled={cart.length === 0}
+                  title="Hold / Park sale"
+                  aria-label="Hold / Park sale"
+                  className="flex h-14 items-center justify-center rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Lock className="icon-4" />
+                </button>
+                <button
                   onClick={() => {
                     cardOrderRefRef.current = null
                     setShowPayModal(true)
@@ -1254,77 +1418,181 @@ export function CheckoutScreen(): React.JSX.Element {
         </div>
       </div>
 
-      {/* PAY popup — not dismissable by outside click; explicit Cancel only before a method is picked */}
+      {/* PAY popup — general split-tender builder (§1-§6): any combination of
+          cash/card/e-transfer/pharmacy-credit lines, in any order/amounts, until
+          Remaining hits zero. Card lines are charged immediately per-line (§3),
+          never batched — see startCardLineCharge. */}
       {showPayModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <Card className="max-h-[90vh] w-[480px] max-w-full overflow-y-auto bg-[var(--card)]">
+          <Card className="max-h-[90vh] w-[520px] max-w-full overflow-y-auto bg-[var(--card)]">
             <CardHeader>
-              <CardTitle>How will they pay?</CardTitle>
-              <CardDescription>Choose a payment method to continue.</CardDescription>
+              <CardTitle>Pay — Total: {formatCurrency(effectiveTotal)}</CardTitle>
+              <CardDescription>
+                {paymentMethod === null
+                  ? 'Add one or more tender lines to cover the total.'
+                  : 'Choose the amount for this line to continue.'}
+              </CardDescription>
             </CardHeader>
 
             {paymentMethod === null ? (
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setPaymentMethod('CASH')}
-                  disabled={cart.length === 0 && !debtSettlement}
-                  className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Banknote className="icon-5 shrink-0" />
-                  CASH
-                </button>
-                <button
-                  onClick={() => setPaymentMethod('E_TRANSFER')}
-                  disabled={cart.length === 0 && !debtSettlement}
-                  className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Send className="icon-5 shrink-0" />
-                  E-TRANSFER
-                </button>
-                <button
-                  onClick={() => setPaymentMethod('CARD')}
-                  disabled={cart.length === 0 && !debtSettlement}
-                  className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] transition-colors duration-150 hover:bg-[var(--muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <CreditCard className="icon-5 shrink-0" />
-                  CARD (Debit/Credit)
-                </button>
-                <button
-                  onClick={() => !(debtSettlementCents > 0) && setPaymentMethod('PHARMACY_CREDIT')}
-                  disabled={cart.length === 0 || debtSettlementCents > 0}
-                  title={
-                    debtSettlementCents > 0
-                      ? 'Cannot use Pharmacy Credit to pay off an outstanding balance — choose another payment method'
-                      : undefined
-                  }
-                  className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <HeartHandshake className="icon-5 shrink-0" />
-                  PHARMACY CREDIT
-                </button>
-                <button
-                  onClick={handleParkSale}
-                  disabled={cart.length === 0}
-                  className="col-span-2 flex min-h-11 items-center justify-center gap-1.5 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-xs font-medium text-[var(--foreground)] transition-colors duration-150 hover:bg-[var(--card)] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Lock className="icon-3_5" />
-                  Hold / Park sale
-                </button>
-                <button
-                  onClick={() => setShowPayModal(false)}
-                  className="col-span-2 min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--card)]"
-                >
-                  Cancel
-                </button>
+              <div className="mt-3 space-y-3 text-sm">
+                <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--muted)] px-3 py-2">
+                  <span className="font-semibold text-[var(--foreground)]">Remaining</span>
+                  <span className="text-lg font-bold text-[var(--primary)]">
+                    {formatCurrency(remainingCents)}
+                  </span>
+                </div>
+
+                {remainingCents > 0 && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => openAddTender('CASH')}
+                      className="flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-2 text-xs font-semibold text-[var(--primary)]"
+                    >
+                      <Banknote className="icon-4 shrink-0" />+ Add Cash
+                    </button>
+                    <button
+                      onClick={() => openAddTender('CARD')}
+                      className="flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-2 text-xs font-semibold text-[var(--primary)]"
+                    >
+                      <CreditCard className="icon-4 shrink-0" />+ Add Card
+                    </button>
+                    <button
+                      onClick={() => openAddTender('E_TRANSFER')}
+                      className="flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-2 text-xs font-semibold text-[var(--primary)]"
+                    >
+                      <Send className="icon-4 shrink-0" />+ Add E-Transfer
+                    </button>
+                    <button
+                      onClick={() => !(debtSettlementCents > 0) && openAddTender('PHARMACY_CREDIT')}
+                      disabled={debtSettlementCents > 0}
+                      title={
+                        debtSettlementCents > 0
+                          ? 'Cannot use Pharmacy Credit to pay off an outstanding balance — choose another method'
+                          : undefined
+                      }
+                      className="flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-2 text-xs font-semibold text-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <HeartHandshake className="icon-4 shrink-0" />+ Add Pharmacy Credit
+                    </button>
+                  </div>
+                )}
+
+                {failedLineNotice && (
+                  <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--error)]/40 bg-[var(--error-bg)] px-2 py-1.5 text-xs text-[var(--error)]">
+                    <span>
+                      {failedLineNotice.method} attempt for {formatCurrency(failedLineNotice.amountCents)} failed — {failedLineNotice.reason}
+                    </span>
+                    <button onClick={() => setFailedLineNotice(null)} aria-label="Dismiss">
+                      <X className="icon-3_5" />
+                    </button>
+                  </div>
+                )}
+
+                {tenderLines.length > 0 && (
+                  <div className="space-y-1.5 rounded-[var(--radius)] border border-[var(--border)] p-2">
+                    <div className="text-xs font-semibold text-[var(--muted-foreground)]">
+                      Applied so far
+                    </div>
+                    {tenderLines.map((line, i) => (
+                      <div
+                        key={line.id}
+                        className="flex items-center justify-between gap-2 border-b border-[var(--border)] py-1.5 text-sm last:border-0"
+                      >
+                        <span className="min-w-0 truncate text-[var(--foreground)]">
+                          {i + 1}.{' '}
+                          {line.method === 'CASH'
+                            ? 'Cash'
+                            : line.method === 'CARD'
+                              ? `Card${line.cardLastFour ? ` ····${line.cardLastFour}` : ''}`
+                              : line.method === 'E_TRANSFER'
+                                ? 'E-Transfer'
+                                : 'Pharmacy Credit'}{' '}
+                          — {formatCurrency(line.amountCents)}
+                          {line.method === 'CASH' && (line.changeCents ?? 0) > 0
+                            ? ` (change ${formatCurrency(line.changeCents ?? 0)})`
+                            : ''}
+                          {line.method === 'CASH' && (line.depositedToTabCents ?? 0) > 0
+                            ? ` (${formatCurrency(line.depositedToTabCents ?? 0)} to tab)`
+                            : ''}
+                        </span>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {line.method !== 'CARD' && line.method !== 'E_TRANSFER' && (
+                            <button
+                              onClick={() => editLine(line)}
+                              className="text-xs font-semibold text-[var(--primary)] underline"
+                            >
+                              Edit
+                            </button>
+                          )}
+                          <button
+                            onClick={() => void removeLine(line)}
+                            className="text-xs font-semibold text-[var(--error)] underline"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {remainingCents > 0 && tenderLines.length > 0 && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => openAddTender('CASH')}
+                      className="min-h-9 rounded-[var(--radius)] border border-[var(--border)] px-2 text-xs font-medium text-[var(--foreground)]"
+                    >
+                      Pay Rest with Cash
+                    </button>
+                    <button
+                      onClick={() => openAddTender('CARD')}
+                      className="min-h-9 rounded-[var(--radius)] border border-[var(--border)] px-2 text-xs font-medium text-[var(--foreground)]"
+                    >
+                      Pay Rest with Card
+                    </button>
+                    <button
+                      onClick={() => openAddTender('E_TRANSFER')}
+                      className="min-h-9 rounded-[var(--radius)] border border-[var(--border)] px-2 text-xs font-medium text-[var(--foreground)]"
+                    >
+                      Pay Rest with E-Transfer
+                    </button>
+                    <button
+                      onClick={() => !(debtSettlementCents > 0) && openAddTender('PHARMACY_CREDIT')}
+                      disabled={debtSettlementCents > 0}
+                      className="min-h-9 rounded-[var(--radius)] border border-[var(--border)] px-2 text-xs font-medium text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Pay Rest with Tab
+                    </button>
+                  </div>
+                )}
+
+                {scanFeedback?.type === 'error' && <Alert variant="error">{scanFeedback.message}</Alert>}
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={requestCancelPay}
+                    className="min-h-11 flex-1 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm font-medium text-[var(--foreground)]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => void completeSale()}
+                    disabled={remainingCents !== 0 || tenderLines.length === 0 || cardProcessing}
+                    className="min-h-11 flex-1 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {cardProcessing ? 'Completing…' : 'Complete Sale'}
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="mt-3 space-y-3 text-xs">
                 <button
-                  onClick={resetPaymentMethod}
+                  onClick={backToTenderList}
                   className="flex min-h-9 items-center gap-1 rounded-[var(--radius)] px-1 text-[var(--primary)] hover:bg-[var(--muted)]"
                 >
                   <ChevronLeft className="icon-4" />
-                  Back to payment methods
+                  Back
                 </button>
 
                 {/* CASH */}
@@ -1332,7 +1600,7 @@ export function CheckoutScreen(): React.JSX.Element {
                   <div className="space-y-3">
                     <div>
                       <label className="mb-1 block font-semibold text-[var(--foreground)]">
-                        Cash received
+                        Amount to apply to this bill
                       </label>
                       <input
                         ref={tenderRef}
@@ -1344,53 +1612,62 @@ export function CheckoutScreen(): React.JSX.Element {
                         placeholder="0.00"
                         className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
                       />
+                      {lineAmountCents > remainingCents && (
+                        <div className="mt-1 text-[var(--error)]">
+                          Cannot exceed the remaining {formatCurrency(remainingCents)}.
+                        </div>
+                      )}
                     </div>
-                    <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3 text-sm">
-                      Paid: {formatCurrency(tenderedCents)} | Change: {formatCurrency(changeCents)}
+                    <div>
+                      <label className="mb-1 block font-semibold text-[var(--foreground)]">
+                        Cash given by customer
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={cashGivenDollars}
+                        onChange={(e) => setCashGivenDollars(e.target.value)}
+                        placeholder={(lineAmountCents / 100).toFixed(2)}
+                        className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
+                      />
                     </div>
-
-                    {tenderedCents > effectiveTotal && attachedCustomer && (
-                      <button
-                        onClick={() => void completeSale('CASH', 0, tenderedCents - effectiveTotal)}
-                        className="w-full min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-white px-2 text-xs font-semibold text-[var(--foreground)]"
-                      >
-                        Deposit {formatCurrency(tenderedCents - effectiveTotal)} overpayment to
-                        credit
-                      </button>
-                    )}
-
-                    {tenderedCents > 0 && tenderedCents < effectiveTotal && !attachedCustomer && (
-                      <div>
-                        <label className="mb-1 block font-semibold text-[var(--foreground)]">
-                          Attach a customer to put {formatCurrency(shortCents)} on their tab
-                        </label>
-                        <CustomerSearchPanel
-                          inputRef={searchRef}
-                          query={customerSearchQuery}
-                          onQueryChange={setCustomerSearchQuery}
-                          results={customerSearchResults}
-                          onSelect={(customer) => void attachCustomer(customer)}
-                          onAddNew={() => setShowAddCustomer(true)}
-                          placeholder="Search name or phone"
-                        />
+                    {cashOverageCents > 0 && (
+                      <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
+                        {attachedCustomer ? (
+                          <div className="space-y-1.5">
+                            <label className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                checked={cashOverageChoice === 'change'}
+                                onChange={() => setCashOverageChoice('change')}
+                              />
+                              Change due: {formatCurrency(cashOverageCents)}
+                            </label>
+                            <label className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                checked={cashOverageChoice === 'deposit'}
+                                onChange={() => setCashOverageChoice('deposit')}
+                              />
+                              Deposit {formatCurrency(cashOverageCents)} to {attachedCustomer.firstName}&apos;s Pharmacy Credit
+                            </label>
+                          </div>
+                        ) : (
+                          <div>Change due: {formatCurrency(cashOverageCents)}</div>
+                        )}
                       </div>
                     )}
-
-                    {tenderedCents > 0 && tenderedCents < effectiveTotal && attachedCustomer && (
-                      <button
-                        onClick={() => void completeSale('CASH', shortCents)}
-                        className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-2 text-xs font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
-                      >
-                        Put {formatCurrency(shortCents)} on {attachedCustomer.firstName}&apos;s tab
-                      </button>
-                    )}
-
                     <button
-                      onClick={handleCashCheckout}
-                      disabled={cardProcessing || tenderedCents < effectiveTotal}
-                      className="w-full min-h-11 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-3 text-sm font-semibold text-[var(--primary)] disabled:opacity-50"
+                      onClick={confirmCashLine}
+                      disabled={
+                        lineAmountCents <= 0 ||
+                        lineAmountCents > remainingCents ||
+                        cashGivenCents < lineAmountCents
+                      }
+                      className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Complete Cash Sale
+                      Add Cash Line
                     </button>
                   </div>
                 )}
@@ -1398,13 +1675,24 @@ export function CheckoutScreen(): React.JSX.Element {
                 {/* E-TRANSFER */}
                 {paymentMethod === 'E_TRANSFER' && (
                   <div className="space-y-3">
-                    <div className="text-center">
-                      <div className="text-xs text-[var(--muted-foreground)]">
-                        Amount due via E-Transfer
-                      </div>
-                      <div className="text-3xl font-bold text-[var(--primary)]">
-                        {formatCurrency(effectiveTotal)}
-                      </div>
+                    <div>
+                      <label className="mb-1 block font-semibold text-[var(--foreground)]">
+                        Amount to apply to this bill
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={tenderedDollars}
+                        onChange={(e) => setTenderedDollars(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
+                      />
+                      {lineAmountCents > remainingCents && (
+                        <div className="mt-1 text-[var(--error)]">
+                          Cannot exceed the remaining {formatCurrency(remainingCents)}.
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="mb-1 block text-[var(--muted-foreground)]">
@@ -1424,14 +1712,16 @@ export function CheckoutScreen(): React.JSX.Element {
                         checked={eTransferConfirmed}
                         onChange={(e) => setETransferConfirmed(e.target.checked)}
                       />
-                      I have received the E-Transfer confirmation
+                      I have received the E-Transfer confirmation for this amount
                     </label>
                     <button
-                      onClick={handleETransferComplete}
-                      disabled={!eTransferConfirmed || cardProcessing}
-                      className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+                      onClick={confirmETransferLine}
+                      disabled={
+                        lineAmountCents <= 0 || lineAmountCents > remainingCents || !eTransferConfirmed
+                      }
+                      className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Complete Sale
+                      Add E-Transfer Line
                     </button>
                   </div>
                 )}
@@ -1439,6 +1729,25 @@ export function CheckoutScreen(): React.JSX.Element {
                 {/* CARD */}
                 {paymentMethod === 'CARD' && (
                   <div className="space-y-3">
+                    <div>
+                      <label className="mb-1 block font-semibold text-[var(--foreground)]">
+                        Amount to apply to this bill
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={tenderedDollars}
+                        onChange={(e) => setTenderedDollars(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
+                      />
+                      {lineAmountCents > remainingCents && (
+                        <div className="mt-1 text-[var(--error)]">
+                          Cannot exceed the remaining {formatCurrency(remainingCents)}.
+                        </div>
+                      )}
+                    </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => setCardType('DEBIT')}
@@ -1453,7 +1762,6 @@ export function CheckoutScreen(): React.JSX.Element {
                         Credit
                       </button>
                     </div>
-
                     {cardType === 'CREDIT' && (
                       <div className="rounded-[var(--radius)] border border-[var(--warning)]/30 bg-[var(--warning-bg)] p-3 text-xs text-[var(--foreground)]">
                         <label className="flex items-center gap-2 font-semibold">
@@ -1466,21 +1774,26 @@ export function CheckoutScreen(): React.JSX.Element {
                         </label>
                         {applySurcharge && (
                           <div className="mt-2">
-                            Original: {formatCurrency(subtotalCents + taxCents)} +{' '}
-                            {checkoutSettings.cardSurchargePercent}% credit fee:{' '}
-                            {formatCurrency(surchargeCents)} = Total:{' '}
-                            {formatCurrency(effectiveTotal)}
+                            {formatCurrency(lineAmountCents)} + {checkoutSettings.cardSurchargePercent}% fee{' '}
+                            {formatCurrency(pendingSurchargeCents)} = charge{' '}
+                            {formatCurrency(lineAmountCents + pendingSurchargeCents)}
                           </div>
                         )}
                       </div>
                     )}
-
+                    {paymentMessage && (
+                      <Alert variant={paymentState === 'declined' || paymentState === 'timeout' ? 'error' : 'pending'}>
+                        {paymentMessage}
+                      </Alert>
+                    )}
                     <button
-                      onClick={startCardCheckout}
-                      disabled={!cardType || cardProcessing}
-                      className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+                      onClick={() => void startCardLineCharge()}
+                      disabled={!cardType || lineAmountCents <= 0 || lineAmountCents > remainingCents || cardProcessing}
+                      className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {cardProcessing ? 'Processing…' : `Charge ${formatCurrency(effectiveTotal)}`}
+                      {cardProcessing
+                        ? 'Waiting for terminal response…'
+                        : `Charge ${formatCurrency(lineAmountCents + pendingSurchargeCents)}`}
                     </button>
                   </div>
                 )}
@@ -1510,18 +1823,9 @@ export function CheckoutScreen(): React.JSX.Element {
                             {attachedCustomer.firstName} {attachedCustomer.lastName} ·{' '}
                             {attachedCustomer.phone}
                           </span>
-                          <button
-                            onClick={() => {
-                              setAttachedCustomer(null)
-                              setTenderedDollars('')
-                            }}
-                            className="text-[var(--primary)]"
-                          >
-                            Remove
-                          </button>
                         </div>
                         <div
-                          className={`flex items-center gap-1.5 text-xs font-semibold ${customerBalance >= 0 ? 'text-[var(--success)]' : 'text-[var(--owed)]'}`}
+                          className={`flex items-center gap-1.5 font-semibold ${customerBalance >= 0 ? 'text-[var(--success)]' : 'text-[var(--owed)]'}`}
                         >
                           {customerBalance >= 0 ? (
                             <ArrowUpRight className="icon-4" />
@@ -1533,48 +1837,67 @@ export function CheckoutScreen(): React.JSX.Element {
                             {formatCurrency(Math.abs(customerBalance))}
                           </span>
                         </div>
-                        <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3 text-sm">
-                          Available: {formatCurrency(customerBalance)} | Applying:{' '}
-                          {formatCurrency(effectiveTotal)}
+                        <div>
+                          <label className="mb-1 block font-semibold text-[var(--foreground)]">
+                            Amount to apply to this bill
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={tenderedDollars}
+                            onChange={(e) => setTenderedDollars(e.target.value)}
+                            placeholder="0.00"
+                            className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
+                          />
+                          {lineAmountCents > remainingCents && (
+                            <div className="mt-1 text-[var(--error)]">
+                              Cannot exceed the remaining {formatCurrency(remainingCents)}.
+                            </div>
+                          )}
                         </div>
-                        {customerBalance < effectiveTotal && (
-                          <Alert variant="warning">
-                            {`Balance is short by ${formatCurrency(effectiveTotal - customerBalance)}; this will push the tab negative.`}
-                          </Alert>
-                        )}
                         <button
-                          onClick={handlePharmacyCreditCheckout}
-                          disabled={cardProcessing}
-                          className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+                          onClick={confirmPharmacyCreditLine}
+                          disabled={lineAmountCents <= 0 || lineAmountCents > remainingCents}
+                          className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          Pay with Pharmacy Credit
+                          Add Pharmacy Credit Line
                         </button>
                       </>
                     )}
                   </div>
                 )}
-
-                {/* Payment status message — approved/declined/timeout are visually
-                    distinct per the design guide (a decline ≠ a timeout: retrying a
-                    genuinely-declined card wastes time, but retrying a timeout risks
-                    a double-charge). */}
-                {paymentMessage && (
-                  <Alert
-                    variant={
-                      paymentState === 'approved'
-                        ? 'success'
-                        : paymentState === 'declined'
-                          ? 'error'
-                          : paymentState === 'timeout'
-                            ? 'warning'
-                            : 'pending'
-                    }
-                  >
-                    {paymentMessage}
-                  </Alert>
-                )}
               </div>
             )}
+          </Card>
+        </div>
+      )}
+
+      {/* Cancel-with-completed-lines warning (§7) — a silent cancel that leaves a
+          charged card/e-transfer orphaned is never allowed. */}
+      {showCancelWarning && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+          <Card className="w-[440px] max-w-full bg-[var(--card)] p-6 space-y-3">
+            <div>
+              <CardTitle className="text-[var(--foreground)]">Charges already made</CardTitle>
+              <CardDescription className="text-[var(--muted-foreground)]">
+                This sale has {formatCurrency(chargedExternalCents)} already charged/confirmed across
+                card or e-transfer lines. Cancelling will require reversing those separately.
+              </CardDescription>
+            </div>
+            <button
+              onClick={() => void confirmCancelWithReversal()}
+              disabled={reversingCancel}
+              className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--error)] px-3 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              {reversingCancel ? 'Reversing…' : 'Reverse charges and cancel sale'}
+            </button>
+            <button
+              onClick={() => setShowCancelWarning(false)}
+              className="w-full min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm font-medium text-[var(--foreground)]"
+            >
+              Go back — keep this sale open
+            </button>
           </Card>
         </div>
       )}
@@ -1727,60 +2050,6 @@ export function CheckoutScreen(): React.JSX.Element {
       )}
 
       {/* Manual / External Terminal confirmation */}
-      {manualPrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <Card className="w-[420px] border-[var(--primary)] bg-[var(--card)] p-6 space-y-4">
-            <div>
-              <CardTitle className="text-[var(--foreground)]">External Terminal Payment</CardTitle>
-              <CardDescription className="text-[var(--muted-foreground)]">
-                Charge this amount on your standalone card terminal, then confirm the result below.
-              </CardDescription>
-            </div>
-            <div className="text-center py-2">
-              <div className="text-xs text-[var(--muted-foreground)]">Amount to charge</div>
-              <div className="text-3xl font-bold text-[var(--primary)]">
-                {formatCurrency(manualPrompt.amountCents)}
-              </div>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
-                Terminal reference # (optional)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. receipt / approval number"
-                value={manualRef}
-                onChange={(e) => setManualRef(e.target.value)}
-                className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <button
-                onClick={() => confirmManualPayment('declined')}
-                disabled={cardProcessing}
-                className="rounded-[var(--radius)] bg-[var(--error-bg)] px-3 py-2 text-sm font-medium text-[var(--error)] disabled:opacity-50"
-              >
-                Declined
-              </button>
-              <button
-                onClick={() => confirmManualPayment('approved')}
-                disabled={cardProcessing}
-                className="rounded-[var(--radius)] bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
-              >
-                Approved
-              </button>
-            </div>
-            <button
-              onClick={() => setManualPrompt(null)}
-              disabled={cardProcessing}
-              className="w-full text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)] disabled:opacity-50"
-            >
-              Cancel
-            </button>
-          </Card>
-        </div>
-      )}
-
       {/* Receipt printing popup — not dismissable by outside click, forces an explicit choice */}
       {activeReceipt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">

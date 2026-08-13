@@ -33,19 +33,18 @@ describe('debt settlement (bring in outstanding balance)', () => {
     const shortSale = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 2000, unitPriceCents: 4000 }],
       taxRatePercent: 0,
-      tenderType: 'SPLIT',
-      tenderedCents: 3200,
-      customerId: c.id,
-      tabAmountCents: 800
+      tenders: [
+        { method: 'PHARMACY_CREDIT', amountCents: 800 },
+        { method: 'CASH', amountCents: 3200 }
+      ],
+      customerId: c.id
     })
     // Full charge to tab: $40 sale, all $40 to tab.
     const fullSale = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 2000, unitPriceCents: 4000 }],
       taxRatePercent: 0,
-      tenderType: 'PHARMACY_CREDIT',
-      tenderedCents: 0,
-      customerId: c.id,
-      tabAmountCents: 4000
+      tenders: [{ method: 'PHARMACY_CREDIT', amountCents: 4000 }],
+      customerId: c.id
     })
 
     const breakdown = await getCustomerDebtBreakdown(db, c.id)
@@ -89,18 +88,14 @@ describe('debt settlement (bring in outstanding balance)', () => {
     const sale1 = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 2000, unitPriceCents: 4000 }],
       taxRatePercent: 0,
-      tenderType: 'PHARMACY_CREDIT',
-      tenderedCents: 0,
-      customerId: c.id,
-      tabAmountCents: 4000
+      tenders: [{ method: 'PHARMACY_CREDIT', amountCents: 4000 }],
+      customerId: c.id
     })
     const sale2 = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 2000, unitPriceCents: 4000 }],
       taxRatePercent: 0,
-      tenderType: 'PHARMACY_CREDIT',
-      tenderedCents: 0,
-      customerId: c.id,
-      tabAmountCents: 4000
+      tenders: [{ method: 'PHARMACY_CREDIT', amountCents: 4000 }],
+      customerId: c.id
     })
     // Pays down exactly the first sale.
     await addFunds(db, c.id, 4000, 'partial payment')
@@ -118,18 +113,14 @@ describe('debt settlement (bring in outstanding balance)', () => {
     const saleA = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 2000, unitPriceCents: 4000 }],
       taxRatePercent: 0,
-      tenderType: 'PHARMACY_CREDIT',
-      tenderedCents: 0,
-      customerId: c.id,
-      tabAmountCents: 4000
+      tenders: [{ method: 'PHARMACY_CREDIT', amountCents: 4000 }],
+      customerId: c.id
     })
     await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 2000, unitPriceCents: 4000 }],
       taxRatePercent: 0,
-      tenderType: 'PHARMACY_CREDIT',
-      tenderedCents: 0,
-      customerId: c.id,
-      tabAmountCents: 4000
+      tenders: [{ method: 'PHARMACY_CREDIT', amountCents: 4000 }],
+      customerId: c.id
     })
 
     const breakdownBefore = await getCustomerDebtBreakdown(db, c.id)
@@ -139,8 +130,7 @@ describe('debt settlement (bring in outstanding balance)', () => {
     const sale = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 2000, unitPriceCents: 4000, hstApplied: true }],
       taxRatePercent: 13,
-      tenderType: 'CASH',
-      tenderedCents: 8520, // 4000 product + 520 tax (13% of 4000) + 4000 for the one selected item
+      tenders: [{ method: 'CASH', amountCents: 8520 }], // 4000 product + 520 tax (13% of 4000) + 4000 for the one selected item
       customerId: c.id,
       debtSettlementLedgerEntryIds: [entryForSaleA.ledgerEntryId]
     })
@@ -170,10 +160,8 @@ describe('debt settlement (bring in outstanding balance)', () => {
     const sale1 = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 2000, unitPriceCents: 4000 }],
       taxRatePercent: 0,
-      tenderType: 'PHARMACY_CREDIT',
-      tenderedCents: 0,
-      customerId: c.id,
-      tabAmountCents: 4000
+      tenders: [{ method: 'PHARMACY_CREDIT', amountCents: 4000 }],
+      customerId: c.id
     })
     await adjustCredit(db, c.id, -1500, 'Owed from a paper invoice', true)
 
@@ -185,8 +173,7 @@ describe('debt settlement (bring in outstanding balance)', () => {
     const settlingSale = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 2000, unitPriceCents: 4000 }],
       taxRatePercent: 0,
-      tenderType: 'CASH',
-      tenderedCents: 4000 + 5500,
+      tenders: [{ method: 'CASH', amountCents: 4000 + 5500 }],
       customerId: c.id,
       debtSettlementLedgerEntryIds: ids
     })
@@ -208,10 +195,8 @@ describe('debt settlement (bring in outstanding balance)', () => {
     await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 2000, unitPriceCents: 4000 }],
       taxRatePercent: 0,
-      tenderType: 'PHARMACY_CREDIT',
-      tenderedCents: 0,
-      customerId: c.id,
-      tabAmountCents: 4000
+      tenders: [{ method: 'PHARMACY_CREDIT', amountCents: 4000 }],
+      customerId: c.id
     })
     const breakdown = await getCustomerDebtBreakdown(db, c.id)
     const staleId = breakdown.entries[0].ledgerEntryId
@@ -223,8 +208,7 @@ describe('debt settlement (bring in outstanding balance)', () => {
       createTransaction(db, {
         items: [{ productId, quantity: 1, costCents: 2000, unitPriceCents: 4000 }],
         taxRatePercent: 0,
-        tenderType: 'CASH',
-        tenderedCents: 9000,
+        tenders: [{ method: 'CASH', amountCents: 9000 }],
         customerId: c.id,
         debtSettlementLedgerEntryIds: [staleId]
       })
@@ -236,10 +220,8 @@ describe('debt settlement (bring in outstanding balance)', () => {
     await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 2000, unitPriceCents: 4000 }],
       taxRatePercent: 0,
-      tenderType: 'PHARMACY_CREDIT',
-      tenderedCents: 0,
-      customerId: c.id,
-      tabAmountCents: 4000
+      tenders: [{ method: 'PHARMACY_CREDIT', amountCents: 4000 }],
+      customerId: c.id
     })
     const breakdown = await getCustomerDebtBreakdown(db, c.id)
 
@@ -247,8 +229,7 @@ describe('debt settlement (bring in outstanding balance)', () => {
       createTransaction(db, {
         items: [{ productId, quantity: 1, costCents: 2000, unitPriceCents: 4000 }],
         taxRatePercent: 0,
-        tenderType: 'PHARMACY_CREDIT',
-        tenderedCents: 0,
+        tenders: [{ method: 'PHARMACY_CREDIT', amountCents: 8000 }],
         customerId: c.id,
         debtSettlementLedgerEntryIds: [breakdown.entries[0].ledgerEntryId]
       })
@@ -260,10 +241,8 @@ describe('debt settlement (bring in outstanding balance)', () => {
     await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 2000, unitPriceCents: 4000 }],
       taxRatePercent: 0,
-      tenderType: 'PHARMACY_CREDIT',
-      tenderedCents: 0,
-      customerId: c.id,
-      tabAmountCents: 4000
+      tenders: [{ method: 'PHARMACY_CREDIT', amountCents: 4000 }],
+      customerId: c.id
     })
     const breakdown = await getCustomerDebtBreakdown(db, c.id)
 
@@ -274,8 +253,7 @@ describe('debt settlement (bring in outstanding balance)', () => {
           { productId, quantity: 1, costCents: 2000, unitPriceCents: 4000, discountCents: 999999 }
         ],
         taxRatePercent: 0,
-        tenderType: 'CASH',
-        tenderedCents: 6000,
+        tenders: [{ method: 'CASH', amountCents: 6000 }],
         customerId: c.id,
         debtSettlementLedgerEntryIds: [breakdown.entries[0].ledgerEntryId]
       })

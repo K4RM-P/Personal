@@ -24,7 +24,7 @@ model User {
   id           Int           @id @default(autoincrement())
   fullName     String        @unique
   passwordHash String
-  role         String        // MANAGER | CASHIER
+  role         String // MANAGER | CASHIER
   lastLogin    DateTime?
   createdAt    DateTime      @default(now())
   transactions Transaction[]
@@ -33,30 +33,30 @@ model User {
 }
 
 model Product {
-  id         Int               @id @default(autoincrement())
-  sku        String            @unique
-  name       String
-  costCents  Int
-  priceCents Int
-  barcode    String?           @unique
-  isPinned   Boolean           @default(false) // If true, ignore pricing tier auto-calculation
+  id             Int               @id @default(autoincrement())
+  sku            String            @unique
+  name           String
+  costCents      Int
+  priceCents     Int
+  barcode        String?           @unique
+  isPinned       Boolean           @default(false) // If true, ignore pricing tier auto-calculation
   // True only when isPinned was set automatically (zero cost / no matching tier at
   // promote time), not by a pharmacist's explicit price override. Lets the tier
   // engine re-evaluate these once new tiers are configured, while leaving genuine
   // manual overrides (isPinned=true, fallbackPinned=false) untouched forever.
-  fallbackPinned Boolean @default(false)
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
-  orderItems TransactionItem[]
+  fallbackPinned Boolean           @default(false)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  orderItems     TransactionItem[]
 
   // --- Inventory (reporting) ---
   // On-hand quantity and reorder point for inventory valuation & low-stock alerts.
   // Defaults to 0; updated by sales (decrement) and InventoryAdjustment entries.
-  currentOnHand  Int @default(0)
-  reorderPoint   Int @default(0)
+  currentOnHand Int     @default(0)
+  reorderPoint  Int     @default(0)
   // Category code for grouping in reports (OTC | RX | SPECIALTY | ...).
   // Mirrors the McKesson categoryCode when promoted from the catalogue.
-  categoryCode   String?
+  categoryCode  String?
 
   // --- Catalogue provenance (McKesson import) ---
   // origin: MANUAL | CATALOG. MANUAL rows are never read or written by a catalogue import.
@@ -165,26 +165,30 @@ model CatalogImportBatch {
 }
 
 model Customer {
-  id               Int                 @id @default(autoincrement())
-  firstName        String
-  lastName         String
-  phone            String
-  phoneNormalized  String
-  address          String
-  email            String?
-  loyaltyEnabled   Boolean             @default(true)
-  notes            String?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-  /** Audit: user who created this customer record (User.id). Soft linkage only. */
-  createdByUserId  Int?
-  /** PIPEDA deletion-on-request (B7): set when PII is anonymized. Financial
-   *  ledger/transaction rows are kept for accounting integrity — only the
-   *  identifying fields (name, phone, address, email, notes) are scrubbed. */
-  deletedAt        DateTime?
-  ledgerEntries    CreditLedgerEntry[]
-  pointEvents      LoyaltyPointEvent[]
-  transactions     Transaction[]
+  id              Int                 @id @default(autoincrement())
+  firstName       String
+  lastName        String
+  phone           String
+  phoneNormalized String
+  address         String
+  email           String?
+  loyaltyEnabled  Boolean             @default(true)
+  notes           String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  /**
+   * Audit: user who created this customer record (User.id). Soft linkage only.
+   */
+  createdByUserId Int?
+  /**
+   * PIPEDA deletion-on-request (B7): set when PII is anonymized. Financial
+   * ledger/transaction rows are kept for accounting integrity — only the
+   * identifying fields (name, phone, address, email, notes) are scrubbed.
+   */
+  deletedAt       DateTime?
+  ledgerEntries   CreditLedgerEntry[]
+  pointEvents     LoyaltyPointEvent[]
+  transactions    Transaction[]
 
   @@index([phoneNormalized])
   @@index([lastName, firstName])
@@ -208,15 +212,15 @@ model CreditLedgerEntry {
 }
 
 model LoyaltyPointEvent {
-  id         Int              @id @default(autoincrement())
-  customerId Int
-  customer   Customer         @relation(fields: [customerId], references: [id])
-  type       LoyaltyEventType
-  points     Int
-  pointsAfter Int
+  id            Int              @id @default(autoincrement())
+  customerId    Int
+  customer      Customer         @relation(fields: [customerId], references: [id])
+  type          LoyaltyEventType
+  points        Int
+  pointsAfter   Int
   transactionId String?
-  note       String?
-  createdAt  DateTime         @default(now())
+  note          String?
+  createdAt     DateTime         @default(now())
 
   @@index([customerId, createdAt])
   @@index([transactionId])
@@ -227,7 +231,9 @@ enum CreditEntryType {
   SALE_CHARGE
   MANUAL_ADJUSTMENT
   REFUND_CREDIT
-  /** Outstanding balance paid off via a checkout transaction (brought-in debt settlement) — distinct from FUNDS_ADDED, which is a standalone prepayment with no linked purchase. */
+  /**
+   * Outstanding balance paid off via a checkout transaction (brought-in debt settlement) — distinct from FUNDS_ADDED, which is a standalone prepayment with no linked purchase.
+   */
   DEBT_SETTLED
 }
 
@@ -239,56 +245,71 @@ enum LoyaltyEventType {
 }
 
 model PricingTier {
-  id            String  @id @default(uuid())
+  id            String @id @default(uuid())
   minCostCents  Int
   maxCostCents  Int?
   markupPercent Float
-  orderIndex    Int     @default(0)
+  orderIndex    Int    @default(0)
 }
 
 model Transaction {
-  id             String            @id @default(uuid())
-  receiptNumber  String            @unique
-  status         String            @default("COMPLETED") // COMPLETED, PARKED, VOIDED, REFUNDED
-  subtotalCents Int
-  taxCents       Int
-  totalCents     Int
-  tenderType     String            @default("CASH") // CASH, CARD, E_TRANSFER, PHARMACY_CREDIT, SPLIT
-  tenderedCents  Int
-  changeCents    Int
-  voidReason     String?
-  customerId     Int?
-  customer       Customer?         @relation(fields: [customerId], references: [id])
-  tabAmountCents Int?               @default(0)
-  /** Additional surcharge cents for credit card transactions (e.g. 2% fee). */
-  surchargeCents Int?               @default(0)
-  /** Customer email for E-Transfer (optional, shown on receipt). */
-  email          String?
-  userId         Int?
-  user           User?             @relation(fields: [userId], references: [id])
-  /** Audit: the cashier who rang up the sale (User.id). */
+  id                     String              @id @default(uuid())
+  receiptNumber          String              @unique
+  status                 String              @default("COMPLETED") // COMPLETED, PARKED, VOIDED, REFUNDED
+  subtotalCents          Int
+  taxCents               Int
+  totalCents             Int
+  tenderType             String              @default("CASH") // CASH, CARD, E_TRANSFER, PHARMACY_CREDIT, SPLIT
+  tenderedCents          Int
+  changeCents            Int
+  voidReason             String?
+  customerId             Int?
+  customer               Customer?           @relation(fields: [customerId], references: [id])
+  tabAmountCents         Int?                @default(0)
+  /**
+   * Additional surcharge cents for credit card transactions (e.g. 2% fee).
+   */
+  surchargeCents         Int?                @default(0)
+  /**
+   * Customer email for E-Transfer (optional, shown on receipt).
+   */
+  email                  String?
+  userId                 Int?
+  user                   User?               @relation(fields: [userId], references: [id])
+  /**
+   * Audit: the cashier who rang up the sale (User.id).
+   */
   cashierId              Int?
-  /** Audit: manager who authorized a void (User.id). */
+  /**
+   * Audit: manager who authorized a void (User.id).
+   */
   voidedByUserId         Int?
-  /** Audit: manager who issued a discount (User.id). */
+  /**
+   * Audit: manager who issued a discount (User.id).
+   */
   discountIssuedByUserId Int?
-  /** Card refund reversal target: the processor's charge id and the card's last 4 digits, captured at charge time. */
+  /**
+   * Card refund reversal target: the processor's charge id and the card's last 4 digits, captured at charge time.
+   */
   processorTransactionId String?
-  cardLast4               String?
-  /** Whole-bill discount applied at checkout (see Discount model for the audit row). */
-  billDiscountCents       Int?     @default(0)
-  items          TransactionItem[]
-  refunds        Refund[]
-  discounts      Discount[]
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  cardLast4              String?
+  /**
+   * Whole-bill discount applied at checkout (see Discount model for the audit row).
+   */
+  billDiscountCents      Int?                @default(0)
+  items                  TransactionItem[]
+  refunds                Refund[]
+  discounts              Discount[]
+  tenders                TransactionTender[]
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
 
   // --- Reporting-focused helper columns (spec §4) ---
   // category mirrors the dominant product category for easy grouping;
   // saleType distinguishes normal sales from returns/adjustments;
   // discountApplied captures the total discount cents applied to this sale.
   category        String?
-  saleType        SaleType        @default(NORMAL)
+  saleType        SaleType @default(NORMAL)
   discountApplied Int?
 
   @@index([createdAt])
@@ -298,46 +319,117 @@ model Transaction {
 }
 
 model TransactionItem {
-  id            String      @id @default(uuid())
-  transactionId String
-  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-  /** Null only for a DEBT_SETTLEMENT line (see lineType) — every PRODUCT line has one. */
-  productId     Int?
-  product       Product?    @relation(fields: [productId], references: [id])
-  quantity      Int
-  costCents     Int
+  id             String      @id @default(uuid())
+  transactionId  String
+  transaction    Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  /**
+   * Null only for a DEBT_SETTLEMENT line (see lineType) — every PRODUCT line has one.
+   */
+  productId      Int?
+  product        Product?    @relation(fields: [productId], references: [id])
+  quantity       Int
+  costCents      Int
   unitPriceCents Int
-  /** Per-item discount applied at checkout (see Discount model for the audit row). Must stay 0 for DEBT_SETTLEMENT lines. */
-  discountCents Int?        @default(0)
-  totalCents    Int
-  isVoided      Boolean     @default(false)
-  /** Whether HST was charged on this line item. Defaults to true. Always false for DEBT_SETTLEMENT lines. */
-  hstApplied    Boolean     @default(true)
-  /** "PRODUCT" (normal line) or "DEBT_SETTLEMENT" (brought-in Pharmacy Credit balance — see customer-credit debt-settlement feature). */
-  lineType      String      @default("PRODUCT")
+  /**
+   * Per-item discount applied at checkout (see Discount model for the audit row). Must stay 0 for DEBT_SETTLEMENT lines.
+   */
+  discountCents  Int?        @default(0)
+  totalCents     Int
+  isVoided       Boolean     @default(false)
+  /**
+   * Whether HST was charged on this line item. Defaults to true. Always false for DEBT_SETTLEMENT lines.
+   */
+  hstApplied     Boolean     @default(true)
+  /**
+   * "PRODUCT" (normal line) or "DEBT_SETTLEMENT" (brought-in Pharmacy Credit balance — see customer-credit debt-settlement feature).
+   */
+  lineType       String      @default("PRODUCT")
 
   @@index([transactionId])
   @@index([productId])
+}
+
+/// One line of a (possibly split) tender: a sale total is covered by an ordered
+/// list of these, each processed/charged individually. Replaces the old flat
+/// tenderType/tenderedCents/tabAmountCents/surchargeCents fields on Transaction
+/// as the source of truth — those flat fields are kept as a denormalized summary
+/// for existing reports/receipts/refund-reversal code that reads a single value.
+model TransactionTender {
+  id            Int          @id @default(autoincrement())
+  transactionId String
+  transaction   Transaction  @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  sequence      Int
+  method        TenderMethod
+  amountCents   Int
+
+  // CASH-specific (null for all other methods)
+  cashGivenCents      Int?
+  changeCents         Int?
+  depositedToTabCents Int?
+
+  // CARD-specific (null for all other methods)
+  cardType               CardType?
+  surchargeCents         Int?
+  processorTransactionId String?
+  cardLastFour           String?
+
+  // E_TRANSFER-specific
+  eTransferEmail     String?
+  eTransferConfirmed Boolean?
+
+  // PHARMACY_CREDIT-specific
+  customerId          Int?
+  creditLedgerEntryId Int?
+
+  status        TenderLineStatus @default(COMPLETED)
+  failureReason String?
+  createdAt     DateTime         @default(now())
+  completedAt   DateTime?
+
+  @@index([transactionId])
+}
+
+enum TenderMethod {
+  CASH
+  CARD
+  E_TRANSFER
+  PHARMACY_CREDIT
+}
+
+enum CardType {
+  DEBIT
+  CREDIT
+}
+
+enum TenderLineStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  VOIDED
 }
 
 /// A refund issued against a past sale — cash/card/e-transfer/tab-credit.
 /// Card refunds reverse the original charge via the payment adapter; tab-credit
 /// refunds also produce a CreditLedgerEntry. See pharmacy-pos-feature-spec.md.
 model Refund {
-  id                Int          @id @default(autoincrement())
-  transactionId     String
-  transaction       Transaction  @relation(fields: [transactionId], references: [id])
-  type              RefundType
-  amountCents       Int
-  reason            String?
-  /** For E_TRANSFER refunds — where the manager must manually send funds. */
-  customerEmail     String?
-  /** Processor's refund id, for CARD refunds. */
-  providerRefundId  String?
-  refundedByUserId  Int
-  refundedBy        User         @relation(fields: [refundedByUserId], references: [id])
-  status            RefundStatus
-  createdAt         DateTime     @default(now())
+  id               Int          @id @default(autoincrement())
+  transactionId    String
+  transaction      Transaction  @relation(fields: [transactionId], references: [id])
+  type             RefundType
+  amountCents      Int
+  reason           String?
+  /**
+   * For E_TRANSFER refunds — where the manager must manually send funds.
+   */
+  customerEmail    String?
+  /**
+   * Processor's refund id, for CARD refunds.
+   */
+  providerRefundId String?
+  refundedByUserId Int
+  refundedBy       User         @relation(fields: [refundedByUserId], references: [id])
+  status           RefundStatus
+  createdAt        DateTime     @default(now())
 
   @@index([transactionId])
   @@index([refundedByUserId])
@@ -362,7 +454,9 @@ model Discount {
   transactionId   String
   transaction     Transaction  @relation(fields: [transactionId], references: [id])
   type            DiscountType
-  /** TransactionItem.id — set when type is ITEM. */
+  /**
+   * TransactionItem.id — set when type is ITEM.
+   */
   itemId          String?
   amountCents     Int
   originalCents   Int

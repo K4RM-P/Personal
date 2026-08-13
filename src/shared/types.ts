@@ -6,6 +6,7 @@ import type {
   PricingTier as DBPricingTier,
   Transaction as DBTransaction,
   TransactionItem as DBTransactionItem,
+  TransactionTender as DBTransactionTender,
   Refund as DBRefund,
   Discount as DBDiscount
 } from '@prisma/client'
@@ -19,6 +20,7 @@ export type {
   DBPricingTier,
   DBTransaction,
   DBTransactionItem,
+  DBTransactionTender,
   PricingTier,
   DBRefund,
   DBDiscount
@@ -47,6 +49,42 @@ export interface AuthUser {
 
 export type LoginResult = { user: AuthUser } | { error: string }
 
+export type TenderMethod = 'CASH' | 'CARD' | 'E_TRANSFER' | 'PHARMACY_CREDIT'
+export type CardType = 'DEBIT' | 'CREDIT'
+export type TenderLineStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'VOIDED'
+
+/**
+ * One tender line as built by the PAY popup. Every line sent to `transaction:create`
+ * has already been "processed" client-side — cash counted, card charged through the
+ * payment adapter, e-transfer confirmed, or a Pharmacy Credit amount validated against
+ * the customer's outstanding breakdown — so every line here is implicitly COMPLETED;
+ * PENDING/FAILED lines never leave the renderer (a failed card charge is simply never
+ * added to the array the cashier is building). See TransactionTender in schema.prisma.
+ */
+export interface TenderLineInput {
+  method: TenderMethod
+  /** Amount this line applies toward the sale total. */
+  amountCents: number
+
+  // CASH-specific
+  /** Physical cash handed over — may exceed amountCents (see changeCents/depositedToTabCents). */
+  cashGivenCents?: number
+  changeCents?: number
+  /** cashGivenCents - amountCents, deposited to the linked customer's Pharmacy Credit instead of returned as change. */
+  depositedToTabCents?: number
+
+  // CARD-specific
+  cardType?: CardType
+  /** 2% surcharge cents, already included in amountCents, scoped to this line only. */
+  surchargeCents?: number
+  processorTransactionId?: string
+  cardLastFour?: string
+
+  // E_TRANSFER-specific
+  eTransferEmail?: string
+  eTransferConfirmed?: boolean
+}
+
 export interface CreateTransactionPayload {
   items: {
     productId: number
@@ -60,24 +98,21 @@ export interface CreateTransactionPayload {
     hstApplied?: boolean
   }[]
   taxRatePercent: number
-  tenderType: 'CASH' | 'CARD' | 'E_TRANSFER' | 'PHARMACY_CREDIT' | 'SPLIT'
-  tenderedCents: number
+  /**
+   * Ordered list of tender lines covering the sale total. Replaces the old single
+   * tenderType/tenderedCents/tabAmountCents/surchargeCents/cashOverageToCreditCents/
+   * processorTransactionId/cardLast4 fields as the source of truth — server validates
+   * that the sum of every line's amountCents exactly equals the computed total
+   * (including surcharge and any debt settlement) before writing anything.
+   */
+  tenders: TenderLineInput[]
   status?: 'COMPLETED' | 'PARKED'
   customerId?: number
-  /** Amount charged to the customer's Pharmacy Credit (for short-pay or tab). */
-  tabAmountCents?: number
-  /** Cash overpayment deposited to the attached customer's credit instead of returned as change. */
-  cashOverageToCreditCents?: number
-  /** Additional surcharge cents for credit card transactions. */
-  surchargeCents?: number
-  /** Customer email for E-Transfer (optional, shown on receipt). */
+  /** Customer email for E-Transfer (optional, shown on receipt) — mirrors the first E_TRANSFER line's email. */
   email?: string
   /** Whole-bill discount in cents, applied to the pre-tax total after item discounts. */
   billDiscountCents?: number
   billDiscountReason?: string
-  /** Processor charge id + card last 4, captured from the CARD charge result — needed later for card refunds. */
-  processorTransactionId?: string
-  cardLast4?: string
   /**
    * `ledgerEntryId`s (see DebtBreakdownEntry) of specific outstanding debt items the
    * cashier chose to bring into and pay off with this sale — the cashier can select
@@ -85,9 +120,8 @@ export interface CreateTransactionPayload {
    * The dollar amount is always derived server-side from these entries' current
    * contribution (see getCustomerDebtBreakdown) — never trust a client-supplied cents
    * amount. Never taxed, never discounted, added to totalCents on top of the product
-   * total. Requires `customerId`. Mutually exclusive with `tenderType: 'PHARMACY_CREDIT'`
-   * and `tabAmountCents > 0` — paying off tab debt by charging it back to the same tab
-   * is circular.
+   * total. Requires `customerId`. Mutually exclusive with a PHARMACY_CREDIT tender line
+   * — paying off tab debt by charging it back to the same tab is circular.
    */
   debtSettlementLedgerEntryIds?: number[]
 }
@@ -129,6 +163,7 @@ export interface BulkImportProductInput {
 export type TransactionWithItems = DBTransaction & {
   /** `product` is null only for a DEBT_SETTLEMENT line (see DBTransactionItem.lineType). */
   items: (DBTransactionItem & { product: Product | null })[]
+  tenders?: DBTransactionTender[]
   customer?: Customer | null
   user?: { id: number; fullName: string; role: string } | null
 }

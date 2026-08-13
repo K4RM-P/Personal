@@ -96,8 +96,7 @@ describe('user auth queries', () => {
     const sale = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 500, unitPriceCents: 1000 }],
       taxRatePercent: 0,
-      tenderType: 'CASH',
-      tenderedCents: 1000
+      tenders: [{ method: 'CASH', amountCents: 1000 }]
     })
     clearSession()
     expect(sale.cashierId).toBe(cashier.id)

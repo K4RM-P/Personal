@@ -22,8 +22,7 @@ describe('checkout discounts', () => {
     const tx = await createTransaction(db, {
       items: [{ productId, quantity: 2, costCents: 150, unitPriceCents: 312, discountCents: 62, discountReason: 'price match' }],
       taxRatePercent: 0,
-      tenderType: 'CASH',
-      tenderedCents: 562
+      tenders: [{ method: 'CASH', amountCents: 562 }]
     })
     expect(tx.items[0].discountCents).toBe(62)
     expect(tx.items[0].totalCents).toBe(312 * 2 - 62)
@@ -39,8 +38,7 @@ describe('checkout discounts', () => {
       createTransaction(db, {
         items: [{ productId, quantity: 1, costCents: 150, unitPriceCents: 312, discountCents: 500 }],
         taxRatePercent: 0,
-        tenderType: 'CASH',
-        tenderedCents: 0
+        tenders: [{ method: 'CASH', amountCents: 1 }]
       })
     ).rejects.toThrow(/exceed the line total/)
   })
@@ -49,8 +47,7 @@ describe('checkout discounts', () => {
     const tx = await createTransaction(db, {
       items: [{ productId, quantity: 2, costCents: 150, unitPriceCents: 312 }],
       taxRatePercent: 13,
-      tenderType: 'CASH',
-      tenderedCents: 1000,
+      tenders: [{ method: 'CASH', amountCents: 592 }],
       billDiscountCents: 100,
       billDiscountReason: 'loyalty'
     })
@@ -69,8 +66,7 @@ describe('checkout discounts', () => {
       createTransaction(db, {
         items: [{ productId, quantity: 1, costCents: 150, unitPriceCents: 312 }],
         taxRatePercent: 0,
-        tenderType: 'CASH',
-        tenderedCents: 0,
+        tenders: [{ method: 'CASH', amountCents: 1 }],
         billDiscountCents: 1000
       })
     ).rejects.toThrow(/exceed the subtotal/)
@@ -80,8 +76,7 @@ describe('checkout discounts', () => {
     const tx = await createTransaction(db, {
       items: [{ productId, quantity: 2, costCents: 150, unitPriceCents: 312, discountCents: 62 }],
       taxRatePercent: 0,
-      tenderType: 'CASH',
-      tenderedCents: 500,
+      tenders: [{ method: 'CASH', amountCents: 512 }],
       billDiscountCents: 50
     })
     // subtotal = 624 - 62 = 562; pre-tax = 562 - 50 = 512
@@ -94,8 +89,7 @@ describe('checkout discounts', () => {
     const tx = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 150, unitPriceCents: 312 }],
       taxRatePercent: 0,
-      tenderType: 'CASH',
-      tenderedCents: 312
+      tenders: [{ method: 'CASH', amountCents: 312 }]
     })
     const rows = await db.discount.findMany({ where: { transactionId: tx.id } })
     expect(rows).toHaveLength(0)

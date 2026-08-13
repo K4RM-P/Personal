@@ -268,6 +268,7 @@ export async function getTransactionDetail(
     where: { id: transactionId },
     include: {
       items: { include: { product: true } },
+      tenders: { orderBy: { sequence: 'asc' } },
       customer: true,
       user: { select: { id: true, fullName: true, role: true } }
     }
@@ -315,22 +316,6 @@ export async function createTransaction(
     subtotalCents > 0 ? taxableSubtotalCents - (billDiscountCents * taxableSubtotalCents) / subtotalCents : 0
   const taxCents = Math.round((taxableAfterBillDiscountCents * payload.taxRatePercent) / 100)
   const sessionUserId = getSession()?.userId ?? null
-  const requestedSurchargeCents = payload.surchargeCents ?? 0
-  // Surcharge is only legitimate on a CARD sale, and must match the configured rate applied
-  // to the post-discount, pre-tax amount — never trust a client-supplied surcharge outright,
-  // since nothing else validates it before this point.
-  if (requestedSurchargeCents > 0 && payload.tenderType !== 'CARD') {
-    throw new Error('Card surcharge cannot be applied to a non-card tender.')
-  }
-  let surchargeCents = 0
-  if (payload.tenderType === 'CARD' && requestedSurchargeCents > 0) {
-    const surchargePercent = await getCardSurchargePercent(db)
-    const expectedSurchargeCents = Math.floor((preTaxCents * surchargePercent) / 100)
-    if (requestedSurchargeCents !== expectedSurchargeCents) {
-      throw new Error('Card surcharge does not match the configured rate.')
-    }
-    surchargeCents = expectedSurchargeCents
-  }
   const debtSettlementLedgerEntryIds = payload.debtSettlementLedgerEntryIds ?? []
 
   // Resolve the selected entries against a fresh breakdown up front so totalCents
@@ -357,34 +342,96 @@ export async function createTransaction(
     })
     debtSettlementNote = `Debt settled via this sale — covers ${covered.join(', ')}`
   }
-  const totalCents = preTaxCents + taxCents + surchargeCents + debtSettlementCents
-  const cashOverageToCreditCents = payload.cashOverageToCreditCents ?? 0
-  const changeCents = cashOverageToCreditCents > 0 ? 0 : Math.max(0, payload.tenderedCents - totalCents)
-  const receiptNumber = `RX-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`
+  const tenders = payload.tenders ?? []
+  if (tenders.length === 0) throw new Error('At least one tender line is required.')
 
-  const tabAmountCents = payload.tabAmountCents ?? 0
-  if (!Number.isInteger(surchargeCents) || surchargeCents < 0) throw new Error('Invalid surcharge amount.')
-  if (!Number.isInteger(tabAmountCents) || tabAmountCents < 0 || tabAmountCents > totalCents) throw new Error('Invalid Pharmacy Credit amount.')
-  if (!Number.isInteger(cashOverageToCreditCents) || cashOverageToCreditCents < 0 || cashOverageToCreditCents > Math.max(0, payload.tenderedCents - totalCents)) throw new Error('Invalid cash deposit amount.')
-  if (tabAmountCents > 0 && !payload.customerId) throw new Error('Attach a customer before using Pharmacy Credit.')
-  if (cashOverageToCreditCents > 0 && !payload.customerId) throw new Error('Attach a customer before depositing cash to Pharmacy Credit.')
+  // Every CARD line's surcharge is validated (and totalled) independently — the
+  // surcharge inflates the sale total itself, so it must be known before the
+  // sum(tenders) === totalCents check below can mean anything.
+  const surchargePercent = await getCardSurchargePercent(db)
+  let totalSurchargeCents = 0
+  for (const t of tenders) {
+    if (!Number.isInteger(t.amountCents) || t.amountCents <= 0) {
+      throw new Error('Every tender line must have a positive whole-cent amount.')
+    }
+    if (t.method === 'CARD') {
+      const lineSurchargeCents = t.surchargeCents ?? 0
+      if (lineSurchargeCents > 0) {
+        const baseCents = t.amountCents - lineSurchargeCents
+        const expectedSurchargeCents = Math.floor((baseCents * surchargePercent) / 100)
+        if (baseCents <= 0 || lineSurchargeCents !== expectedSurchargeCents) {
+          throw new Error('Card surcharge does not match the configured rate.')
+        }
+      }
+      if (!t.processorTransactionId) {
+        throw new Error('A card tender line must have a processor transaction id — it must be charged before being added.')
+      }
+      totalSurchargeCents += lineSurchargeCents
+    } else if (t.surchargeCents) {
+      throw new Error('Surcharge can only be applied to a card tender line.')
+    }
+    if (t.method === 'E_TRANSFER' && !t.eTransferConfirmed) {
+      throw new Error('An e-transfer tender line must be confirmed before being added.')
+    }
+    if (t.method === 'CASH') {
+      const cashGivenCents = t.cashGivenCents ?? t.amountCents
+      if (!Number.isInteger(cashGivenCents) || cashGivenCents < t.amountCents) {
+        throw new Error('Cash given cannot be less than the amount applied to the bill.')
+      }
+      const overageCents = cashGivenCents - t.amountCents
+      const changeCents = t.changeCents ?? (t.depositedToTabCents ? 0 : overageCents)
+      const depositedToTabCents = t.depositedToTabCents ?? 0
+      if (changeCents + depositedToTabCents !== overageCents) {
+        throw new Error('Cash change and tab deposit must together equal the overage.')
+      }
+      if (depositedToTabCents > 0 && !payload.customerId) {
+        throw new Error('Attach a customer before depositing cash to Pharmacy Credit.')
+      }
+    } else if (t.cashGivenCents != null || t.changeCents != null || t.depositedToTabCents != null) {
+      throw new Error('Cash-specific fields can only be set on a cash tender line.')
+    }
+    if (t.method === 'PHARMACY_CREDIT' && !payload.customerId) {
+      throw new Error('Attach a customer before using Pharmacy Credit.')
+    }
+  }
+
+  const totalCents = preTaxCents + taxCents + debtSettlementCents + totalSurchargeCents
+  const tabAmountCents = tenders
+    .filter((t) => t.method === 'PHARMACY_CREDIT')
+    .reduce((sum, t) => sum + t.amountCents, 0)
 
   // Paying off tab debt by charging it back to the same tab is circular — block it
   // outright rather than trusting the renderer to have hidden the option. Checked
-  // before the generic Pharmacy Credit validation below so the specific reason wins.
+  // before the sum-equality check below so this specific reason always wins over a
+  // generic "doesn't add up" error, regardless of what amount was on the line.
   if (debtSettlementCents > 0) {
     if (!payload.customerId) throw new Error('A customer must be linked to bring in an outstanding balance.')
-    if (payload.tenderType === 'PHARMACY_CREDIT' || tabAmountCents > 0) {
+    if (tabAmountCents > 0) {
       throw new Error('Cannot use Pharmacy Credit to pay off an outstanding balance — choose another payment method.')
     }
   }
 
-  if (payload.tenderType === 'PHARMACY_CREDIT' && tabAmountCents !== totalCents) {
-    throw new Error('Pharmacy Credit standalone must charge the full sale total to the tab.')
+  const appliedCents = tenders.reduce((sum, t) => sum + t.amountCents, 0)
+  if (appliedCents !== totalCents) {
+    throw new Error(
+      `Tender lines total ${(appliedCents / 100).toFixed(2)} but the sale total is ${(totalCents / 100).toFixed(2)} — every cent must be covered before completing the sale.`
+    )
   }
 
+  const tenderType = tenders.length === 1 ? tenders[0].method : 'SPLIT'
+  const tenderedCents = tenders.reduce(
+    (sum, t) => sum + (t.method === 'CASH' ? (t.cashGivenCents ?? t.amountCents) : t.amountCents),
+    0
+  )
+  const changeCents = tenders
+    .filter((t) => t.method === 'CASH')
+    .reduce((sum, t) => sum + (t.changeCents ?? 0), 0)
+  const lastCardTender = [...tenders].reverse().find((t) => t.method === 'CARD')
+  const firstETransferTender = tenders.find((t) => t.method === 'E_TRANSFER')
+  const receiptNumber = `RX-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`
+
   return db.$transaction(async (tx) => {
-    if (tabAmountCents > 0 && payload.customerId) {
+    if (payload.customerId) {
       await tx.customer.findUniqueOrThrow({ where: { id: payload.customerId } })
     }
 
@@ -395,17 +442,17 @@ export async function createTransaction(
         subtotalCents,
         taxCents,
         totalCents,
-        tenderType: payload.tenderType,
-        tenderedCents: payload.tenderedCents,
+        tenderType,
+        tenderedCents,
         changeCents,
         customerId: payload.customerId || null,
         tabAmountCents,
-        surchargeCents,
+        surchargeCents: totalSurchargeCents,
         billDiscountCents,
         discountApplied: itemDiscountTotal + billDiscountCents,
-        processorTransactionId: payload.processorTransactionId || null,
-        cardLast4: payload.cardLast4 || null,
-        email: payload.email || null,
+        processorTransactionId: lastCardTender?.processorTransactionId || null,
+        cardLast4: lastCardTender?.cardLastFour || null,
+        email: payload.email || firstETransferTender?.eTransferEmail || null,
         // Audit: attribute the sale to the signed-in cashier (server session,
         // not renderer-supplied). Null in tests / when no session is active.
         userId: sessionUserId,
@@ -413,6 +460,46 @@ export async function createTransaction(
       },
       include: { customer: true }
     })
+
+    let cashOverageToCreditCents = 0
+    for (const [index, t] of tenders.entries()) {
+      const depositedToTabCents = t.method === 'CASH' ? (t.depositedToTabCents ?? 0) : null
+      if (depositedToTabCents) cashOverageToCreditCents += depositedToTabCents
+
+      let creditLedgerEntryId: number | null = null
+      if (t.method === 'PHARMACY_CREDIT') {
+        const entry = await customerLedgerInternals.appendCreditEntry(
+          tx,
+          payload.customerId!,
+          'SALE_CHARGE',
+          -t.amountCents,
+          { transactionId: transaction.id }
+        )
+        creditLedgerEntryId = entry.id
+      }
+
+      await tx.transactionTender.create({
+        data: {
+          transactionId: transaction.id,
+          sequence: index + 1,
+          method: t.method,
+          amountCents: t.amountCents,
+          cashGivenCents: t.method === 'CASH' ? (t.cashGivenCents ?? t.amountCents) : null,
+          changeCents: t.method === 'CASH' ? (t.changeCents ?? 0) : null,
+          depositedToTabCents,
+          cardType: t.method === 'CARD' ? (t.cardType ?? null) : null,
+          surchargeCents: t.method === 'CARD' ? (t.surchargeCents ?? 0) : null,
+          processorTransactionId: t.processorTransactionId ?? null,
+          cardLastFour: t.cardLastFour ?? null,
+          eTransferEmail: t.method === 'E_TRANSFER' ? (t.eTransferEmail ?? null) : null,
+          eTransferConfirmed: t.method === 'E_TRANSFER' ? (t.eTransferConfirmed ?? false) : null,
+          customerId: t.method === 'PHARMACY_CREDIT' ? payload.customerId ?? null : null,
+          creditLedgerEntryId,
+          status: 'COMPLETED',
+          completedAt: new Date()
+        }
+      })
+    }
 
     // Created one at a time (rather than a nested `items: { create: [...] }`)
     // so each item's discount audit row can link back to its real id and
@@ -500,16 +587,7 @@ export async function createTransaction(
       })
     }
 
-    if (tabAmountCents > 0 && payload.customerId) {
-      await customerLedgerInternals.appendCreditEntry(tx, payload.customerId, 'SALE_CHARGE', -tabAmountCents, { transactionId: transaction.id })
-      const loyaltyFlag = await tx.featureFlag.findUnique({ where: { key: 'rewardPoints' } })
-      const customer = await tx.customer.findUniqueOrThrow({ where: { id: payload.customerId } })
-      if (loyaltyFlag?.enabled && customer.loyaltyEnabled) {
-        const creditSettings = await getCreditSettings(tx)
-        const points = Math.floor((totalCents / 100) * creditSettings.loyaltyPointsPerDollar)
-        if (points > 0) await customerLedgerInternals.appendPointEvent(tx, customer.id, 'EARNED', points, { transactionId: transaction.id })
-      }
-    } else if (payload.customerId) {
+    if (payload.customerId) {
       const loyaltyFlag = await tx.featureFlag.findUnique({ where: { key: 'rewardPoints' } })
       const customer = await tx.customer.findUniqueOrThrow({ where: { id: payload.customerId } })
       if (loyaltyFlag?.enabled && customer.loyaltyEnabled) {
@@ -523,7 +601,12 @@ export async function createTransaction(
       await customerLedgerInternals.appendCreditEntry(tx, payload.customerId, 'FUNDS_ADDED', cashOverageToCreditCents, { transactionId: transaction.id, note: `Cash overpayment deposited from ${transaction.receiptNumber}` })
     }
 
-    return { ...transaction, items }
+    const createdTenders = await tx.transactionTender.findMany({
+      where: { transactionId: transaction.id },
+      orderBy: { sequence: 'asc' }
+    })
+
+    return { ...transaction, items, tenders: createdTenders }
   })
 }
 
