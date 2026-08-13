@@ -54,6 +54,7 @@ import type {
   DashboardData,
   CustomerActivityRow,
   CustomerDebtReport,
+  CompleteProductSaleRow,
   CheckoutSettings,
   AuthUser,
   LoginResult,
@@ -363,6 +364,11 @@ const api = {
       ipcRenderer.invoke(IPC.REPORTS_GET_CUSTOMER_ACTIVITY, { fromDate, toDate, limit }),
     getCustomerDebtReport: (): Promise<CustomerDebtReport> =>
       ipcRenderer.invoke(IPC.REPORTS_GET_CUSTOMER_DEBT),
+    getCompleteProductSales: (
+      fromDate: string,
+      toDate: string
+    ): Promise<CompleteProductSaleRow[]> =>
+      ipcRenderer.invoke(IPC.REPORTS_GET_COMPLETE_PRODUCT_SALES, { fromDate, toDate }),
     exportCsv: (): Promise<{ path: string }> => ipcRenderer.invoke(IPC.REPORTS_EXPORT_CSV),
     exportXlsx: (): Promise<{ path: string }> => ipcRenderer.invoke(IPC.REPORTS_EXPORT_XLSX)
   },

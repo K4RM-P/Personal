@@ -880,7 +880,10 @@ export async function getCustomerDebtReport(db: PrismaClient): Promise<CustomerD
     const balanceOwedCents = remaining.reduce((sum, d) => sum + d.remainingCents, 0)
     if (balanceOwedCents <= 0) continue // fully offsetting entries — not a debtor after all
 
-    const oldest = remaining.reduce((min, d) => (d.createdAt < min ? d.createdAt : min), remaining[0].createdAt)
+    const oldest = remaining.reduce(
+      (min, d) => (d.createdAt < min ? d.createdAt : min),
+      remaining[0].createdAt
+    )
     const daysOverdue = Math.floor((now - oldest.getTime()) / 86400000)
 
     byBalance.push({
@@ -897,7 +900,11 @@ export async function getCustomerDebtReport(db: PrismaClient): Promise<CustomerD
     .filter((row) => row.daysOverdue >= debtWarningThresholdDays)
     .sort((a, b) => b.daysOverdue - a.daysOverdue)
 
-  const result: CustomerDebtReport = { thresholdDays: debtWarningThresholdDays, byBalance, warnings }
+  const result: CustomerDebtReport = {
+    thresholdDays: debtWarningThresholdDays,
+    byBalance,
+    warnings
+  }
   setCached(cacheKey, result)
   return result
 }
@@ -980,4 +987,213 @@ export async function getDashboardData(db: PrismaClient): Promise<DashboardData>
 
   setCached(cacheKey, result)
   return result
+}
+
+// ---------------------------------------------------------------------------
+// Complete Products Sales Report
+// ---------------------------------------------------------------------------
+
+/**
+ * Apportions a transaction's single `taxCents` total across its taxable PRODUCT
+ * line items, since HST is only persisted per-transaction, not per-line.
+ * Mirrors the taxable-base calculation `createTransaction` used to compute
+ * `taxCents` in the first place (posQueries.ts) — same items, same formula,
+ * run in reverse. Any rounding remainder is assigned to the last taxable line
+ * so per-transaction HST always sums back to exactly `taxCents`.
+ */
+function apportionHstCents(
+  tx: Pick<Transaction, 'taxCents'>,
+  items: Pick<TransactionItem, 'unitPriceCents' | 'quantity' | 'discountCents' | 'hstApplied'>[]
+): number[] {
+  const taxableLineCents = items.map((item) =>
+    item.hstApplied === false ? 0 : item.unitPriceCents * item.quantity - (item.discountCents ?? 0)
+  )
+  const taxableSubtotalCents = taxableLineCents.reduce((sum, c) => sum + c, 0)
+  if (taxableSubtotalCents <= 0 || tx.taxCents <= 0) return items.map(() => 0)
+
+  const hstCents = taxableLineCents.map((c) =>
+    c > 0 ? Math.round((tx.taxCents * c) / taxableSubtotalCents) : 0
+  )
+  const assigned = hstCents.reduce((sum, c) => sum + c, 0)
+  const remainder = tx.taxCents - assigned
+  if (remainder !== 0) {
+    const lastTaxableIndex = taxableLineCents
+      .map((c, i) => (c > 0 ? i : -1))
+      .filter((i) => i >= 0)
+      .pop()
+    if (lastTaxableIndex !== undefined) hstCents[lastTaxableIndex] += remainder
+  }
+  return hstCents
+}
+
+type ProductItemForReport = Pick<
+  TransactionItem,
+  | 'productId'
+  | 'quantity'
+  | 'costCents'
+  | 'unitPriceCents'
+  | 'discountCents'
+  | 'totalCents'
+  | 'hstApplied'
+> & { product: { name: string } | null }
+
+/** Builds report rows for one transaction's PRODUCT items, dated to `reportDate`. */
+function buildCompleteProductSaleRows(
+  tx: Pick<Transaction, 'taxCents' | 'receiptNumber'>,
+  items: ProductItemForReport[],
+  reportDate: Date
+): CompleteProductSaleRow[] {
+  const hstCentsByItem = apportionHstCents(tx, items)
+  return items.map((item, i) => {
+    const hstCents = hstCentsByItem[i]
+    const discountCents = item.discountCents ?? 0
+    return {
+      date: localDateString(reportDate),
+      receiptNumber: tx.receiptNumber,
+      productName: item.product?.name ?? 'Unknown',
+      quantity: item.quantity,
+      supplierCostCents: item.costCents,
+      retailCostCents: item.unitPriceCents,
+      discountCents,
+      hstCents,
+      totalPriceCents: item.totalCents,
+      profitCents: item.totalCents - item.costCents * item.quantity - hstCents
+    }
+  })
+}
+
+/**
+ * Finds every SALE_CHARGE (tab/credit sale) that became fully paid off within
+ * [from, to], and returns report rows for the *original* sale's PRODUCT items,
+ * dated to the payoff date rather than the original sale date — a debt-financed
+ * product only counts as "sold" once the customer has actually paid for it.
+ *
+ * Same FIFO debit/credit offsetting as `getCustomerDebtBreakdown`
+ * (customerQueries.ts), but instead of returning what's still outstanding,
+ * this tracks the moment each debit's `remainingCents` reaches exactly 0.
+ */
+async function getDebtPayoffAttributedSales(
+  db: PrismaClient,
+  from: Date,
+  to: Date
+): Promise<CompleteProductSaleRow[]> {
+  // Only customers with a credit-side entry in range could have zeroed a debt in range.
+  const candidates = await db.creditLedgerEntry.findMany({
+    where: { createdAt: { gte: from, lte: to }, amountCents: { gt: 0 } },
+    select: { customerId: true },
+    distinct: ['customerId']
+  })
+  if (candidates.length === 0) return []
+
+  const zeroedTransactionIds: { transactionId: string; payoffDate: Date }[] = []
+
+  for (const { customerId } of candidates) {
+    const ledgerEntries = await db.creditLedgerEntry.findMany({
+      where: { customerId },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }]
+    })
+
+    type DebitRecord = { remainingCents: number; transactionId: string | null }
+    const outstanding: DebitRecord[] = []
+    let creditBalance = 0
+
+    for (const entry of ledgerEntries) {
+      if (entry.amountCents < 0) {
+        if (entry.type === 'SALE_CHARGE') {
+          let debitRemaining = -entry.amountCents
+          if (creditBalance > 0) {
+            const offset = Math.min(creditBalance, debitRemaining)
+            creditBalance -= offset
+            debitRemaining -= offset
+          }
+          if (debitRemaining > 0) {
+            outstanding.push({ remainingCents: debitRemaining, transactionId: entry.transactionId })
+          }
+        }
+        continue
+      }
+      let creditRemaining = entry.amountCents
+      for (const debit of outstanding) {
+        if (creditRemaining <= 0) break
+        if (debit.remainingCents <= 0) continue
+        const offset = Math.min(creditRemaining, debit.remainingCents)
+        debit.remainingCents -= offset
+        creditRemaining -= offset
+        if (
+          debit.remainingCents === 0 &&
+          debit.transactionId &&
+          entry.createdAt >= from &&
+          entry.createdAt <= to
+        ) {
+          zeroedTransactionIds.push({
+            transactionId: debit.transactionId,
+            payoffDate: entry.createdAt
+          })
+        }
+      }
+      creditBalance += creditRemaining
+    }
+  }
+
+  if (zeroedTransactionIds.length === 0) return []
+
+  const transactions = await db.transaction.findMany({
+    where: { id: { in: zeroedTransactionIds.map((z) => z.transactionId) } },
+    include: {
+      items: { where: { lineType: 'PRODUCT', isVoided: false }, include: { product: true } }
+    }
+  })
+  const txById = new Map(transactions.map((t) => [t.id, t]))
+
+  const rows: CompleteProductSaleRow[] = []
+  for (const { transactionId, payoffDate } of zeroedTransactionIds) {
+    const tx = txById.get(transactionId)
+    if (!tx || tx.items.length === 0) continue
+    rows.push(...buildCompleteProductSaleRows(tx, tx.items, payoffDate))
+  }
+  return rows
+}
+
+/**
+ * One row per PRODUCT line item sold in [fromDate, toDate], for a full,
+ * exportable product-level sales report. Debt-financed items (transactions
+ * with a non-zero `tabAmountCents`) are excluded here and instead surface via
+ * `getDebtPayoffAttributedSales`, dated to when their debt was fully paid off.
+ */
+export async function getCompleteProductSales(
+  db: PrismaClient,
+  fromDate: string,
+  toDate: string
+): Promise<CompleteProductSaleRow[]> {
+  const cacheKey = `completeProductSales:${fromDate}:${toDate}`
+  const cached = getCached<CompleteProductSaleRow[]>(cacheKey)
+  if (cached) return cached
+
+  const from = startOfDay(parseDate(fromDate))
+  const to = endOfDay(parseDate(toDate))
+
+  const transactions = await db.transaction.findMany({
+    where: {
+      createdAt: { gte: from, lte: to },
+      status: { in: ['COMPLETED', 'REFUNDED'] },
+      OR: [{ tabAmountCents: null }, { tabAmountCents: 0 }]
+    },
+    include: {
+      items: { where: { lineType: 'PRODUCT', isVoided: false }, include: { product: true } }
+    }
+  })
+
+  const rows: CompleteProductSaleRow[] = []
+  for (const tx of transactions) {
+    if (tx.items.length === 0) continue
+    rows.push(...buildCompleteProductSaleRows(tx, tx.items, tx.createdAt))
+  }
+
+  rows.push(...(await getDebtPayoffAttributedSales(db, from, to)))
+  rows.sort(
+    (a, b) => a.date.localeCompare(b.date) || a.receiptNumber.localeCompare(b.receiptNumber)
+  )
+
+  setCached(cacheKey, rows)
+  return rows
 }
