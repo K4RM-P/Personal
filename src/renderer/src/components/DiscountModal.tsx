@@ -14,6 +14,12 @@ interface DiscountModalProps {
   initialReason?: string
   onApply: (discountCents: number, reason?: string) => void
   onCancel: () => void
+  /**
+   * Clears an existing discount. When provided and a discount is already
+   * applied, a "Cancel discount" action is shown — without it there is no way
+   * to get back to no-discount, since Apply is disabled at $0.
+   */
+  onRemove?: () => void
 }
 
 /** Shared % / $ discount editor used for both per-item and whole-bill discounts. */
@@ -24,7 +30,8 @@ export function DiscountModal({
   initialDiscountCents = 0,
   initialReason,
   onApply,
-  onCancel
+  onCancel,
+  onRemove
 }: DiscountModalProps): React.JSX.Element {
   const [mode, setMode] = React.useState<DiscountMode>('DOLLAR')
   const [percentInput, setPercentInput] = React.useState(
@@ -158,6 +165,16 @@ export function DiscountModal({
             Apply Discount
           </button>
         </div>
+
+        {onRemove && initialDiscountCents > 0 && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--error)] px-3 text-sm font-semibold text-[var(--error)] hover:bg-[var(--error-bg)]"
+          >
+            Cancel discount
+          </button>
+        )}
       </Card>
     </div>
   )

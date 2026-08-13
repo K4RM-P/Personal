@@ -453,6 +453,17 @@ export function CheckoutScreen(): React.JSX.Element {
     )
   }
 
+  /** Removes a per-item discount, returning the line to full price. */
+  const handleClearItemDiscount = (productId: number): void => {
+    setCart((prev) =>
+      prev.map((item) =>
+        item.product.id === productId
+          ? { ...item, discountCents: undefined, discountReason: undefined }
+          : item
+      )
+    )
+  }
+
   const handleAddCustomProduct = async (
     mode: 'RX' | 'NONRX',
     data: { name: string; priceCents: number }
@@ -1223,6 +1234,14 @@ export function CheckoutScreen(): React.JSX.Element {
                         {lineDiscountCents > 0 && (
                           <span className="ml-1 text-xs font-normal text-[var(--success)]">
                             -{formatCurrency(lineDiscountCents)}
+                            <button
+                              type="button"
+                              onClick={() => handleClearItemDiscount(item.product.id)}
+                              title="Cancel discount on this item"
+                              className="ml-1 text-[10px] text-[var(--muted-foreground)] underline"
+                            >
+                              remove
+                            </button>
                           </span>
                         )}
                       </div>
@@ -2143,6 +2162,10 @@ export function CheckoutScreen(): React.JSX.Element {
                 setDiscountItemTarget(null)
               }}
               onCancel={() => setDiscountItemTarget(null)}
+              onRemove={() => {
+                handleClearItemDiscount(discountItemTarget)
+                setDiscountItemTarget(null)
+              }}
             />
           )
         })()}
