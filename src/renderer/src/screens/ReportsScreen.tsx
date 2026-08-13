@@ -16,7 +16,8 @@ import type {
   InventoryValuation,
   CustomerActivityRow,
   CustomerDebtReport,
-  CustomerDebtRow
+  CustomerDebtRow,
+  CompleteProductSaleRow
 } from '@shared/types'
 
 type ReportTab = 'dashboard' | 'sales' | 'inventory' | 'cashiers' | 'customers'
@@ -399,24 +400,31 @@ function SalesReportsPage(): React.JSX.Element {
   const [tenderData, setTenderData] = React.useState<TenderBreakdownRow[]>([])
   const [topItems, setTopItems] = React.useState<TopItemRow[]>([])
   const [slowItems, setSlowItems] = React.useState<SlowItemRow[]>([])
+  const [completeProductSales, setCompleteProductSales] = React.useState<CompleteProductSaleRow[]>(
+    []
+  )
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
-  const [subTab, setSubTab] = React.useState<'daily' | 'tender' | 'top' | 'slow'>('daily')
+  const [subTab, setSubTab] = React.useState<'daily' | 'tender' | 'top' | 'slow' | 'products'>(
+    'daily'
+  )
 
   const loadData = React.useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [daily, tender, top, slow] = await Promise.all([
+      const [daily, tender, top, slow, products] = await Promise.all([
         window.api.reports.getDailySales(fromDate, toDate),
         window.api.reports.getSalesByTender(fromDate, toDate),
         window.api.reports.getTopItems(fromDate, toDate, 25),
-        window.api.reports.getSlowItems(fromDate, toDate, 1)
+        window.api.reports.getSlowItems(fromDate, toDate, 1),
+        window.api.reports.getCompleteProductSales(fromDate, toDate)
       ])
       setDailySales(daily)
       setTenderData(tender)
       setTopItems(top)
       setSlowItems(slow)
+      setCompleteProductSales(products)
     } catch (err: any) {
       console.error(err)
       setError(err instanceof Error ? err.message : 'Failed to load sales reports.')
@@ -470,11 +478,24 @@ function SalesReportsPage(): React.JSX.Element {
                   String(r.revenueCents),
                   formatPercent(r.marginPercent)
                 ])
-              return slowItems.map((r) => [
-                r.name,
-                r.sku,
-                String(r.quantitySold),
-                String(r.currentOnHand)
+              if (subTab === 'slow')
+                return slowItems.map((r) => [
+                  r.name,
+                  r.sku,
+                  String(r.quantitySold),
+                  String(r.currentOnHand)
+                ])
+              return completeProductSales.map((r) => [
+                r.date,
+                r.receiptNumber,
+                r.productName,
+                String(r.quantity),
+                formatCurrency(r.supplierCostCents),
+                formatCurrency(r.retailCostCents),
+                formatCurrency(r.discountCents),
+                formatCurrency(r.hstCents),
+                formatCurrency(r.totalPriceCents),
+                formatCurrency(r.profitCents)
               ])
             })()
             const csvHeaders = (() => {
@@ -482,7 +503,19 @@ function SalesReportsPage(): React.JSX.Element {
                 return ['Date', 'Transactions', 'Gross', 'Returns', 'Net', 'Margin%']
               if (subTab === 'tender') return ['Tender', 'Amount', '%']
               if (subTab === 'top') return ['Item', 'SKU', 'Qty', 'Revenue', 'Margin%']
-              return ['Item', 'SKU', 'Qty Sold', 'On Hand']
+              if (subTab === 'slow') return ['Item', 'SKU', 'Qty Sold', 'On Hand']
+              return [
+                'Date',
+                'Receipt #',
+                'Product',
+                'Qty',
+                'Supplier Cost',
+                'Retail Cost',
+                'Discount',
+                'HST',
+                'Total Price',
+                'Profit'
+              ]
             })()
             downloadCsv(`sales-${subTab}`, csvHeaders, csvRows)
           }}
@@ -506,7 +539,7 @@ function SalesReportsPage(): React.JSX.Element {
       />
 
       <div className="flex flex-wrap gap-1 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-1">
-        {(['daily', 'tender', 'top', 'slow'] as const).map((tab) => (
+        {(['daily', 'tender', 'top', 'slow', 'products'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setSubTab(tab)}
@@ -524,7 +557,9 @@ function SalesReportsPage(): React.JSX.Element {
                 ? 'By Tender'
                 : tab === 'top'
                   ? 'Top Items'
-                  : 'Slow Items'}
+                  : tab === 'slow'
+                    ? 'Slow Items'
+                    : 'Complete Products Sales Report'}
           </button>
         ))}
       </div>
@@ -536,6 +571,9 @@ function SalesReportsPage(): React.JSX.Element {
       {!loading && subTab === 'tender' && <TenderTable rows={tenderData} />}
       {!loading && subTab === 'top' && <TopItemsTable rows={topItems} />}
       {!loading && subTab === 'slow' && <SlowItemsTable rows={slowItems} />}
+      {!loading && subTab === 'products' && (
+        <CompleteProductSalesTable rows={completeProductSales} />
+      )}
     </div>
   )
 }
@@ -596,6 +634,93 @@ function DailySalesTable({ rows }: { rows: DailySalesRow[] }): React.JSX.Element
               <tr>
                 <td colSpan={6} className="py-6 text-center text-[var(--muted-foreground)]">
                   No sales in this period.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}
+
+function CompleteProductSalesTable({
+  rows
+}: {
+  rows: CompleteProductSaleRow[]
+}): React.JSX.Element {
+  const { sorted, sortKey, sortDir, toggleSort } = useSort(rows, 'date', 'desc')
+  const th = (
+    label: string,
+    key: keyof CompleteProductSaleRow,
+    align: 'left' | 'right' = 'left'
+  ) => (
+    <SortableTh
+      label={label}
+      sortKeyName={key}
+      active={sortKey === key}
+      dir={sortDir}
+      onSort={toggleSort}
+      align={align}
+    />
+  )
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Complete Products Sales Report</CardTitle>
+        <CardDescription>
+          Every product line item sold, one row per line. Debt-financed products appear on the date
+          their tab was fully paid off, not the original sale date. Click a column to sort.
+        </CardDescription>
+      </CardHeader>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--border)] text-left text-[var(--muted-foreground)]">
+              {th('Date', 'date')}
+              {th('Receipt #', 'receiptNumber')}
+              {th('Product', 'productName')}
+              {th('Qty', 'quantity', 'right')}
+              {th('Supplier Cost', 'supplierCostCents', 'right')}
+              {th('Retail Cost', 'retailCostCents', 'right')}
+              {th('Discount', 'discountCents', 'right')}
+              {th('HST', 'hstCents', 'right')}
+              {th('Total Price', 'totalPriceCents', 'right')}
+              {th('Profit', 'profitCents', 'right')}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((row, i) => (
+              <tr
+                key={`${row.receiptNumber}-${row.productName}-${i}`}
+                className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30"
+              >
+                <td className="py-3 pr-3 font-medium">{row.date}</td>
+                <td className="py-3 pr-3">{row.receiptNumber}</td>
+                <td className="py-3 pr-3">{row.productName}</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{row.quantity}</td>
+                <td className="py-3 pr-3 text-right tabular-nums">
+                  {formatCurrency(row.supplierCostCents)}
+                </td>
+                <td className="py-3 pr-3 text-right tabular-nums">
+                  {formatCurrency(row.retailCostCents)}
+                </td>
+                <td className="py-3 pr-3 text-right tabular-nums">
+                  {row.discountCents !== 0 ? formatCurrency(row.discountCents) : '—'}
+                </td>
+                <td className="py-3 pr-3 text-right tabular-nums">
+                  {formatCurrency(row.hstCents)}
+                </td>
+                <td className="py-3 pr-3 text-right font-semibold tabular-nums">
+                  {formatCurrency(row.totalPriceCents)}
+                </td>
+                <td className="py-3 text-right tabular-nums">{formatCurrency(row.profitCents)}</td>
+              </tr>
+            ))}
+            {sorted.length === 0 && (
+              <tr>
+                <td colSpan={10} className="py-6 text-center text-[var(--muted-foreground)]">
+                  No product sales in this period.
                 </td>
               </tr>
             )}
@@ -1124,7 +1249,11 @@ function CashierTotalsTable({ rows }: { rows: CashierTotalRow[] }): React.JSX.El
 // Customer Reports page
 // ---------------------------------------------------------------------------
 
-function DebtWarningBanner({ report }: { report: CustomerDebtReport | null }): React.JSX.Element | null {
+function DebtWarningBanner({
+  report
+}: {
+  report: CustomerDebtReport | null
+}): React.JSX.Element | null {
   if (!report || report.warnings.length === 0) return null
   const VISIBLE_CAP = 5
   const visible = report.warnings.slice(0, VISIBLE_CAP)
@@ -1135,13 +1264,15 @@ function DebtWarningBanner({ report }: { report: CustomerDebtReport | null }): R
       {visible.map((row) => (
         <Alert key={row.customerId} variant="warning">
           <span className="font-semibold">{row.customerName}</span> owes{' '}
-          <span className="font-semibold">{formatCurrency(row.balanceOwedCents)}</span> — unpaid
-          for {row.daysOverdue} day{row.daysOverdue === 1 ? '' : 's'} (threshold:{' '}
-          {report.thresholdDays} days)
+          <span className="font-semibold">{formatCurrency(row.balanceOwedCents)}</span> — unpaid for{' '}
+          {row.daysOverdue} day{row.daysOverdue === 1 ? '' : 's'} (threshold: {report.thresholdDays}{' '}
+          days)
         </Alert>
       ))}
       {overflow > 0 && (
-        <Alert variant="warning">+{overflow} more customer{overflow === 1 ? '' : 's'} overdue</Alert>
+        <Alert variant="warning">
+          +{overflow} more customer{overflow === 1 ? '' : 's'} overdue
+        </Alert>
       )}
     </div>
   )
@@ -1316,7 +1447,11 @@ function CustomerReportsPage(): React.JSX.Element {
               downloadCsv(
                 'customers-active',
                 ['Customer', 'Transactions', 'Total Spent'],
-                activity.map((r) => [r.customerName, String(r.transactionCount), String(r.totalSpentCents)])
+                activity.map((r) => [
+                  r.customerName,
+                  String(r.transactionCount),
+                  String(r.totalSpentCents)
+                ])
               )
             } else {
               downloadCsv(

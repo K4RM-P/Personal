@@ -99,7 +99,7 @@ function buildSampleTransaction(): TransactionWithItems {
   const now = new Date()
   return {
     id: 'preview',
-    receiptNumber: 'RX-PREVIEW-0001',
+    receiptNumber: `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}00001`,
     status: 'COMPLETED',
     subtotalCents: 2497,
     taxCents: 325,

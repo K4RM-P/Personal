@@ -1,4 +1,4 @@
-import { PrismaClient, Product, Transaction } from '@prisma/client'
+import { Prisma, PrismaClient, Product, Transaction } from '@prisma/client'
 import {
   calculateRetailPriceCents,
   findPricingTier,
@@ -275,6 +275,24 @@ export async function getTransactionDetail(
   })
 }
 
+/**
+ * Receipt number format: YYYYMM followed by a 5-digit counter that resets
+ * each calendar month (local time) — e.g. the first sale of August 2026 is
+ * `20260800001`. The counter is stored in `ReceiptSequence`, keyed by
+ * "YYYYMM", and incremented via `upsert` inside the same DB transaction that
+ * creates the sale, so two concurrent checkouts can never collide.
+ */
+export async function generateReceiptNumber(tx: Prisma.TransactionClient): Promise<string> {
+  const now = new Date()
+  const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
+  const sequence = await tx.receiptSequence.upsert({
+    where: { yearMonth },
+    create: { yearMonth, lastNumber: 1 },
+    update: { lastNumber: { increment: 1 } }
+  })
+  return `${yearMonth}${String(sequence.lastNumber).padStart(5, '0')}`
+}
+
 // Transaction & Checkout Queries
 export async function createTransaction(
   db: PrismaClient,
@@ -428,12 +446,13 @@ export async function createTransaction(
     .reduce((sum, t) => sum + (t.changeCents ?? 0), 0)
   const lastCardTender = [...tenders].reverse().find((t) => t.method === 'CARD')
   const firstETransferTender = tenders.find((t) => t.method === 'E_TRANSFER')
-  const receiptNumber = `RX-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`
 
   return db.$transaction(async (tx) => {
     if (payload.customerId) {
       await tx.customer.findUniqueOrThrow({ where: { id: payload.customerId } })
     }
+
+    const receiptNumber = await generateReceiptNumber(tx)
 
     const transaction = await tx.transaction.create({
       data: {
