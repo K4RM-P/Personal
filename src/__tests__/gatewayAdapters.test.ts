@@ -65,28 +65,47 @@ describe('SquareTerminalAdapter', () => {
 })
 
 describe('CloverAdapter', () => {
-  it('approves a succeeded charge', async () => {
+  it('approves via REST Pay Display (result SUCCESS + cardTransaction CLOSED)', async () => {
     const http = router((method, url) => {
-      if (method === 'POST' && url.endsWith('/v1/charges'))
-        return ok({ id: 'chg_1', status: 'succeeded', auth_code: 'A9', source: { last4: '1234' } })
+      if (method === 'POST' && url.endsWith('/v1/payments'))
+        return ok({
+          payment: {
+            id: 'pay_1',
+            result: 'SUCCESS',
+            cardTransaction: { state: 'CLOSED', authCode: 'A9', last4: '1234' }
+          }
+        })
       return undefined
     })
     const a = new CloverAdapter(http)
     await a.init({ provider: 'clover', environment: 'sandbox', terminalId: 'dev_1', apiKey: 'tok' })
     const res = await a.charge(4217, 'SALE-1')
     expect(res.status).toBe('approved')
-    expect(res.transactionId).toBe('chg_1')
+    expect(res.transactionId).toBe('pay_1')
     expect(res.cardLast4).toBe('1234')
     expect(res.authCode).toBe('A9')
   })
 
-  it('declines a failed charge', async () => {
-    const http = router(() => ok({ id: 'chg_2', status: 'failed', failure_message: 'DECLINED' }))
+  it('declines when result is not SUCCESS', async () => {
+    const http = router(() => ok({ payment: { id: 'pay_2', result: 'FAIL' } }))
     const a = new CloverAdapter(http)
     await a.init({ provider: 'clover', environment: 'sandbox', terminalId: 'dev_1', apiKey: 'tok' })
     const res = await a.charge(1000, 'SALE-2')
     expect(res.status).toBe('declined')
-    expect(res.message).toBe('DECLINED')
+  })
+
+  it('sends X-Clover-Device-Id and reuses the Idempotency-Key on retry', async () => {
+    const seenHeaders: Record<string, string>[] = []
+    const http: HttpTransport = async (_m, _u, headers) => {
+      seenHeaders.push(headers)
+      return ok({ payment: { id: 'pay_1', result: 'SUCCESS', cardTransaction: { state: 'CLOSED' } } })
+    }
+    const a = new CloverAdapter(http)
+    await a.init({ provider: 'clover', environment: 'sandbox', terminalId: 'dev_1', apiKey: 'tok' })
+    await a.charge(4217, 'SALE-3')
+    await a.charge(4217, 'SALE-3')
+    expect(seenHeaders[0]['X-Clover-Device-Id']).toBe('dev_1')
+    expect(seenHeaders[0]['Idempotency-Key']).toBe(seenHeaders[1]['Idempotency-Key'])
   })
 
   it('errors without a device id', async () => {
@@ -178,7 +197,11 @@ describe('GlobalPaymentsAdapter', () => {
     const http = router((method, url) => {
       if (url.endsWith('/accesstoken')) return ok({ token: 'tok_123' })
       if (url.endsWith('/transactions'))
-        return ok({ id: 'trn_1', status: 'CAPTURED', payment_method: { card: { masked_number_last4: '1111' } } })
+        return ok({
+          id: 'trn_1',
+          status: 'CAPTURED',
+          payment_method: { card: { masked_number_last4: '1111' }, authcode: 'AUTH1' }
+        })
       return undefined
     })
     const a = new GlobalPaymentsAdapter(http)
@@ -187,6 +210,25 @@ describe('GlobalPaymentsAdapter', () => {
     expect(res.status).toBe('approved')
     expect(res.transactionId).toBe('trn_1')
     expect(res.cardLast4).toBe('1111')
+    expect(res.authCode).toBe('AUTH1')
+  })
+
+  it('sends a nonce and a SHA512(nonce+app_key) secret rather than the raw app_key', async () => {
+    let seenBody: any
+    const http = router((method, url, body) => {
+      if (url.endsWith('/accesstoken')) {
+        seenBody = body
+        return ok({ token: 'tok_123' })
+      }
+      if (url.endsWith('/transactions')) return ok({ id: 'trn_1', status: 'CAPTURED', payment_method: {} })
+      return undefined
+    })
+    const a = new GlobalPaymentsAdapter(http)
+    await a.init({ provider: 'globalpayments', environment: 'sandbox', terminalId: 'term_1', apiKey: 'app:key' })
+    await a.charge(1000, 'SALE-nonce')
+    expect(seenBody.nonce).toBeTruthy()
+    expect(seenBody.secret).not.toBe('key')
+    expect(seenBody.secret).toMatch(/^[0-9a-f]{128}$/)
   })
 
   it('declines a non-captured transaction', async () => {
