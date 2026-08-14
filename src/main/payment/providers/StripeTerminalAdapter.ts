@@ -16,6 +16,20 @@ import type { PaymentProvider } from '../PaymentProvider'
  * sandbox with a simulated reader we auto-present a test card so the flow can be
  * driven end-to-end without physical hardware.
  *
+ * Confirmed against Stripe's current docs (docs.stripe.com/terminal/payments/collect-card-payment,
+ * server-driven variant): PaymentIntent with payment_method_types:['card_present'],
+ * terminal.readers.processPaymentIntent (= POST .../process_payment_intent), polling the
+ * PaymentIntent status (requires_payment_method → succeeded/requires_capture), reader.status
+ * ('online'/etc, docs.stripe.com/api/terminal/readers/object), and the
+ * test_helpers.terminal.readers.presentPaymentMethod simulated-card-presentment endpoint
+ * (docs.stripe.com/terminal/references/testing#simulated-card-presentment) are all real.
+ *
+ * That same page explicitly warns: "Don't recreate a PaymentIntent if a card is declined...
+ * to help avoid double charges." PaymentIntent creation is therefore given a stable
+ * Idempotency-Key derived from orderRef (Stripe's documented idempotent-requests mechanism,
+ * docs.stripe.com/api/idempotent_requests) so a retried charge() call for the same sale reuses
+ * the original PaymentIntent instead of creating a second one.
+ *
  * The `stripe` SDK is imported lazily so the app builds/loads even when a
  * pharmacy never selects Stripe.
  */
@@ -46,13 +60,18 @@ export class StripeTerminalAdapter implements PaymentProvider {
     const stripe = this.requireStripe()
     const reader = this.requireReader()
 
-    let intent: StripeSdk.PaymentIntent = await stripe.paymentIntents.create({
-      amount: amountCents,
-      currency: 'usd',
-      payment_method_types: ['card_present'],
-      capture_method: 'automatic',
-      metadata: { orderRef }
-    })
+    let intent: StripeSdk.PaymentIntent = await stripe.paymentIntents.create(
+      {
+        amount: amountCents,
+        currency: 'usd',
+        payment_method_types: ['card_present'],
+        capture_method: 'automatic',
+        metadata: { orderRef }
+      },
+      // Reused verbatim on retry of the same logical charge (same orderRef) so Stripe returns
+      // the original PaymentIntent instead of creating a second one — see class doc.
+      { idempotencyKey: `create-intent-${orderRef}` }
+    )
 
     await stripe.terminal.readers.processPaymentIntent(reader, { payment_intent: intent.id })
 

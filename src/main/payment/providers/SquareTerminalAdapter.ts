@@ -18,7 +18,11 @@ import { fetchTransport, type HttpTransport } from '../httpTransport'
  * Structured against Square's documented `/v2/terminals/checkouts` shape; the
  * transport is injectable so it is unit-testable without network access.
  */
-const SQUARE_VERSION = '2024-10-17'
+// Confirmed against developer.squareup.com/reference/square/terminal-api/create-terminal-checkout
+// (live example on that reference page). Square versions are monthly and backward-compatible, so
+// this being a bit stale doesn't break calls — but check developer.squareup.com/docs/changelog/connect
+// for the current value periodically.
+const SQUARE_VERSION = '2026-07-15'
 
 export class SquareTerminalAdapter implements PaymentProvider {
   readonly name = 'square' as const
@@ -128,8 +132,13 @@ export class SquareTerminalAdapter implements PaymentProvider {
   private async pollCheckout(id: string, attempts = 30, delayMs = 1000): ReturnType<HttpTransport> {
     let res = await this.http('GET', `${this.baseUrl}/v2/terminals/checkouts/${id}`, this.headers())
     for (let i = 0; i < attempts; i++) {
+      // Confirmed status enum (developer.squareup.com/reference/square/objects/TerminalCheckout):
+      // PENDING, IN_PROGRESS, CANCEL_REQUESTED, CANCELED, COMPLETED. CANCEL_REQUESTED is transient —
+      // give it a chance to resolve to CANCELED rather than reporting "declined" prematurely.
       const status = (res.body as any)?.checkout?.status as string | undefined
-      if (status && status !== 'PENDING' && status !== 'IN_PROGRESS') return res
+      if (status && status !== 'PENDING' && status !== 'IN_PROGRESS' && status !== 'CANCEL_REQUESTED') {
+        return res
+      }
       await new Promise((r) => setTimeout(r, delayMs))
       res = await this.http('GET', `${this.baseUrl}/v2/terminals/checkouts/${id}`, this.headers())
     }

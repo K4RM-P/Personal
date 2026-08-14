@@ -3,7 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // Shared, hoisted state the fake SDK reads so each test can steer the outcome.
 const h = vi.hoisted(() => ({
   intentStatus: 'succeeded' as string,
-  lastError: undefined as { message: string } | undefined
+  lastError: undefined as { message: string } | undefined,
+  seenIdempotencyKeys: [] as string[]
 }))
 
 vi.mock('stripe', () => {
@@ -18,7 +19,10 @@ vi.mock('stripe', () => {
     }
     testHelpers = { terminal: { readers: { presentPaymentMethod: async () => ({}) } } }
     paymentIntents = {
-      create: async () => ({ id: 'pi_1', status: 'requires_confirmation' }),
+      create: async (_params: unknown, options?: { idempotencyKey?: string }) => {
+        if (options?.idempotencyKey) h.seenIdempotencyKeys.push(options.idempotencyKey)
+        return { id: 'pi_1', status: 'requires_confirmation' }
+      },
       retrieve: async () => ({
         id: 'pi_1',
         status: h.intentStatus,
@@ -40,6 +44,7 @@ describe('StripeTerminalAdapter (cloud SDK reader)', () => {
   beforeEach(async () => {
     h.intentStatus = 'succeeded'
     h.lastError = undefined
+    h.seenIdempotencyKeys = []
     adapter = new StripeTerminalAdapter()
     // No terminalId → auto-discovers the simulated reader in sandbox.
     await adapter.init({ provider: 'stripe', environment: 'sandbox', apiKey: 'sk_test_x' })
@@ -67,6 +72,14 @@ describe('StripeTerminalAdapter (cloud SDK reader)', () => {
     const status = await adapter.getReaderStatus()
     expect(status.connected).toBe(true)
     expect(status.provider).toBe('stripe')
+  })
+
+  it('reuses the same idempotency key for the same orderRef (retry safety)', async () => {
+    await adapter.charge(4217, 'SALE-3')
+    await adapter.charge(4217, 'SALE-3')
+    expect(h.seenIdempotencyKeys).toHaveLength(2)
+    expect(h.seenIdempotencyKeys[0]).toBe(h.seenIdempotencyKeys[1])
+    expect(h.seenIdempotencyKeys[0]).toBe('create-intent-SALE-3')
   })
 
   it('requires an API key', async () => {
