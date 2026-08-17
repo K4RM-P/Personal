@@ -55,7 +55,7 @@ export function RefundWorkflowModal({
   React.useEffect(() => {
     void (async () => {
       try {
-        const detail = await window.api.refund.getSaleDetails(transactionId)
+        const detail = await window.api.refund.getSaleDetails(transactionId, manager.id)
         setSale(detail)
         setCustomerEmail(detail.customer?.email || detail.email || '')
         setStep('scope')

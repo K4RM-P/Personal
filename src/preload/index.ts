@@ -431,14 +431,23 @@ const api = {
       ipcRenderer.invoke(IPC.USER_DELETE, userId)
   },
   refund: {
-    searchSales: (query?: string, range?: SaleDateRange): Promise<SaleSearchResult[]> =>
+    // `managerId` is the id of whichever manager authenticated for this refund session
+    // (either the actually-logged-in user, or one who quick-authenticated via
+    // ManagerAuthModal at a cashier terminal — see RefundsScreen). Verified server-side
+    // against the real User table before it's trusted for anything beyond "today only".
+    searchSales: (
+      query?: string,
+      range?: SaleDateRange,
+      managerId?: number
+    ): Promise<SaleSearchResult[]> =>
       ipcRenderer.invoke(IPC.REFUND_SEARCH_SALES, {
         query,
         fromDate: range?.fromDate,
-        toDate: range?.toDate
+        toDate: range?.toDate,
+        managerId
       }),
-    getSaleDetails: (transactionId: string): Promise<SaleRefundDetail> =>
-      ipcRenderer.invoke(IPC.REFUND_GET_SALE_DETAILS, transactionId),
+    getSaleDetails: (transactionId: string, managerId: number): Promise<SaleRefundDetail> =>
+      ipcRenderer.invoke(IPC.REFUND_GET_SALE_DETAILS, { transactionId, managerId }),
     process: (payload: ProcessRefundPayload): Promise<ProcessRefundResult> =>
       ipcRenderer.invoke(IPC.REFUND_PROCESS, payload)
   },

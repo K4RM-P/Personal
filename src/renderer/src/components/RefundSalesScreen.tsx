@@ -24,14 +24,14 @@ export function RefundSalesScreen({ manager, onExit }: RefundSalesScreenProps): 
   const load = React.useCallback(async (q: string): Promise<void> => {
     setLoading(true)
     try {
-      const results = await window.api.refund.searchSales(q || undefined)
+      const results = await window.api.refund.searchSales(q || undefined, undefined, manager.id)
       setSales(results)
     } catch (err) {
       console.error('Failed to search sales:', err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [manager.id])
 
   React.useEffect(() => {
     const timer = setTimeout(() => void load(query), 200)

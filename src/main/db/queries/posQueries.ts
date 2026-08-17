@@ -10,6 +10,7 @@ import { CreateTransactionPayload, BulkImportProductInput, TransactionWithItems 
 import { customerLedgerInternals, getCreditSettings, getCustomerDebtBreakdown } from './customerQueries'
 import { getCardSurchargePercent } from './settingsQueries'
 import { getSession } from '../../auth/session'
+import { gtinNorm } from '../../catalog/webcatParser'
 
 // Product Queries
 /**
@@ -81,9 +82,20 @@ export async function previewTierImpact(
 }
 
 export async function getProductByBarcode(db: PrismaClient, barcode: string): Promise<Product | null> {
+  // Catalogue-promoted products store `barcode` leading-zero-stripped (see
+  // catalog/webcatParser.ts gtinNorm, used consistently at promote-time). A scanner
+  // emitting the same item as a longer code with a leading-zero padding convention
+  // (e.g. a UPC-A read out as its 13-digit EAN-13 form) would otherwise never match —
+  // normalize the scanned value the same way and match against that too, alongside
+  // the plain exact match (which still covers manually-entered barcodes/SKUs as-is).
+  const normalized = gtinNorm(barcode)
   return db.product.findFirst({
     where: {
-      OR: [{ barcode: barcode }, { sku: barcode }]
+      OR: [
+        { barcode: barcode },
+        { sku: barcode },
+        ...(normalized && normalized !== barcode ? [{ barcode: normalized }] : [])
+      ]
     }
   })
 }
