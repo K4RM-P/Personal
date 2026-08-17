@@ -13,6 +13,8 @@ import type {
   Customer,
   TransactionWithItems,
   ChargeResult,
+  ChargeOptions,
+  PaymentInteractionMode,
   DebtBreakdownEntry
 } from '@shared/types'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
@@ -112,6 +114,21 @@ export function CheckoutScreen(): React.JSX.Element {
     'idle' | 'awaiting' | 'processing' | 'approved' | 'declined' | 'timeout'
   >('idle')
   const [paymentMessage, setPaymentMessage] = React.useState<string | null>(null)
+  // Whether the active processor drives itself (Stripe/Square/Moneris/etc. — await a
+  // result) or is a standalone terminal the cashier operates by hand (Manual mode /
+  // any semi-integrated terminal without a wired protocol yet, e.g. current Moneris
+  // V400c). Fetched once — Settings is the only place this changes.
+  const [paymentInteractionMode, setPaymentInteractionMode] =
+    React.useState<PaymentInteractionMode>('automatic')
+  // Manual-mode "type this into the terminal" popup — replaces the old dead-end where
+  // tapping Charge in Manual mode just errored ("requires the cashier to confirm").
+  const [manualCardPrompt, setManualCardPrompt] = React.useState<{
+    amountCents: number
+    orderRef: string
+    lineSurchargeCents: number
+    cardType: 'DEBIT' | 'CREDIT'
+  } | null>(null)
+  const [manualReference, setManualReference] = React.useState('')
   const [showRefunds, setShowRefunds] = React.useState(false)
   const [showPayModal, setShowPayModal] = React.useState(false)
   const [customProductMode, setCustomProductMode] = React.useState<'RX' | 'NONRX' | null>(null)
@@ -233,6 +250,20 @@ export function CheckoutScreen(): React.JSX.Element {
       }
     }
     void loadSettings()
+  }, [])
+
+  React.useEffect(() => {
+    const loadPaymentMode = async (): Promise<void> => {
+      try {
+        if (window.api?.settings?.getPayment) {
+          const cfg = await window.api.settings.getPayment()
+          setPaymentInteractionMode(cfg.interactionMode)
+        }
+      } catch (err) {
+        console.error('Failed to load payment interaction mode:', err)
+      }
+    }
+    void loadPaymentMode()
   }, [])
 
   // ---- Customer-facing display (second screen) ----------------------------
@@ -607,32 +638,26 @@ export function CheckoutScreen(): React.JSX.Element {
    *  it's confirmed — never batched to sale completion (§3, non-negotiable #1).
    *  Two "+ Add Card" lines are two independent calls here, each its own real
    *  terminal authorization — this is how two physical cards get supported. */
-  const startCardLineCharge = async (): Promise<void> => {
-    if (!cardType || cardProcessing) return
-    if (lineAmountCents <= 0 || lineAmountCents > remainingCents) return
-    const lineSurchargeCents = pendingSurchargeCents
-    const chargeCents = lineAmountCents + lineSurchargeCents
-    setPaymentState('awaiting')
-    setPaymentMessage('Waiting for terminal response…')
-    if (!cardOrderRefRef.current) {
-      cardOrderRefRef.current = `SALE-${Date.now()}-${tenderLines.length}`
-    }
-    const orderRef = cardOrderRefRef.current
-    if (!window.api?.payment) {
-      setPaymentState('timeout')
-      setPaymentMessage('Payment service unavailable.')
-      return
-    }
+  /** Shared by the automatic (processor drives itself) and manual (cashier reports the
+   *  outcome) paths — both end up needing identical success/failure handling once the
+   *  charge() call returns, so this is the one place that logic lives. */
+  const performCardCharge = async (
+    orderRef: string,
+    chargeCents: number,
+    lineSurchargeCents: number,
+    cardTypeForLine: 'DEBIT' | 'CREDIT',
+    options?: ChargeOptions
+  ): Promise<void> => {
     setCardProcessing(true)
     try {
-      const result: ChargeResult = await window.api.payment.charge(chargeCents, orderRef)
+      const result: ChargeResult = await window.api.payment.charge(chargeCents, orderRef, options)
       if (result.status === 'approved') {
         cardOrderRefRef.current = null
         addLine({
           id: crypto.randomUUID(),
           method: 'CARD',
           amountCents: chargeCents,
-          cardType,
+          cardType: cardTypeForLine,
           surchargeCents: lineSurchargeCents,
           processorTransactionId: result.transactionId,
           cardLastFour: result.cardLast4
@@ -661,6 +686,44 @@ export function CheckoutScreen(): React.JSX.Element {
     } finally {
       setCardProcessing(false)
     }
+  }
+
+  const startCardLineCharge = async (): Promise<void> => {
+    if (!cardType || cardProcessing) return
+    if (lineAmountCents <= 0 || lineAmountCents > remainingCents) return
+    const lineSurchargeCents = pendingSurchargeCents
+    const chargeCents = lineAmountCents + lineSurchargeCents
+    if (!cardOrderRefRef.current) {
+      cardOrderRefRef.current = `SALE-${Date.now()}-${tenderLines.length}`
+    }
+    const orderRef = cardOrderRefRef.current
+    if (!window.api?.payment) {
+      setPaymentState('timeout')
+      setPaymentMessage('Payment service unavailable.')
+      return
+    }
+    if (paymentInteractionMode === 'manual') {
+      // Manual/External Terminal (and any semi-integrated terminal without a wired
+      // protocol yet): there's no automatic result to await. Show exactly what to key
+      // into the terminal, then record what it said — instead of the old dead end
+      // where this just errored with "requires the cashier to confirm."
+      setManualCardPrompt({ amountCents: chargeCents, orderRef, lineSurchargeCents, cardType })
+      setManualReference('')
+      return
+    }
+    setPaymentState('awaiting')
+    setPaymentMessage('Waiting for terminal response…')
+    await performCardCharge(orderRef, chargeCents, lineSurchargeCents, cardType)
+  }
+
+  const confirmManualCardOutcome = async (outcome: 'approved' | 'declined'): Promise<void> => {
+    if (!manualCardPrompt) return
+    const { amountCents, orderRef, lineSurchargeCents, cardType: promptCardType } = manualCardPrompt
+    setManualCardPrompt(null)
+    await performCardCharge(orderRef, amountCents, lineSurchargeCents, promptCardType, {
+      manualOutcome: outcome,
+      manualReference: manualReference.trim() || undefined
+    })
   }
 
   /** Edit is only offered for CASH/PHARMACY_CREDIT lines — nothing external
@@ -825,6 +888,23 @@ export function CheckoutScreen(): React.JSX.Element {
       setCardProcessing(false)
     }
   }
+
+  // Auto-finish the sale the instant the last tender line brings Remaining to $0 — no
+  // extra tap on "Complete Sale" needed. Only fires from the tender-list screen (not
+  // mid-entry) and only once (completeSale's own guard + cardProcessing prevent a
+  // second fire while the first is still in flight).
+  React.useEffect(() => {
+    if (
+      showPayModal &&
+      paymentMethod === null &&
+      remainingCents === 0 &&
+      tenderLines.length > 0 &&
+      !cardProcessing
+    ) {
+      void completeSale()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remainingCents, tenderLines.length, showPayModal, paymentMethod, cardProcessing])
 
   const handleParkSale = (): void => {
     if (cart.length === 0) return
@@ -1854,7 +1934,9 @@ export function CheckoutScreen(): React.JSX.Element {
                     >
                       {cardProcessing
                         ? 'Waiting for terminal response…'
-                        : `Charge ${formatCurrency(lineAmountCents + pendingSurchargeCents)}`}
+                        : paymentInteractionMode === 'manual'
+                          ? `Continue — ${formatCurrency(lineAmountCents + pendingSurchargeCents)}`
+                          : `Charge ${formatCurrency(lineAmountCents + pendingSurchargeCents)}`}
                     </button>
                   </div>
                 )}
@@ -1933,6 +2015,64 @@ export function CheckoutScreen(): React.JSX.Element {
                 )}
               </div>
             )}
+          </Card>
+        </div>
+      )}
+
+      {/* Manual/External Terminal prompt — the cashier keys the amount into their own
+          standalone terminal, then reports the outcome here. Sits above the PAY popup
+          (z-[65] vs its z-50) since it's a step within the Card entry screen. */}
+      {manualCardPrompt && (
+        <div className="fixed inset-0 z-[65] flex items-center justify-center bg-black/60 p-4">
+          <Card className="w-[420px] max-w-full bg-[var(--card)] p-6 space-y-4">
+            <div>
+              <CardTitle className="text-[var(--foreground)]">Run this on the terminal</CardTitle>
+              <CardDescription className="text-[var(--muted-foreground)]">
+                Key this exact amount into your standalone card terminal, then tap what it says once
+                the card is done.
+              </CardDescription>
+            </div>
+            <div className="rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--muted)] px-4 py-3 text-center">
+              <div className="text-xs font-semibold text-[var(--muted-foreground)]">
+                Amount to key in
+              </div>
+              <div className="text-3xl font-bold text-[var(--primary)]">
+                {formatCurrency(manualCardPrompt.amountCents)}
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
+                Terminal receipt / reference number (optional)
+              </label>
+              <input
+                autoFocus
+                type="text"
+                value={manualReference}
+                onChange={(e) => setManualReference(e.target.value)}
+                placeholder="e.g. last 4 digits or approval code"
+                className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setManualCardPrompt(null)}
+                className="min-h-11 flex-1 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-sm font-medium text-[var(--foreground)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void confirmManualCardOutcome('declined')}
+                className="min-h-11 flex-1 rounded-[var(--radius)] border border-[var(--error)] px-3 text-sm font-semibold text-[var(--error)]"
+              >
+                Declined
+              </button>
+              <button
+                onClick={() => void confirmManualCardOutcome('approved')}
+                className="min-h-11 flex-1 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
+              >
+                Approved
+              </button>
+            </div>
           </Card>
         </div>
       )}
