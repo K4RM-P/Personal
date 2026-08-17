@@ -532,7 +532,12 @@ export function CheckoutScreen(): React.JSX.Element {
    *  with [Method]", which are the same action, just surfaced twice per §2.1. */
   const openAddTender = (method: NonNullable<PaymentMethod>): void => {
     resetTenderEntryFields()
-    setTenderedDollars(remainingCents > 0 ? (remainingCents / 100).toFixed(2) : '')
+    const remainingDollars = remainingCents > 0 ? (remainingCents / 100).toFixed(2) : ''
+    setTenderedDollars(remainingDollars)
+    // Cash given defaults to exact change — the overwhelmingly common case — so the
+    // cashier can tap "Add Cash Line" with zero typing; still fully editable for
+    // when the customer hands over more than owed.
+    if (method === 'CASH') setCashGivenDollars(remainingDollars)
     setPaymentMethod(method)
   }
 
@@ -1623,7 +1628,12 @@ export function CheckoutScreen(): React.JSX.Element {
                         step="0.01"
                         min="0"
                         value={tenderedDollars}
-                        onChange={(e) => setTenderedDollars(e.target.value)}
+                        onChange={(e) => {
+                          // Keep "cash given" tracking the amount as it's edited, as long as the
+                          // cashier hasn't diverged it themselves (still exact-change by default).
+                          if (cashGivenDollars === tenderedDollars) setCashGivenDollars(e.target.value)
+                          setTenderedDollars(e.target.value)
+                        }}
                         placeholder="0.00"
                         className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
                       />
