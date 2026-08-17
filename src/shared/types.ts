@@ -567,6 +567,14 @@ export interface PaymentConfig {
   terminalId?: string
   /** Secret/API key. Never sent to the renderer; stored encrypted at rest. */
   apiKey?: string
+  /**
+   * Local network address of a semi-integrated terminal that the POS connects to
+   * directly (e.g. Moneris V400c Core Semi-Integrated) — not a secret, just where
+   * the device lives on the LAN. Unused by cloud-API providers.
+   */
+  terminalIp?: string
+  /** Listening port on the local terminal (see `terminalIp`). Unused by cloud-API providers. */
+  terminalPort?: string
 }
 
 /** Renderer-safe view of the payment config — never carries the secret key. */
@@ -574,6 +582,8 @@ export interface PaymentConfigView {
   provider: PaymentProviderName
   environment: PaymentEnvironment
   terminalId?: string
+  terminalIp?: string
+  terminalPort?: string
   /** True when an encrypted API key is on file, so the UI can show "•••• set". */
   hasApiKey: boolean
   /**
@@ -598,6 +608,8 @@ export interface SavePaymentConfigInput {
   environment: PaymentEnvironment
   terminalId?: string
   apiKey?: string
+  terminalIp?: string
+  terminalPort?: string
 }
 
 export type PaymentStatus = 'approved' | 'declined' | 'error'

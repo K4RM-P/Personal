@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto'
+import { Socket } from 'net'
 import type {
   PaymentConfig,
   ChargeResult,
@@ -7,252 +7,144 @@ import type {
   ReaderStatus
 } from '../../../shared/types'
 import type { PaymentProvider } from '../PaymentProvider'
-import { fetchTransport, type HttpTransport } from '../httpTransport'
+
+/** Injectable so tests don't need a real socket/network. */
+export type TcpProbe = (host: string, port: number, timeoutMs: number) => Promise<boolean>
+
+const defaultTcpProbe: TcpProbe = (host, port, timeoutMs) =>
+  new Promise((resolve) => {
+    const socket = new Socket()
+    const finish = (ok: boolean): void => {
+      socket.destroy()
+      resolve(ok)
+    }
+    socket.setTimeout(timeoutMs)
+    socket.once('connect', () => finish(true))
+    socket.once('timeout', () => finish(false))
+    socket.once('error', () => finish(false))
+    socket.connect(port, host)
+  })
 
 /**
- * Moneris Go Cloud Integration.
+ * Moneris V400c — Core Semi-Integrated (Ethernet).
  *
- * Confirmed against the real Moneris Go developer docs (developer.moneris.com/moneris-go/docs/*):
- *  - base URLs: cloud-integration.md
- *  - action strings "purchase" / "independentRefund" / "void": purchase-api.md,
- *    card-present-refund-api.md, void-api.md
- *  - totalAmount is cents-as-a-string, e.g. "$10.50 must be sent as '1050'": message-field-data-description.md
- *  - responseCode < 050 = approved, >= 050 = declined, null = incomplete: message-field-data-description.md
- *  - idempotencyKey retry semantics (same action+amount+key on retry returns the original result
- *    rather than double-processing): idempotent-request.md
- *  - Independent Refund's request has no field referencing the original transaction — it is a
- *    standalone card-present refund, not a linked reversal: card-present-refund-api.md
+ * This is a DIFFERENT Moneris product from what earlier versions of this file
+ * targeted. The first version of this adapter was built against Moneris Go
+ * Cloud (a JSON REST API requiring `ist_config_code`, `ippostest.moneris.com`,
+ * etc.) — that was the wrong product for a V400c. Confirmed via Moneris's own
+ * V400c Core Semi-Integrated setup guide (moneris.com/help — V400C-WH-EN):
+ * Core Semi-Integrated is a LOCAL NETWORK connection — the POS talks directly
+ * to the terminal's own IP address and a configurable Listening Port on the
+ * LAN. There is no cloud call, no store_id/api_token/ist_config_code in the
+ * wire protocol at all for this product.
  *
- * Two things are NOT confirmed by any fetched example and are called out inline where they matter:
- *  1. Exact placement of storeId/apiToken. cloud-integration.md states they're "included in the POST
- *     request payload" but no sample request in purchase-api.md/void-api.md/etc. shows them (likely
- *     redacted from the docs). They're placed inside `data.request[0]` here, next to terminalId — the
- *     only place any per-call field appears in every confirmed sample. If a live sandbox call shows
- *     otherwise, it's a one-line move in `envelope()`.
- *  2. Async delivery. cloud-integration.md says a transaction can complete asynchronously via a
- *     receiptUrl/postback instead of in the initial HTTP response, but no field name for that
- *     poll/receipt URL is documented anywhere fetchable. Every purchase/void/refund/getDeviceInfo
- *     sample in the docs shows `"completed": "true"` directly in the response, so this adapter
- *     handles that synchronous case and returns a clear "pending" error otherwise, rather than
- *     guessing a polling field name. Confirm the receiptUrl field name with a live sandbox
- *     transaction before relying on this for slow/async terminals.
+ * What is CONFIRMED (from the setup guide, and from reading the terminal's own
+ * settings screen — Settings → Application → Integration):
+ *  - The terminal is reachable at `terminalIp:terminalPort` once Core
+ *    Semi-Integrated + Ethernet is enabled on the device.
+ *  - Once semi-integrated mode is on, the terminal's own Transactions menu
+ *    disappears — every transaction must originate from the POS over this
+ *    connection; there's no fallback.
  *
- * `apiKey` is stored as "<store_id>:<api_token>:<ist_config_code>". `istConfigCode` has no
- * public self-service source — it's issued by a Moneris Client Consultant per store.
+ * What is NOT confirmed, despite exhausting public Moneris documentation
+ * (merchant setup guides, the iCT250 semi-integrated *operating* guide, the
+ * public developer portal at developer.moneris.com — none of which contain
+ * it): the actual ECR/POS wire protocol — message framing, field names, how a
+ * Purchase/Refund/Void request and response look, how approved/declined is
+ * signaled to the POS programmatically. Moneris's own docs explicitly say to
+ * "consult your POS integration provider" for this — it's gated to
+ * registered integration partners, not public. A request for it is pending
+ * (emailed api@moneris.com / ClientConsulting@moneris.com).
+ *
+ * Given that, this adapter does the honest, real thing it CAN do without that
+ * spec: verify the terminal is actually reachable at the configured IP/port
+ * (a real TCP connection test, not a guess), and refuse to fabricate a
+ * charge/refund/void protocol. `charge`/`refund`/`void` return a clear
+ * `status: 'error'` explaining exactly what's missing, rather than a
+ * plausible-looking request built on invented field names — that would be
+ * worse than not working at all, since it could look like it's doing
+ * something while silently never charging (or worse, double-charging) a
+ * customer's card.
+ *
+ * Once the real protocol spec arrives, only `charge`/`refund`/`void` below
+ * need to be filled in — `init`/`getReaderStatus`/config plumbing are already
+ * correct for this product and don't need to change.
  */
 export class MonerisAdapter implements PaymentProvider {
   readonly name = 'moneris' as const
   readonly interactionMode = 'automatic' as const
 
-  private storeId = ''
-  private apiToken = ''
-  private istConfigCode = ''
-  private terminalId: string | null = null
-  private baseUrl = ''
+  private terminalIp: string | null = null
+  private terminalPort: number | null = null
 
-  constructor(private readonly http: HttpTransport = fetchTransport) {}
+  constructor(private readonly probe: TcpProbe = defaultTcpProbe) {}
 
   async init(config: PaymentConfig): Promise<void> {
-    if (!config.apiKey) {
-      throw new Error('Moneris requires credentials as "<store_id>:<api_token>:<ist_config_code>"')
-    }
-    const [storeId, apiToken, istConfigCode] = config.apiKey.split(':')
-    if (!storeId || !apiToken || !istConfigCode) {
+    const ip = config.terminalIp?.trim()
+    const port = config.terminalPort?.trim()
+    if (!ip || !port) {
       throw new Error(
-        'Moneris apiKey must be "<store_id>:<api_token>:<ist_config_code>" — ist_config_code is ' +
-          'issued by your Moneris Client Consultant, it is not the same as the API token'
+        "Moneris Core Semi-Integrated requires the terminal's local IP address and Listening Port " +
+          '(read from the terminal itself: Settings → Application → Integration)'
       )
     }
-    this.storeId = storeId
-    this.apiToken = apiToken
-    this.istConfigCode = istConfigCode
-    this.terminalId = config.terminalId?.trim() || null
-    // Confirmed: developer.moneris.com/moneris-go/docs/cloud-integration.md
-    this.baseUrl =
-      config.environment === 'production'
-        ? 'https://ippos.moneris.com/v3/terminal'
-        : 'https://ippostest.moneris.com/v3/terminal'
+    const portNum = Number(port)
+    if (!Number.isInteger(portNum) || portNum <= 0 || portNum > 65535) {
+      throw new Error(`Moneris terminal port must be a valid port number, got "${port}"`)
+    }
+    this.terminalIp = ip
+    this.terminalPort = portNum
   }
 
-  private envelope(action: string, requestFields: Record<string, unknown>): Record<string, unknown> {
-    return {
-      apiVersion: '3.0',
-      istConfigCode: this.istConfigCode,
-      dataId: `${action}-${Date.now()}-${randomUUID().slice(0, 8)}`,
-      dataTimestamp: this.timestamp(),
-      data: {
-        request: [
-          {
-            storeId: this.storeId,
-            apiToken: this.apiToken,
-            terminalId: this.terminalId,
-            action,
-            ...requestFields
-          }
-        ]
-      }
-    }
-  }
-
-  async charge(amountCents: number, orderRef: string): Promise<ChargeResult> {
-    if (!this.terminalId) {
-      return { status: 'error', amountCents, message: 'No Moneris terminal id configured' }
-    }
-    const res = await this.http(
-      'POST',
-      this.baseUrl,
-      {},
-      this.envelope('purchase', {
-        orderId: orderRef,
-        // Reused verbatim on retry of the same logical charge (same orderRef) so Moneris's own
-        // idempotency handling (idempotent-request.md) returns the original result instead of
-        // double-processing a retried request.
-        idempotencyKey: `purchase-${orderRef}`,
-        totalAmount: this.cents(amountCents)
-      })
+  private notImplemented(action: string): string {
+    return (
+      `Moneris Core Semi-Integrated ${action} is not implemented yet — the ECR/POS protocol spec ` +
+      'for this connection has not been confirmed (Moneris gates it to registered integration ' +
+      'partners; request is pending). The terminal connection itself is configured and reachable, ' +
+      'but no request is sent because the real message format is unknown, and guessing risks a ' +
+      'silent failure or a duplicate charge. Do not attempt this transaction on Moneris until the ' +
+      'spec is confirmed — use Manual/External Terminal mode instead.'
     )
-    if (!res.ok) return { status: 'error', amountCents, message: this.messageFrom(res) }
-
-    const entry = this.entryFrom(res)
-    if (!entry) return { status: 'error', amountCents, message: 'No response entry from Moneris' }
-    if (entry.completed !== 'true') {
-      return {
-        status: 'error',
-        amountCents,
-        message:
-          'Moneris returned a pending (not yet completed) response — this adapter does not poll ' +
-          'for async completion since the receiptUrl field name is unconfirmed; check the terminal ' +
-          'directly before retrying'
-      }
-    }
-
-    const approved = this.isApproved(entry.responseCode)
-    if (approved) {
-      return {
-        status: 'approved',
-        amountCents,
-        // realTimeUniqueId is what Independent Refund needs later (Moneris Go Integration Guide
-        // §9.6), so it — not transactionId — is threaded forward as ChargeResult.transactionId.
-        transactionId: String(entry.realTimeUniqueId ?? entry.transactionId ?? orderRef),
-        cardLast4: this.last4(entry.maskedPan),
-        authCode: entry.authCode,
-        message: entry.status ?? 'Approved'
-      }
-    }
-    return {
-      status: 'declined',
-      amountCents,
-      transactionId: entry.realTimeUniqueId ? String(entry.realTimeUniqueId) : undefined,
-      message: entry.status ?? `Declined (code ${entry.responseCode})`
-    }
   }
 
-  async refund(transactionId: string, amountCents?: number): Promise<RefundResult> {
-    // Independent Refund is not linked to the original transaction (see class doc), so there is no
-    // "refund the original amount" fallback — an explicit amount is required.
-    if (amountCents == null) {
-      return {
-        status: 'declined',
-        message:
-          'Moneris independent refunds are not linked to the original transaction and require an explicit amount'
-      }
-    }
-    const orderId = `refund-${transactionId}-${Date.now()}`
-    const res = await this.http(
-      'POST',
-      this.baseUrl,
-      {},
-      this.envelope('independentRefund', {
-        orderId,
-        idempotencyKey: orderId,
-        totalAmount: this.cents(amountCents)
-      })
-    )
-    if (!res.ok) return { status: 'declined', message: this.messageFrom(res) }
-    const entry = this.entryFrom(res)
-    if (!entry || entry.completed !== 'true') {
-      return { status: 'declined', message: 'Moneris refund did not complete synchronously' }
-    }
-    if (!this.isApproved(entry.responseCode)) {
-      return { status: 'declined', message: entry.status ?? `Declined (code ${entry.responseCode})` }
-    }
-    return {
-      status: 'approved',
-      refundId: String(entry.realTimeUniqueId ?? entry.transactionId ?? orderId),
-      message: entry.status ?? 'Refunded'
-    }
+  async charge(amountCents: number): Promise<ChargeResult> {
+    if (!this.terminalIp)
+      return { status: 'error', amountCents, message: 'Moneris terminal not configured' }
+    return { status: 'error', amountCents, message: this.notImplemented('Purchase') }
   }
 
-  async void(transactionId: string): Promise<VoidResult> {
-    const orderId = `void-${transactionId}-${Date.now()}`
-    const res = await this.http(
-      'POST',
-      this.baseUrl,
-      {},
-      this.envelope('void', {
-        orderId,
-        transactionId,
-        idempotencyKey: orderId
-      })
-    )
-    if (!res.ok) return { status: 'error', message: this.messageFrom(res) }
-    const entry = this.entryFrom(res)
-    if (!entry || entry.completed !== 'true' || !this.isApproved(entry.responseCode)) {
-      return { status: 'error', message: entry?.status ?? this.messageFrom(res) }
-    }
-    return { status: 'approved', message: entry.status ?? 'Voided' }
+  async refund(): Promise<RefundResult> {
+    return { status: 'declined', message: this.notImplemented('Refund') }
   }
 
+  async void(): Promise<VoidResult> {
+    return { status: 'error', message: this.notImplemented('Void') }
+  }
+
+  /**
+   * The one thing that CAN be verified for real right now: is the terminal actually
+   * reachable at the configured IP/port over the LAN? Plain TCP connect, no protocol
+   * knowledge required — this alone confirms the network setup is correct so that
+   * whoever wires up the real protocol later isn't also debugging connectivity.
+   */
   async getReaderStatus(): Promise<ReaderStatus> {
-    if (!this.storeId || !this.terminalId) {
-      return { connected: false, provider: this.name, message: 'Not configured' }
+    if (!this.terminalIp || !this.terminalPort) {
+      return {
+        connected: false,
+        provider: this.name,
+        message: 'Not configured — set the terminal IP and port'
+      }
     }
-    // Action string confirmed (get-device-info-api.md). Moneris does not document a dedicated
-    // online/offline flag on this response, so "the terminal answered at all" is the strongest
-    // reachability signal available from this call.
-    const res = await this.http(
-      'POST',
-      this.baseUrl,
-      {},
-      this.envelope('getDeviceInfo', { idempotencyKey: `status-${Date.now()}` })
-    )
-    const entry = this.entryFrom(res)
-    const reachable = res.ok && entry?.completed === 'true'
+    const label = `Moneris V400c at ${this.terminalIp}:${this.terminalPort}`
+    const reachable = await this.probe(this.terminalIp, this.terminalPort, 5_000)
     return {
       connected: reachable,
       provider: this.name,
-      label: `Moneris terminal ${this.terminalId}`,
-      message: res.ok ? (reachable ? 'Terminal reachable' : 'No response from terminal') : this.messageFrom(res)
+      label,
+      message: reachable
+        ? 'Terminal is reachable on the network (protocol not yet implemented — see adapter notes)'
+        : 'Could not open a TCP connection to the terminal — check the IP/port and that Core ' +
+          'Semi-Integrated + Ethernet is enabled on the device'
     }
-  }
-
-  private entryFrom(res: { body: unknown }): Record<string, any> | null {
-    const arr = (res.body as any)?.data?.response
-    return Array.isArray(arr) ? arr[0] : null
-  }
-
-  private isApproved(responseCode: unknown): boolean {
-    if (responseCode == null) return false
-    return Number(responseCode) < 50
-  }
-
-  private last4(maskedPan: unknown): string | undefined {
-    const s = typeof maskedPan === 'string' ? maskedPan : undefined
-    return s ? s.slice(-4) : undefined
-  }
-
-  private cents(amountCents: number): string {
-    return String(Math.round(amountCents))
-  }
-
-  private timestamp(): string {
-    const d = new Date()
-    const pad = (n: number): string => String(n).padStart(2, '0')
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-  }
-
-  private messageFrom(res: { body: unknown }): string {
-    const entry = this.entryFrom(res)
-    return entry?.status ?? (res.body as any)?.status ?? (res.body as any)?.error ?? 'Moneris API error'
   }
 }

@@ -13,7 +13,9 @@ const KEYS = {
   provider: 'payment.provider',
   environment: 'payment.environment',
   terminalId: 'payment.terminalId',
-  apiKeyEnc: 'payment.apiKeyEnc'
+  apiKeyEnc: 'payment.apiKeyEnc',
+  terminalIp: 'payment.terminalIp',
+  terminalPort: 'payment.terminalPort'
 } as const
 
 // Safe real-world default for a fresh pharmacy: assume a standalone terminal
@@ -33,20 +35,34 @@ async function set(db: PrismaClient, key: string, value: string): Promise<void> 
 /** Full config incl. decrypted secret — MAIN PROCESS ONLY (provider init). */
 export async function getPaymentConfig(db: PrismaClient): Promise<PaymentConfig> {
   const provider = ((await get(db, KEYS.provider)) || DEFAULT_PROVIDER) as PaymentProviderName
-  const environment = ((await get(db, KEYS.environment)) || DEFAULT_ENVIRONMENT) as PaymentEnvironment
+  const environment = ((await get(db, KEYS.environment)) ||
+    DEFAULT_ENVIRONMENT) as PaymentEnvironment
   const terminalId = (await get(db, KEYS.terminalId)) || undefined
+  const terminalIp = (await get(db, KEYS.terminalIp)) || undefined
+  const terminalPort = (await get(db, KEYS.terminalPort)) || undefined
   const enc = await get(db, KEYS.apiKeyEnc)
   const apiKey = enc ? decryptSecret(enc) : undefined
-  return { provider, environment, terminalId, apiKey }
+  return { provider, environment, terminalId, apiKey, terminalIp, terminalPort }
 }
 
 /** Renderer-safe view — never includes the secret key. */
 export async function getPaymentConfigView(db: PrismaClient): Promise<PaymentConfigView> {
   const provider = ((await get(db, KEYS.provider)) || DEFAULT_PROVIDER) as PaymentProviderName
-  const environment = ((await get(db, KEYS.environment)) || DEFAULT_ENVIRONMENT) as PaymentEnvironment
+  const environment = ((await get(db, KEYS.environment)) ||
+    DEFAULT_ENVIRONMENT) as PaymentEnvironment
   const terminalId = (await get(db, KEYS.terminalId)) || undefined
+  const terminalIp = (await get(db, KEYS.terminalIp)) || undefined
+  const terminalPort = (await get(db, KEYS.terminalPort)) || undefined
   const hasApiKey = Boolean(await get(db, KEYS.apiKeyEnc))
-  return { provider, environment, terminalId, hasApiKey, interactionMode: providerInteractionMode(provider) }
+  return {
+    provider,
+    environment,
+    terminalId,
+    terminalIp,
+    terminalPort,
+    hasApiKey,
+    interactionMode: providerInteractionMode(provider)
+  }
 }
 
 /**
@@ -61,6 +77,8 @@ export async function savePaymentConfig(
   await set(db, KEYS.provider, input.provider)
   await set(db, KEYS.environment, input.environment)
   await set(db, KEYS.terminalId, input.terminalId ?? '')
+  await set(db, KEYS.terminalIp, input.terminalIp ?? '')
+  await set(db, KEYS.terminalPort, input.terminalPort ?? '')
 
   if (input.apiKey && input.apiKey.trim()) {
     await set(db, KEYS.apiKeyEnc, encryptSecret(input.apiKey.trim()))
