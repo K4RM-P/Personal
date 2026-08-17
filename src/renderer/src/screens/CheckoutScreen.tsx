@@ -152,6 +152,10 @@ export function CheckoutScreen(): React.JSX.Element {
 
   // ---- Link Customer + Bring In Outstanding Balance --------------------------
   const [showLinkCustomerSearch, setShowLinkCustomerSearch] = React.useState(false)
+  // Cash-overage "deposit to a tab" search — shown inline when the customer isn't
+  // already attached to the sale, so the cashier doesn't have to back out of the
+  // PAY popup, attach a customer from the top of the screen, and re-enter Cash.
+  const [showOverageDepositSearch, setShowOverageDepositSearch] = React.useState(false)
   const [showCustomerOverflowMenu, setShowCustomerOverflowMenu] = React.useState(false)
   const [showBringInBalanceModal, setShowBringInBalanceModal] = React.useState(false)
   const [showDebtDetailsModal, setShowDebtDetailsModal] = React.useState(false)
@@ -546,6 +550,18 @@ export function CheckoutScreen(): React.JSX.Element {
     setPaymentMessage(null)
     setPaymentState('idle')
   }
+
+  /** Enter submits the current tender-entry screen — keeps the cashier's hands on the
+   *  keyboard instead of requiring a mouse click on "Add ... Line" every time. */
+  const confirmOnEnter =
+    (fn: () => void) =>
+    (e: React.KeyboardEvent): void => {
+      if (e.key === 'Enter') fn()
+    }
+
+  /** Focusing a prefilled amount selects it, so typing immediately replaces the
+   *  default instead of requiring a manual clear/backspace first. */
+  const selectOnFocus = (e: React.FocusEvent<HTMLInputElement>): void => e.target.select()
 
   const addLine = (line: TenderLine): void => {
     setTenderLines((prev) => [...prev, line])
@@ -1455,48 +1471,22 @@ export function CheckoutScreen(): React.JSX.Element {
             </CardHeader>
 
             {paymentMethod === null ? (
-              <div className="mt-3 space-y-3 text-sm">
+              <div
+                className="mt-3 space-y-3 text-sm"
+                onKeyDown={(e) => {
+                  // Enter completes the sale the instant it's fully tendered — the fastest
+                  // path once the last line is added, no mouse trip to the button required.
+                  if (e.key === 'Enter' && remainingCents === 0 && tenderLines.length > 0 && !cardProcessing) {
+                    void completeSale()
+                  }
+                }}
+              >
                 <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--muted)] px-3 py-2">
                   <span className="font-semibold text-[var(--foreground)]">Remaining</span>
                   <span className="text-lg font-bold text-[var(--primary)]">
                     {formatCurrency(remainingCents)}
                   </span>
                 </div>
-
-                {remainingCents > 0 && tenderLines.length === 0 && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => openAddTender('CASH')}
-                      className="flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-2 text-xs font-semibold text-[var(--primary)]"
-                    >
-                      <Banknote className="icon-4 shrink-0" />+ Add Cash
-                    </button>
-                    <button
-                      onClick={() => openAddTender('CARD')}
-                      className="flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-2 text-xs font-semibold text-[var(--primary)]"
-                    >
-                      <CreditCard className="icon-4 shrink-0" />+ Add Card
-                    </button>
-                    <button
-                      onClick={() => openAddTender('E_TRANSFER')}
-                      className="flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-2 text-xs font-semibold text-[var(--primary)]"
-                    >
-                      <Send className="icon-4 shrink-0" />+ Add E-Transfer
-                    </button>
-                    <button
-                      onClick={() => !(debtSettlementCents > 0) && openAddTender('PHARMACY_CREDIT')}
-                      disabled={debtSettlementCents > 0}
-                      title={
-                        debtSettlementCents > 0
-                          ? 'Cannot use Pharmacy Credit to pay off an outstanding balance — choose another method'
-                          : undefined
-                      }
-                      className="flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-2 text-xs font-semibold text-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <HeartHandshake className="icon-4 shrink-0" />+ Add Pharmacy Credit
-                    </button>
-                  </div>
-                )}
 
                 {failedLineNotice && (
                   <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--error)]/40 bg-[var(--error-bg)] px-2 py-1.5 text-xs text-[var(--error)]">
@@ -1557,32 +1547,41 @@ export function CheckoutScreen(): React.JSX.Element {
                   </div>
                 )}
 
-                {remainingCents > 0 && tenderLines.length > 0 && (
+                {remainingCents > 0 && (
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => openAddTender('CASH')}
-                      className="min-h-9 rounded-[var(--radius)] border border-[var(--border)] px-2 text-xs font-medium text-[var(--foreground)]"
+                      className="flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-2 text-xs font-semibold text-[var(--primary)]"
                     >
-                      Pay Rest with Cash
+                      <Banknote className="icon-4 shrink-0" />
+                      {tenderLines.length === 0 ? '+ Add Cash' : 'Pay Rest with Cash'}
                     </button>
                     <button
                       onClick={() => openAddTender('CARD')}
-                      className="min-h-9 rounded-[var(--radius)] border border-[var(--border)] px-2 text-xs font-medium text-[var(--foreground)]"
+                      className="flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-2 text-xs font-semibold text-[var(--primary)]"
                     >
-                      Pay Rest with Card
+                      <CreditCard className="icon-4 shrink-0" />
+                      {tenderLines.length === 0 ? '+ Add Card' : 'Pay Rest with Card'}
                     </button>
                     <button
                       onClick={() => openAddTender('E_TRANSFER')}
-                      className="min-h-9 rounded-[var(--radius)] border border-[var(--border)] px-2 text-xs font-medium text-[var(--foreground)]"
+                      className="flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-2 text-xs font-semibold text-[var(--primary)]"
                     >
-                      Pay Rest with E-Transfer
+                      <Send className="icon-4 shrink-0" />
+                      {tenderLines.length === 0 ? '+ Add E-Transfer' : 'Pay Rest with E-Transfer'}
                     </button>
                     <button
                       onClick={() => !(debtSettlementCents > 0) && openAddTender('PHARMACY_CREDIT')}
                       disabled={debtSettlementCents > 0}
-                      className="min-h-9 rounded-[var(--radius)] border border-[var(--border)] px-2 text-xs font-medium text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+                      title={
+                        debtSettlementCents > 0
+                          ? 'Cannot use Pharmacy Credit to pay off an outstanding balance — choose another method'
+                          : undefined
+                      }
+                      className="flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-2 text-xs font-semibold text-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Pay Rest with Tab
+                      <HeartHandshake className="icon-4 shrink-0" />
+                      {tenderLines.length === 0 ? '+ Add Pharmacy Credit' : 'Pay Rest with Tab'}
                     </button>
                   </div>
                 )}
@@ -1606,6 +1605,7 @@ export function CheckoutScreen(): React.JSX.Element {
                 </div>
               </div>
             ) : (
+              // Escape already backs out of this screen via the global handler above.
               <div className="mt-3 space-y-3 text-xs">
                 <button
                   onClick={backToTenderList}
@@ -1627,6 +1627,8 @@ export function CheckoutScreen(): React.JSX.Element {
                         type="number"
                         step="0.01"
                         min="0"
+                        autoFocus
+                        onFocus={selectOnFocus}
                         value={tenderedDollars}
                         onChange={(e) => {
                           // Keep "cash given" tracking the amount as it's edited, as long as the
@@ -1634,6 +1636,7 @@ export function CheckoutScreen(): React.JSX.Element {
                           if (cashGivenDollars === tenderedDollars) setCashGivenDollars(e.target.value)
                           setTenderedDollars(e.target.value)
                         }}
+                        onKeyDown={confirmOnEnter(confirmCashLine)}
                         placeholder="0.00"
                         className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
                       />
@@ -1651,35 +1654,60 @@ export function CheckoutScreen(): React.JSX.Element {
                         type="number"
                         step="0.01"
                         min="0"
+                        onFocus={selectOnFocus}
                         value={cashGivenDollars}
                         onChange={(e) => setCashGivenDollars(e.target.value)}
+                        onKeyDown={confirmOnEnter(confirmCashLine)}
                         placeholder={(lineAmountCents / 100).toFixed(2)}
                         className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
                       />
                     </div>
                     {cashOverageCents > 0 && (
-                      <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
+                      <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3 space-y-1.5">
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            checked={cashOverageChoice === 'change'}
+                            onChange={() => setCashOverageChoice('change')}
+                          />
+                          Change due: {formatCurrency(cashOverageCents)}
+                        </label>
                         {attachedCustomer ? (
-                          <div className="space-y-1.5">
-                            <label className="flex items-center gap-2">
-                              <input
-                                type="radio"
-                                checked={cashOverageChoice === 'change'}
-                                onChange={() => setCashOverageChoice('change')}
-                              />
-                              Change due: {formatCurrency(cashOverageCents)}
-                            </label>
-                            <label className="flex items-center gap-2">
-                              <input
-                                type="radio"
-                                checked={cashOverageChoice === 'deposit'}
-                                onChange={() => setCashOverageChoice('deposit')}
-                              />
-                              Deposit {formatCurrency(cashOverageCents)} to {attachedCustomer.firstName}&apos;s Pharmacy Credit
-                            </label>
-                          </div>
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              checked={cashOverageChoice === 'deposit'}
+                              onChange={() => setCashOverageChoice('deposit')}
+                            />
+                            Deposit {formatCurrency(cashOverageCents)} to {attachedCustomer.firstName}
+                            &apos;s Pharmacy Credit
+                          </label>
                         ) : (
-                          <div>Change due: {formatCurrency(cashOverageCents)}</div>
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => setShowOverageDepositSearch((v) => !v)}
+                              className="text-xs font-semibold text-[var(--primary)] underline"
+                            >
+                              Deposit to a tab instead
+                            </button>
+                            {showOverageDepositSearch && (
+                              <div className="mt-2">
+                                <CustomerSearchPanel
+                                  query={customerSearchQuery}
+                                  onQueryChange={setCustomerSearchQuery}
+                                  results={customerSearchResults}
+                                  onSelect={(customer) => {
+                                    void attachCustomer(customer)
+                                    setCashOverageChoice('deposit')
+                                    setShowOverageDepositSearch(false)
+                                  }}
+                                  onAddNew={() => setShowAddCustomer(true)}
+                                  placeholder="Search name or phone to deposit to their tab"
+                                />
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     )}
@@ -1708,6 +1736,8 @@ export function CheckoutScreen(): React.JSX.Element {
                         type="number"
                         step="0.01"
                         min="0"
+                        autoFocus
+                        onFocus={selectOnFocus}
                         value={tenderedDollars}
                         onChange={(e) => setTenderedDollars(e.target.value)}
                         placeholder="0.00"
@@ -1736,6 +1766,7 @@ export function CheckoutScreen(): React.JSX.Element {
                         type="checkbox"
                         checked={eTransferConfirmed}
                         onChange={(e) => setETransferConfirmed(e.target.checked)}
+                        onKeyDown={confirmOnEnter(confirmETransferLine)}
                       />
                       I have received the E-Transfer confirmation for this amount
                     </label>
@@ -1762,8 +1793,13 @@ export function CheckoutScreen(): React.JSX.Element {
                         type="number"
                         step="0.01"
                         min="0"
+                        autoFocus
+                        onFocus={selectOnFocus}
                         value={tenderedDollars}
                         onChange={(e) => setTenderedDollars(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') void startCardLineCharge()
+                        }}
                         placeholder="0.00"
                         className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
                       />
@@ -1870,8 +1906,11 @@ export function CheckoutScreen(): React.JSX.Element {
                             type="number"
                             step="0.01"
                             min="0"
+                            autoFocus
+                            onFocus={selectOnFocus}
                             value={tenderedDollars}
                             onChange={(e) => setTenderedDollars(e.target.value)}
+                            onKeyDown={confirmOnEnter(confirmPharmacyCreditLine)}
                             placeholder="0.00"
                             className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none"
                           />
