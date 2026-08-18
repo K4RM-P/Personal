@@ -4,8 +4,193 @@ import * as net from 'net'
 import { writeFile } from 'fs/promises'
 import { join } from 'path'
 import { formatCurrency } from '../../shared/formatCurrency'
-import { PrintReceiptOptions, PrintReceiptResult, SystemPrinterInfo } from '../../shared/types'
+import { PrintReceiptOptions, PrintReceiptResult, PrinterConfig, SystemPrinterInfo } from '../../shared/types'
 import { buildReceiptHtml, DEFAULT_STORE_INFO } from './receiptTemplate'
+
+/** Zebra 203dpi label printers (ZD421 included) address content in dots at ~8 dots/mm. */
+const ZPL_DOTS_PER_MM = 8
+const ZPL_DEFAULT_LABEL_WIDTH_MM = 85
+const ZPL_DEFAULT_LABEL_HEIGHT_MM = 105
+const ZPL_DEFAULT_TOP_MARGIN_MM = 10
+const ZPL_SIDE_MARGIN_MM = 4
+const ZPL_BOTTOM_MARGIN_MM = 6
+
+function zplEscape(text: string): string {
+  // ZPL uses ^ ~ and \ as control characters inside ^FD field data.
+  return text.replace(/\\/g, '\\\\').replace(/\^/g, '\\5E').replace(/~/g, '\\7E')
+}
+
+interface ZplLabelConfig {
+  widthMm: number
+  heightMm: number
+  topMarginMm: number
+}
+
+/**
+ * Accumulates ZPL across one or more physical labels, starting a new label
+ * (`^XA` ... `^XZ`) whenever the next line would overflow the usable height —
+ * used for die-cut label stock where a variable-length receipt must span
+ * multiple fixed-size labels rather than one continuous strip.
+ */
+class ZplLabelWriter {
+  private readonly widthDots: number
+  private readonly heightDots: number
+  private readonly topMarginDots: number
+  private readonly bottomMarginDots: number
+  private readonly leftDots: number
+  private readonly contentWidthDots: number
+  private pages: string[] = []
+  private current = ''
+  private y = 0
+  private pageCount = 0
+  private onNewPage: (() => void) | null = null
+
+  constructor(config: ZplLabelConfig) {
+    this.widthDots = Math.round(config.widthMm * ZPL_DOTS_PER_MM)
+    this.heightDots = Math.round(config.heightMm * ZPL_DOTS_PER_MM)
+    this.topMarginDots = Math.round(config.topMarginMm * ZPL_DOTS_PER_MM)
+    this.bottomMarginDots = Math.round(ZPL_BOTTOM_MARGIN_MM * ZPL_DOTS_PER_MM)
+    this.leftDots = Math.round(ZPL_SIDE_MARGIN_MM * ZPL_DOTS_PER_MM)
+    this.contentWidthDots = this.widthDots - this.leftDots * 2
+    this.startPage()
+  }
+
+  private startPage(): void {
+    this.pageCount += 1
+    this.current = `^XA\n^PW${this.widthDots}\n^LL${this.heightDots}\n`
+    this.y = this.topMarginDots
+  }
+
+  private get usableBottom(): number {
+    return this.heightDots - this.bottomMarginDots
+  }
+
+  /**
+   * Registers the callback that writes a continuation-label header (store name,
+   * receipt #) — invoked automatically every time content overflows onto a new
+   * physical label, regardless of which helper triggered the overflow.
+   */
+  setOnNewPage(fn: () => void): void {
+    this.onNewPage = fn
+  }
+
+  /** Ensures `heightNeeded` more dots are available on the current label, starting a new one if not. */
+  ensureSpace(heightNeeded: number): void {
+    if (this.y + heightNeeded > this.usableBottom) {
+      this.current += '^XZ\n'
+      this.pages.push(this.current)
+      this.startPage()
+      if (this.onNewPage) this.onNewPage()
+    }
+  }
+
+  /** Left-aligned text field at the current y, then advances y by lineHeight. */
+  text(value: string, opts: { fontHeight?: number; fontWidth?: number; bold?: boolean } = {}): void {
+    const h = opts.fontHeight ?? 22
+    const w = opts.fontWidth ?? h
+    this.ensureSpace(h + 6)
+    this.current += `^FO${this.leftDots},${this.y}^A0N,${h},${w}^FD${zplEscape(value)}^FS\n`
+    this.y += h + 6
+  }
+
+  /** A row of left name / right-justified value (item lines, totals) sharing one y position. */
+  row(left: string, right: string, opts: { fontHeight?: number; bold?: boolean } = {}): void {
+    const h = opts.fontHeight ?? 22
+    this.ensureSpace(h + 6)
+    const rightWidth = Math.round(this.contentWidthDots * 0.35)
+    const leftWidth = this.contentWidthDots - rightWidth
+    this.current += `^FO${this.leftDots},${this.y}^A0N,${h},${h}^FB${leftWidth},1,0,L,0^FD${zplEscape(left)}^FS\n`
+    this.current += `^FO${this.leftDots + leftWidth},${this.y}^A0N,${h},${h}^FB${rightWidth},1,0,R,0^FD${zplEscape(right)}^FS\n`
+    this.y += h + 6
+  }
+
+  /** A horizontal rule across the content width. */
+  divider(): void {
+    this.ensureSpace(14)
+    this.current += `^FO${this.leftDots},${this.y}^GB${this.contentWidthDots},1,2^FS\n`
+    this.y += 14
+  }
+
+  gap(dots = 10): void {
+    this.y += dots
+  }
+
+  finish(): Uint8Array {
+    this.current += '^XZ\n'
+    this.pages.push(this.current)
+    return new TextEncoder().encode(this.pages.join(''))
+  }
+
+  get labelCount(): number {
+    return this.pageCount
+  }
+}
+
+/**
+ * Builds ZPL for a receipt printed on fixed-size die-cut labels (e.g. a Zebra ZD421),
+ * as opposed to continuous ESC/POS roll paper. Content starts `topMarginMm` down on
+ * every label to clear pre-printed stock (a logo, etc.), and a receipt that doesn't
+ * fit on one label continues onto additional labels with a short "(cont'd)" header.
+ */
+export function buildZplReceiptBuffer(options: PrintReceiptOptions): Uint8Array {
+  const { transaction } = options
+  const store = options.storeInfo || DEFAULT_STORE_INFO
+  const config = options.printerConfig
+
+  const labelConfig: ZplLabelConfig = {
+    widthMm: config?.labelWidthMm || ZPL_DEFAULT_LABEL_WIDTH_MM,
+    heightMm: config?.labelHeightMm || ZPL_DEFAULT_LABEL_HEIGHT_MM,
+    topMarginMm: config?.topMarginMm ?? ZPL_DEFAULT_TOP_MARGIN_MM
+  }
+
+  const writer = new ZplLabelWriter(labelConfig)
+
+  const writeHeader = (continuation: boolean): void => {
+    writer.text(continuation ? `${store.name} (cont'd)` : store.name, { fontHeight: 26 })
+    if (!continuation) {
+      writer.text(store.address, { fontHeight: 18 })
+      writer.text(store.phone, { fontHeight: 18 })
+    }
+    writer.divider()
+    writer.text(`Receipt: #${transaction.receiptNumber}`, { fontHeight: 18 })
+    if (!continuation) {
+      writer.text(`Date: ${new Date(transaction.createdAt).toLocaleString()}`, { fontHeight: 18 })
+      writer.text(`Type: ${transaction.tenderType}`, { fontHeight: 18 })
+    }
+    writer.divider()
+  }
+
+  writer.setOnNewPage(() => writeHeader(true))
+  writeHeader(false)
+
+  transaction.items.forEach((item) => {
+    const displayName = item.lineType === 'DEBT_SETTLEMENT' ? 'Previous Balance' : (item.product?.name ?? '(item)')
+    writer.ensureSpace(28)
+    writer.row(displayName, `x${item.quantity}  ${formatCurrency(item.totalCents)}`, { fontHeight: 20 })
+  })
+
+  writer.divider()
+  writer.row('Subtotal', formatCurrency(transaction.subtotalCents), { fontHeight: 20 })
+  writer.row('Tax', formatCurrency(transaction.taxCents), { fontHeight: 20 })
+  writer.row('TOTAL', formatCurrency(transaction.totalCents), { fontHeight: 26, bold: true })
+  writer.row('Tendered', formatCurrency(transaction.tenderedCents), { fontHeight: 18 })
+  writer.row('Change Due', formatCurrency(transaction.changeCents), { fontHeight: 18 })
+  writer.divider()
+  writer.text('Thank you for choosing VantisPOS!', { fontHeight: 18 })
+  writer.text('Please retain receipt for returns.', { fontHeight: 18 })
+
+  if (options.rxFooter) {
+    writer.divider()
+    writer.text(options.rxFooter, { fontHeight: 18 })
+  }
+
+  return writer.finish()
+}
+
+/** Picks the byte-encoder for a NETWORK printer based on its configured command language. */
+export function buildNetworkReceiptBuffer(options: PrintReceiptOptions): Uint8Array {
+  return options.printerConfig?.language === 'zpl' ? buildZplReceiptBuffer(options) : buildEscPosReceiptBuffer(options)
+}
 
 /**
  * Builds ESC/POS binary data array using receipt-printer-encoder
@@ -172,7 +357,7 @@ export async function printReceipt(options: PrintReceiptOptions): Promise<PrintR
     storeInfo: options.storeInfo,
     rxFooter: options.rxFooter
   })
-  const buffer = buildEscPosReceiptBuffer(options)
+  const buffer = buildNetworkReceiptBuffer(options)
   const config = options.printerConfig
   const receiptNumber = options.transaction.receiptNumber
 
@@ -214,9 +399,24 @@ export async function printReceipt(options: PrintReceiptOptions): Promise<PrintR
 /**
  * Test network printer connectivity by sending a minimal ESC/POS init + cut command.
  */
-export async function testNetworkPrinter(ipAddress: string, port = 9100): Promise<{ ok: boolean; message: string }> {
-  const encoder = new ReceiptPrinterEncoder({ language: 'esc-pos', width: 32 })
-  const testBuffer = encoder.initialize().line('VantisPOS Printer Test OK').newline().cut().encode()
+export async function testNetworkPrinter(
+  ipAddress: string,
+  port = 9100,
+  config?: Pick<PrinterConfig, 'language' | 'labelWidthMm' | 'labelHeightMm' | 'topMarginMm'>
+): Promise<{ ok: boolean; message: string }> {
+  let testBuffer: Uint8Array
+  if (config?.language === 'zpl') {
+    const writer = new ZplLabelWriter({
+      widthMm: config.labelWidthMm || ZPL_DEFAULT_LABEL_WIDTH_MM,
+      heightMm: config.labelHeightMm || ZPL_DEFAULT_LABEL_HEIGHT_MM,
+      topMarginMm: config.topMarginMm ?? ZPL_DEFAULT_TOP_MARGIN_MM
+    })
+    writer.text('VantisPOS Printer Test OK', { fontHeight: 24 })
+    testBuffer = writer.finish()
+  } else {
+    const encoder = new ReceiptPrinterEncoder({ language: 'esc-pos', width: 32 })
+    testBuffer = encoder.initialize().line('VantisPOS Printer Test OK').newline().cut().encode()
+  }
 
   try {
     await printToNetworkSocket(testBuffer, ipAddress, port, 3000)

@@ -244,12 +244,21 @@ export interface ExportReceiptResult {
 
 export type PrinterType = 'NETWORK' | 'SYSTEM' | 'PDF'
 
+export type PrinterLanguage = 'escpos' | 'zpl'
+
 export interface PrinterConfig {
   type: PrinterType
   ipAddress?: string
   port?: number
   /** OS printer device name for SYSTEM type — printing targets this printer silently, no OS print dialog. */
   deviceName?: string
+  /** Command language for NETWORK printers — ESC/POS thermal receipt printers vs. Zebra ZPL label printers. Defaults to 'escpos'. */
+  language?: PrinterLanguage
+  /** ZPL label geometry, only used when language is 'zpl'. Defaults match a Zebra ZD421 loaded with 85x105mm die-cut labels. */
+  labelWidthMm?: number
+  labelHeightMm?: number
+  /** Blank space reserved at the top of each label for pre-printed stock (e.g. a logo), in mm. */
+  topMarginMm?: number
 }
 
 /** An installed OS printer, as reported by Electron's printer enumeration. */

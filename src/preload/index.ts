@@ -203,8 +203,12 @@ const api = {
   receipt: {
     print: (transaction: TransactionWithItems): Promise<PrintReceiptResult> =>
       ipcRenderer.invoke(IPC.RECEIPT_PRINT, transaction),
-    testNetwork: (ipAddress: string, port?: number): Promise<{ ok: boolean; message: string }> =>
-      ipcRenderer.invoke(IPC.RECEIPT_TEST_NETWORK, { ipAddress, port }),
+    testNetwork: (
+      ipAddress: string,
+      port?: number,
+      printerOpts?: Pick<PrinterConfig, 'language' | 'labelWidthMm' | 'labelHeightMm' | 'topMarginMm'>
+    ): Promise<{ ok: boolean; message: string }> =>
+      ipcRenderer.invoke(IPC.RECEIPT_TEST_NETWORK, { ipAddress, port, ...printerOpts }),
     listPrinters: (): Promise<SystemPrinterInfo[]> => ipcRenderer.invoke(IPC.RECEIPT_LIST_PRINTERS),
     preview: (): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.RECEIPT_PREVIEW),
     export: (): Promise<ExportReceiptResult | null> => ipcRenderer.invoke(IPC.RECEIPT_EXPORT),

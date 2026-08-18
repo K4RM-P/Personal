@@ -140,12 +140,20 @@ export async function getPrinterConfig(db: PrismaClient): Promise<PrinterConfig>
   const portStr = await getSetting(db, 'printer.networkPort')
   const port = parseInt(portStr, 10) || 9100
   const deviceName = await getSetting(db, 'printer.deviceName')
+  const language = await getSetting(db, 'printer.language')
+  const labelWidthMm = parseFloat(await getSetting(db, 'printer.labelWidthMm'))
+  const labelHeightMm = parseFloat(await getSetting(db, 'printer.labelHeightMm'))
+  const topMarginMm = parseFloat(await getSetting(db, 'printer.topMarginMm'))
 
   return {
     type: type === 'NETWORK' || type === 'SYSTEM' ? type : 'PDF',
     ipAddress: ipAddress || undefined,
     port,
-    deviceName: deviceName || undefined
+    deviceName: deviceName || undefined,
+    language: language === 'zpl' ? 'zpl' : 'escpos',
+    labelWidthMm: Number.isFinite(labelWidthMm) ? labelWidthMm : undefined,
+    labelHeightMm: Number.isFinite(labelHeightMm) ? labelHeightMm : undefined,
+    topMarginMm: Number.isFinite(topMarginMm) ? topMarginMm : undefined
   }
 }
 
@@ -157,6 +165,10 @@ export async function savePrinterConfig(
   await setSetting(db, 'printer.networkIp', config.ipAddress ?? '')
   await setSetting(db, 'printer.networkPort', String(config.port ?? 9100))
   await setSetting(db, 'printer.deviceName', config.deviceName ?? '')
+  await setSetting(db, 'printer.language', config.language === 'zpl' ? 'zpl' : 'escpos')
+  await setSetting(db, 'printer.labelWidthMm', config.labelWidthMm != null ? String(config.labelWidthMm) : '')
+  await setSetting(db, 'printer.labelHeightMm', config.labelHeightMm != null ? String(config.labelHeightMm) : '')
+  await setSetting(db, 'printer.topMarginMm', config.topMarginMm != null ? String(config.topMarginMm) : '')
   return getPrinterConfig(db)
 }
 

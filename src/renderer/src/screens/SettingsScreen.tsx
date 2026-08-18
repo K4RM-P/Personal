@@ -498,7 +498,13 @@ export function SettingsScreen() {
       if (window.api?.receipt) {
         const result = await window.api.receipt.testNetwork(
           printerConfig.ipAddress,
-          printerConfig.port ?? 9100
+          printerConfig.port ?? 9100,
+          {
+            language: printerConfig.language,
+            labelWidthMm: printerConfig.labelWidthMm,
+            labelHeightMm: printerConfig.labelHeightMm,
+            topMarginMm: printerConfig.topMarginMm
+          }
         )
         setTestResult(result)
       }
@@ -678,6 +684,83 @@ export function SettingsScreen() {
                         className="input w-28"
                       />
                     </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
+                        Printer Language
+                      </label>
+                      <select
+                        value={printerConfig.language ?? 'escpos'}
+                        onChange={(e) =>
+                          setPrinterConfig((c) => ({
+                            ...c,
+                            language: e.target.value as PrinterConfig['language']
+                          }))
+                        }
+                        className="input"
+                      >
+                        <option value="escpos">ESC/POS Thermal (receipt roll)</option>
+                        <option value="zpl">Zebra ZPL Label (die-cut labels)</option>
+                      </select>
+                    </div>
+
+                    {printerConfig.language === 'zpl' && (
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
+                            Label Width (mm)
+                          </label>
+                          <input
+                            type="number"
+                            value={printerConfig.labelWidthMm ?? 85}
+                            onChange={(e) =>
+                              setPrinterConfig((c) => ({
+                                ...c,
+                                labelWidthMm: parseFloat(e.target.value) || undefined
+                              }))
+                            }
+                            className="input"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
+                            Label Height (mm)
+                          </label>
+                          <input
+                            type="number"
+                            value={printerConfig.labelHeightMm ?? 105}
+                            onChange={(e) =>
+                              setPrinterConfig((c) => ({
+                                ...c,
+                                labelHeightMm: parseFloat(e.target.value) || undefined
+                              }))
+                            }
+                            className="input"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
+                            Top Margin (mm)
+                          </label>
+                          <input
+                            type="number"
+                            value={printerConfig.topMarginMm ?? 10}
+                            onChange={(e) =>
+                              setPrinterConfig((c) => ({
+                                ...c,
+                                topMarginMm: parseFloat(e.target.value) || undefined
+                              }))
+                            }
+                            className="input"
+                          />
+                        </div>
+                        <p className="col-span-3 text-xs text-[var(--muted-foreground)]">
+                          Top margin is blank space reserved at the top of every label for
+                          pre-printed stock (e.g. a logo). Receipts that don&apos;t fit on one
+                          label continue onto the next.
+                        </p>
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-3 flex-wrap">
                       <button
                         onClick={handleTestNetworkPrinter}

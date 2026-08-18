@@ -204,8 +204,19 @@ export function registerReceiptHandlers(db: PrismaClient): void {
 
   ipcMain.handle(
     IPC.RECEIPT_TEST_NETWORK,
-    async (_e, { ipAddress, port }: { ipAddress: string; port?: number }) => {
-      return testNetworkPrinter(ipAddress, port ?? 9100)
+    async (
+      _e,
+      {
+        ipAddress,
+        port,
+        language,
+        labelWidthMm,
+        labelHeightMm,
+        topMarginMm
+      }: Pick<PrinterConfig, 'ipAddress' | 'port' | 'language' | 'labelWidthMm' | 'labelHeightMm' | 'topMarginMm'>
+    ) => {
+      if (!ipAddress) throw new Error('ipAddress is required')
+      return testNetworkPrinter(ipAddress, port ?? 9100, { language, labelWidthMm, labelHeightMm, topMarginMm })
     }
   )
 
