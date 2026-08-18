@@ -35,7 +35,8 @@ function buildLineItemsHtml(transaction: TransactionWithItems): string {
       </tr>`
           : ''
       const hstLabel = item.hstApplied === false ? ' (HST exempt)' : ''
-      const displayName = item.lineType === 'DEBT_SETTLEMENT' ? 'Previous Balance' : (item.product?.name ?? '(item)')
+      const displayName =
+        item.lineType === 'DEBT_SETTLEMENT' ? 'Previous Balance' : (item.product?.name ?? '(item)')
       return `
       <tr>
         <td>${escapeHtml(displayName)}${hstLabel}</td>
@@ -125,7 +126,8 @@ function buildDefaultReceiptHtml(
   const licenseLine = store.licenseNumber
     ? `<div class="center">License #${escapeHtml(store.licenseNumber)}</div>`
     : ''
-  const emailLine = store.email ? `<div class="center">${escapeHtml(store.email)}</div>` : ''
+  const faxLine = store.fax ? `<div class="center">Fax: ${escapeHtml(store.fax)}</div>` : ''
+  const emailLine = store.email ? `<div class="footer">Email: ${escapeHtml(store.email)}</div>` : ''
   const rxFooter = rxFooterText ? `<div class="footer rx">${escapeHtml(rxFooterText)}</div>` : ''
 
   return `<!DOCTYPE html>
@@ -155,9 +157,9 @@ function buildDefaultReceiptHtml(
   ${logo}
   <div class="center bold">${escapeHtml(store.name)}</div>
   <div class="center">${escapeHtml(store.address)}</div>
-  <div class="center">${escapeHtml(store.phone)}</div>
+  <div class="center">Phone: ${escapeHtml(store.phone)}</div>
+  ${faxLine}
   ${licenseLine}
-  ${emailLine}
   <div class="divider"></div>
   <div>Receipt: #${escapeHtml(transaction.receiptNumber)}</div>
   <div>Date: ${escapeHtml(dateStr)}</div>
@@ -177,6 +179,7 @@ function buildDefaultReceiptHtml(
   </table>
   <div class="divider"></div>
   <div class="footer">Thank you for choosing ${escapeHtml(store.name)}!</div>
+  ${emailLine}
   ${rxFooter}
 </body>
 </html>`
@@ -187,6 +190,7 @@ export const RECEIPT_TEMPLATE_TOKENS = [
   'storeName',
   'storeAddress',
   'storePhone',
+  'storeFax',
   'storeLicense',
   'storeEmail',
   'logo',
@@ -214,6 +218,7 @@ function buildCustomReceiptHtml(
     storeName: escapeHtml(store.name),
     storeAddress: escapeHtml(store.address),
     storePhone: escapeHtml(store.phone),
+    storeFax: store.fax ? escapeHtml(store.fax) : '',
     storeLicense: store.licenseNumber ? escapeHtml(store.licenseNumber) : '',
     storeEmail: store.email ? escapeHtml(store.email) : '',
     logo: buildLogoHtml(store),
@@ -223,7 +228,9 @@ function buildCustomReceiptHtml(
     tenders: buildTenderLinesText(transaction),
     items: buildLineItemsHtml(transaction),
     subtotal: formatCurrency(transaction.subtotalCents),
-    billDiscount: transaction.billDiscountCents ? formatCurrency(transaction.billDiscountCents) : '',
+    billDiscount: transaction.billDiscountCents
+      ? formatCurrency(transaction.billDiscountCents)
+      : '',
     tax: formatCurrency(transaction.taxCents),
     total: formatCurrency(transaction.totalCents),
     tendered: formatCurrency(transaction.tenderedCents),
@@ -231,9 +238,11 @@ function buildCustomReceiptHtml(
     footer: rxFooterText ? escapeHtml(rxFooterText) : ''
   }
 
-  return (store.customReceiptTemplateHtml ?? '').replace(/{{\s*(\w+)\s*}}/g, (match, key: string) =>
-    Object.prototype.hasOwnProperty.call(tokens, key)
-      ? tokens[key as (typeof RECEIPT_TEMPLATE_TOKENS)[number]]
-      : match
+  return (store.customReceiptTemplateHtml ?? '').replace(
+    /{{\s*(\w+)\s*}}/g,
+    (match, key: string) =>
+      Object.prototype.hasOwnProperty.call(tokens, key)
+        ? tokens[key as (typeof RECEIPT_TEMPLATE_TOKENS)[number]]
+        : match
   )
 }

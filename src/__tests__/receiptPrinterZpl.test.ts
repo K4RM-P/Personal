@@ -163,7 +163,7 @@ describe('buildZplReceiptBuffer', () => {
     // the plain ^FO...^FD used for left-aligned lines (receipt #, date, items).
     expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FDTest Pharmacy\^FS/)
     expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FD1 Main St\^FS/)
-    expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FD555-0000\^FS/)
+    expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FDPhone: 555-0000\^FS/)
     expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FDThank you for choosing Test Pharmacy!\^FS/)
     expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FDRx pickup/)
     // Receipt #/date/type stay left-aligned, same as the ESC/POS layout.
@@ -186,6 +186,45 @@ describe('buildZplReceiptBuffer', () => {
     const zpl = decode(buildZplReceiptBuffer({ transaction: mockTransaction() }))
     expect(zpl).not.toContain('^MN')
     expect(zpl).not.toContain('^PR')
+  })
+
+  it('labels the phone number and includes fax under it when set', () => {
+    const zpl = decode(
+      buildZplReceiptBuffer({
+        transaction: mockTransaction(),
+        storeInfo: {
+          name: 'Test Pharmacy',
+          address: '1 Main St',
+          phone: '555-0000',
+          fax: '555-1111'
+        }
+      })
+    )
+    expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FDPhone: 555-0000\^FS/)
+    expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FDFax: 555-1111\^FS/)
+  })
+
+  it('omits the fax line when no fax number is set', () => {
+    const zpl = decode(buildZplReceiptBuffer({ transaction: mockTransaction() }))
+    expect(zpl).not.toContain('Fax:')
+  })
+
+  it('includes a labeled, centered email line after the thank-you line', () => {
+    const zpl = decode(
+      buildZplReceiptBuffer({
+        transaction: mockTransaction(),
+        storeInfo: {
+          name: 'Test Pharmacy',
+          address: '1 Main St',
+          phone: '555-0000',
+          email: 'store@example.com'
+        }
+      })
+    )
+    expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FDEmail: store@example\.com\^FS/)
+    const thankYouIndex = zpl.indexOf('Thank you for choosing')
+    const emailIndex = zpl.indexOf('Email: store@example.com')
+    expect(emailIndex).toBeGreaterThan(thankYouIndex)
   })
 
   it('includes receipt number, totals, and rx footer', () => {

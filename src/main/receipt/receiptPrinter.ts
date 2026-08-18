@@ -181,7 +181,8 @@ export function buildZplReceiptBuffer(options: PrintReceiptOptions): Uint8Array 
     })
     if (!continuation) {
       writer.text(store.address, { fontHeight: 18, align: 'center' })
-      writer.text(store.phone, { fontHeight: 18, align: 'center' })
+      writer.text(`Phone: ${store.phone}`, { fontHeight: 18, align: 'center' })
+      if (store.fax) writer.text(`Fax: ${store.fax}`, { fontHeight: 18, align: 'center' })
     }
     writer.divider()
     writer.text(`Receipt: #${transaction.receiptNumber}`, { fontHeight: 18 })
@@ -212,6 +213,7 @@ export function buildZplReceiptBuffer(options: PrintReceiptOptions): Uint8Array 
   writer.row('Change Due', formatCurrency(transaction.changeCents), { fontHeight: 18 })
   writer.divider()
   writer.text(`Thank you for choosing ${store.name}!`, { fontHeight: 18, align: 'center' })
+  if (store.email) writer.text(`Email: ${store.email}`, { fontHeight: 18, align: 'center' })
 
   if (options.rxFooter) {
     writer.divider()
@@ -247,7 +249,9 @@ export function buildEscPosReceiptBuffer(options: PrintReceiptOptions): Uint8Arr
     .line(store.name)
     .bold(false)
     .line(store.address)
-    .line(store.phone)
+    .line(`Phone: ${store.phone}`)
+  if (store.fax) encoder.line(`Fax: ${store.fax}`)
+  encoder
     .line('--------------------------------')
     .align('left')
     .line(`Receipt: #${transaction.receiptNumber}`)
@@ -277,6 +281,8 @@ export function buildEscPosReceiptBuffer(options: PrintReceiptOptions): Uint8Arr
     .line('--------------------------------')
     .align('center')
     .line(`Thank you for choosing ${store.name}!`)
+
+  if (store.email) encoder.line(`Email: ${store.email}`)
 
   if (options.rxFooter) {
     encoder.line('--------------------------------').line(options.rxFooter)

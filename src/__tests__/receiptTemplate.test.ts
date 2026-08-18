@@ -80,4 +80,41 @@ describe('buildReceiptHtml', () => {
     expect(html).not.toContain('<script>')
     expect(html).toContain('&lt;script&gt;')
   })
+
+  it('labels the phone number and includes fax under it when set', () => {
+    const html = buildReceiptHtml({
+      transaction: mockTransaction(),
+      storeInfo: { name: 'Test Pharmacy', address: '1 Main St', phone: '555-0000', fax: '555-1111' }
+    })
+
+    expect(html).toContain('Phone: 555-0000')
+    expect(html).toContain('Fax: 555-1111')
+  })
+
+  it('omits the fax line when no fax number is set', () => {
+    const html = buildReceiptHtml({
+      transaction: mockTransaction(),
+      storeInfo: { name: 'Test Pharmacy', address: '1 Main St', phone: '555-0000' }
+    })
+
+    expect(html).not.toContain('Fax:')
+  })
+
+  it('places the labeled email at the very bottom, after the thank-you line', () => {
+    const html = buildReceiptHtml({
+      transaction: mockTransaction(),
+      storeInfo: {
+        name: 'Test Pharmacy',
+        address: '1 Main St',
+        phone: '555-0000',
+        email: 'store@example.com'
+      }
+    })
+
+    expect(html).toContain('Email: store@example.com')
+    const thankYouIndex = html.indexOf('Thank you for choosing')
+    const emailIndex = html.indexOf('Email: store@example.com')
+    expect(thankYouIndex).toBeGreaterThan(-1)
+    expect(emailIndex).toBeGreaterThan(thankYouIndex)
+  })
 })
