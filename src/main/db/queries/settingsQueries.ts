@@ -8,6 +8,7 @@ const DEFAULTS = {
   'store.name': 'VantisPOS Rx Pharmacy',
   'store.address': '123 Health Ave, Suite 100, Cityville',
   'store.phone': '(555) 019-2831',
+  'store.fax': '',
   'store.licenseNumber': '',
   'store.email': '',
   'store.logoDataUrl': '',
@@ -75,11 +76,12 @@ async function setSetting(db: PrismaClient, key: string, value: string): Promise
 }
 
 export async function getStoreInfo(db: PrismaClient): Promise<StoreInfo> {
-  const [name, address, phone, licenseNumber, email, logoDataUrl, useCustom, customHtml] =
+  const [name, address, phone, fax, licenseNumber, email, logoDataUrl, useCustom, customHtml] =
     await Promise.all([
       getSetting(db, 'store.name'),
       getSetting(db, 'store.address'),
       getSetting(db, 'store.phone'),
+      getSetting(db, 'store.fax'),
       getSetting(db, 'store.licenseNumber'),
       getSetting(db, 'store.email'),
       getSetting(db, 'store.logoDataUrl'),
@@ -90,6 +92,7 @@ export async function getStoreInfo(db: PrismaClient): Promise<StoreInfo> {
     name,
     address,
     phone,
+    fax: fax || undefined,
     licenseNumber: licenseNumber || undefined,
     email: email || undefined,
     logoDataUrl: logoDataUrl || undefined,
@@ -102,6 +105,7 @@ export async function saveStoreInfo(db: PrismaClient, info: StoreInfo): Promise<
   await setSetting(db, 'store.name', info.name)
   await setSetting(db, 'store.address', info.address)
   await setSetting(db, 'store.phone', info.phone)
+  await setSetting(db, 'store.fax', info.fax ?? '')
   await setSetting(db, 'store.licenseNumber', info.licenseNumber ?? '')
   await setSetting(db, 'store.email', info.email ?? '')
   return getStoreInfo(db)

@@ -534,17 +534,24 @@ model InventoryAdjustment {
 }
 
 /// A single slide shown in the customer-facing display's idle slideshow —
-/// either a line of promotional text or an uploaded image. Text length is
-/// capped at 60 chars at the application layer (see
-/// CUSTOMER_DISPLAY_SLIDE_MAX_LENGTH in src/shared/customerDisplay.ts).
+/// a line of promotional text, an uploaded image, or an uploaded video. Text
+/// length is capped at 60 chars at the application layer (see
+/// CUSTOMER_DISPLAY_SLIDE_MAX_LENGTH in src/shared/customerDisplay.ts). Video
+/// files are stored on disk (userData/customerDisplayMedia), not inline —
+/// see `videoFilePath` — because they're too large for the base64-in-SQLite
+/// pattern used for images.
 model CustomerDisplaySlide {
-  id           Int      @id @default(autoincrement())
-  type         String   @default("TEXT") // "TEXT" | "IMAGE"
-  text         String
-  imageDataUrl String?
-  sortOrder    Int
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id              Int      @id @default(autoincrement())
+  type            String   @default("TEXT") // "TEXT" | "IMAGE" | "VIDEO"
+  text            String
+  imageDataUrl    String?
+  videoFilePath   String? // relative path under userData/customerDisplayMedia
+  /// Seconds this slide is shown before advancing. Null = use the display's
+  /// global default (Setting: customerDisplay.slideDurationSeconds).
+  durationSeconds Int?
+  sortOrder       Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([sortOrder])
 }

@@ -206,7 +206,10 @@ const api = {
     testNetwork: (
       ipAddress: string,
       port?: number,
-      printerOpts?: Pick<PrinterConfig, 'language' | 'labelWidthMm' | 'labelHeightMm' | 'topMarginMm'>
+      printerOpts?: Pick<
+        PrinterConfig,
+        'language' | 'labelWidthMm' | 'labelHeightMm' | 'topMarginMm'
+      >
     ): Promise<{ ok: boolean; message: string }> =>
       ipcRenderer.invoke(IPC.RECEIPT_TEST_NETWORK, { ipAddress, port, ...printerOpts }),
     listPrinters: (): Promise<SystemPrinterInfo[]> => ipcRenderer.invoke(IPC.RECEIPT_LIST_PRINTERS),
@@ -479,9 +482,11 @@ const api = {
     saveSlides: (
       slides: Array<{
         id?: number
-        type?: 'TEXT' | 'IMAGE'
+        type?: 'TEXT' | 'IMAGE' | 'VIDEO'
         text: string
         imageDataUrl?: string | null
+        videoFilePath?: string | null
+        durationSeconds?: number | null
       }>
     ): Promise<CustomerDisplaySlideDTO[]> =>
       ipcRenderer.invoke(IPC.CUSTOMER_DISPLAY_SAVE_SLIDES, slides),
@@ -489,6 +494,8 @@ const api = {
       ipcRenderer.invoke(IPC.CUSTOMER_DISPLAY_DELETE_SLIDE, id),
     uploadSlideImage: (): Promise<{ imageDataUrl: string } | null> =>
       ipcRenderer.invoke(IPC.CUSTOMER_DISPLAY_UPLOAD_SLIDE_IMAGE),
+    uploadSlideVideo: (): Promise<{ videoFilePath: string } | null> =>
+      ipcRenderer.invoke(IPC.CUSTOMER_DISPLAY_UPLOAD_SLIDE_VIDEO),
     getSettings: (): Promise<CustomerDisplaySettingsDTO> =>
       ipcRenderer.invoke(IPC.CUSTOMER_DISPLAY_GET_SETTINGS),
     saveSettings: (input: {
@@ -509,12 +516,9 @@ const api = {
   reportCsvExport: {
     getSettings: (): Promise<ReportCsvExportSettingsDTO> =>
       ipcRenderer.invoke(IPC.REPORT_CSV_EXPORT_GET_SETTINGS),
-    saveSettings: (
-      input: SaveReportCsvExportSettingsInput
-    ): Promise<ReportCsvExportSettingsDTO> =>
+    saveSettings: (input: SaveReportCsvExportSettingsInput): Promise<ReportCsvExportSettingsDTO> =>
       ipcRenderer.invoke(IPC.REPORT_CSV_EXPORT_SAVE_SETTINGS, input),
-    pickFolder: (): Promise<string | null> =>
-      ipcRenderer.invoke(IPC.REPORT_CSV_EXPORT_PICK_FOLDER),
+    pickFolder: (): Promise<string | null> => ipcRenderer.invoke(IPC.REPORT_CSV_EXPORT_PICK_FOLDER),
     runNow: (): Promise<RunReportCsvExportResult> =>
       ipcRenderer.invoke(IPC.REPORT_CSV_EXPORT_RUN_NOW)
   }

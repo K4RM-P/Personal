@@ -14,7 +14,15 @@ import { initAutoUpdater, setUpdateWindow } from './update/autoUpdate'
 import { initCustomerDisplayWindow, teardownCustomerDisplayWindow } from './customerDisplayWindow'
 import { initReportEmailScheduler } from './reports/reportEmailScheduler'
 import { initReportCsvExportScheduler } from './reports/reportCsvExportScheduler'
+import {
+  registerSlideMediaProtocolPrivileges,
+  registerSlideMediaProtocolHandler
+} from './customerDisplay/slideMediaStore'
 import { join as joinPath } from 'path'
+
+// Must run before app.whenReady() — Electron requires privileged custom schemes
+// to be declared at module load time.
+registerSlideMediaProtocolPrivileges()
 
 // .env (dev-only, gitignored) is the only thing that sets DATABASE_URL under normal
 // circumstances, and it's intentionally excluded from the packaged app.
@@ -112,6 +120,7 @@ function createWindow(): BrowserWindow {
 
 app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.pharmacy.pos')
+  registerSlideMediaProtocolHandler()
 
   // BrowserWindow's `icon` option is a no-op on macOS (window icons aren't a thing there) —
   // only the Dock icon is visible, and in dev that defaults to Electron's own atom icon

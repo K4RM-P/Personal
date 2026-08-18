@@ -18,6 +18,7 @@ import {
   reconcileCustomerDisplayWindowNow
 } from '../customerDisplayWindow'
 import { requireManager } from '../auth/session'
+import { storeSlideVideo } from '../customerDisplay/slideMediaStore'
 
 /** Spec §5.2: Thank You is shown for a short fixed duration, then falls back to Idle. */
 const THANK_YOU_DURATION_MS = 5000
@@ -30,6 +31,9 @@ const SLIDE_IMAGE_MIME_BY_EXT: Record<string, string> = {
   gif: 'image/gif',
   webp: 'image/webp'
 }
+
+const MAX_SLIDE_VIDEO_BYTES = 100 * 1024 * 1024
+const SLIDE_VIDEO_EXTS = ['mp4', 'webm', 'mov']
 
 /** Wraps a handler so a thrown error surfaces as a clean message, not an unhandled rejection. */
 function guard<A extends unknown[], R>(
@@ -80,9 +84,11 @@ export function registerCustomerDisplayHandlers(db: PrismaClient): void {
       _e: IpcMainInvokeEvent,
       slides: Array<{
         id?: number
-        type?: 'TEXT' | 'IMAGE'
+        type?: 'TEXT' | 'IMAGE' | 'VIDEO'
         text: string
         imageDataUrl?: string | null
+        videoFilePath?: string | null
+        durationSeconds?: number | null
       }>
     ) => {
       const saved = await saveCustomerDisplaySlides(db, slides)
@@ -120,6 +126,33 @@ export function registerCustomerDisplayHandlers(db: PrismaClient): void {
 
       const imageDataUrl = `data:${mime};base64,${buffer.toString('base64')}`
       return { imageDataUrl }
+    })
+  )
+
+  ipcMain.handle(
+    IPC.CUSTOMER_DISPLAY_UPLOAD_SLIDE_VIDEO,
+    guard('Upload slide video', async () => {
+      requireManager()
+      const result = await dialog.showOpenDialog({
+        title: 'Select slide video',
+        properties: ['openFile'],
+        filters: [{ name: 'Videos', extensions: SLIDE_VIDEO_EXTS }]
+      })
+      if (result.canceled || result.filePaths.length === 0) return null
+
+      const filePath = result.filePaths[0]
+      const ext = extname(filePath).slice(1).toLowerCase()
+      if (!SLIDE_VIDEO_EXTS.includes(ext)) {
+        throw new Error('Unsupported video format. Use MP4, WebM, or MOV.')
+      }
+
+      const buffer = await readFile(filePath)
+      if (buffer.length > MAX_SLIDE_VIDEO_BYTES) {
+        throw new Error('Slide video must be smaller than 100MB.')
+      }
+
+      const videoFilePath = await storeSlideVideo(buffer, `.${ext}`)
+      return { videoFilePath }
     })
   )
 

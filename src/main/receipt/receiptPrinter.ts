@@ -177,7 +177,6 @@ export function buildZplReceiptBuffer(options: PrintReceiptOptions): Uint8Array 
   writer.row('Change Due', formatCurrency(transaction.changeCents), { fontHeight: 18 })
   writer.divider()
   writer.text('Thank you for choosing VantisPOS!', { fontHeight: 18 })
-  writer.text('Please retain receipt for returns.', { fontHeight: 18 })
 
   if (options.rxFooter) {
     writer.divider()
@@ -240,7 +239,6 @@ export function buildEscPosReceiptBuffer(options: PrintReceiptOptions): Uint8Arr
     .line('--------------------------------')
     .align('center')
     .line('Thank you for choosing VantisPOS!')
-    .line('Please retain receipt for returns.')
 
   if (options.rxFooter) {
     encoder.line('--------------------------------').line(options.rxFooter)

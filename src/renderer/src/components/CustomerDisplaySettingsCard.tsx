@@ -1,14 +1,30 @@
 import * as React from 'react'
-import { ArrowDown, ArrowUp, ImageIcon, Pencil, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, ImageIcon, Pencil, Trash2, Video } from 'lucide-react'
 import { CardHeader, CardTitle, CardDescription } from './ui/Card'
 import { Alert } from './ui/Alert'
 import { Switch } from './ui/Switch'
 import {
   CUSTOMER_DISPLAY_SLIDE_MAX_LENGTH,
+  customerDisplayMediaUrl,
   type CustomerDisplaySettingsDTO,
   type CustomerDisplaySlideDTO,
   type CustomerDisplaySlideType
 } from '@shared/customerDisplay'
+
+/** Reads a video file's natural length by loading it in a detached, invisible <video>. */
+function probeVideoDurationSeconds(videoFilePath: string): Promise<number | null> {
+  return new Promise((resolve) => {
+    const el = document.createElement('video')
+    el.preload = 'metadata'
+    el.muted = true
+    el.onloadedmetadata = () => {
+      const seconds = Number.isFinite(el.duration) ? Math.round(el.duration) : null
+      resolve(seconds && seconds > 0 ? seconds : null)
+    }
+    el.onerror = () => resolve(null)
+    el.src = customerDisplayMediaUrl(videoFilePath)
+  })
+}
 
 /**
  * Settings → Customer Display (spec §6). Slide edits save immediately so a
@@ -32,8 +48,13 @@ export function CustomerDisplaySettingsCard(): React.JSX.Element {
   const [modalText, setModalText] = React.useState('')
   const [modalImageDataUrl, setModalImageDataUrl] = React.useState<string | null>(null)
   const [modalImageError, setModalImageError] = React.useState<string | null>(null)
+  const [modalVideoFilePath, setModalVideoFilePath] = React.useState<string | null>(null)
+  const [modalVideoError, setModalVideoError] = React.useState<string | null>(null)
+  const [modalDurationInput, setModalDurationInput] = React.useState('')
   const [uploadingImage, setUploadingImage] = React.useState(false)
+  const [uploadingVideo, setUploadingVideo] = React.useState(false)
   const [editingIndex, setEditingIndex] = React.useState<number | null>(null)
+  const [bulkDurationInput, setBulkDurationInput] = React.useState('')
 
   const load = async (): Promise<void> => {
     try {
@@ -63,7 +84,13 @@ export function CustomerDisplaySettingsCard(): React.JSX.Element {
     setSaved(null)
     try {
       const result = await window.api.customerDisplay.saveSlides(
-        next.map((s) => ({ type: s.type, text: s.text, imageDataUrl: s.imageDataUrl }))
+        next.map((s) => ({
+          type: s.type,
+          text: s.text,
+          imageDataUrl: s.imageDataUrl,
+          videoFilePath: s.videoFilePath,
+          durationSeconds: s.durationSeconds
+        }))
       )
       setSlides(result)
       setSaved('Slides updated.')
@@ -123,7 +150,12 @@ export function CustomerDisplaySettingsCard(): React.JSX.Element {
   }
 
   const handleDelete = (slide: CustomerDisplaySlideDTO): void => {
-    const label = slide.type === 'IMAGE' ? 'this image slide' : `the slide "${slide.text}"`
+    const label =
+      slide.type === 'IMAGE'
+        ? 'this image slide'
+        : slide.type === 'VIDEO'
+          ? 'this video slide'
+          : `the slide "${slide.text}"`
     if (!window.confirm(`Delete ${label}?`)) return
     setError(null)
     setSaved(null)
@@ -141,6 +173,9 @@ export function CustomerDisplaySettingsCard(): React.JSX.Element {
     setModalText('')
     setModalImageDataUrl(null)
     setModalImageError(null)
+    setModalVideoFilePath(null)
+    setModalVideoError(null)
+    setModalDurationInput('')
     setModalOpen(true)
   }
 
@@ -151,6 +186,9 @@ export function CustomerDisplaySettingsCard(): React.JSX.Element {
     setModalText(slide.text)
     setModalImageDataUrl(slide.imageDataUrl)
     setModalImageError(null)
+    setModalVideoFilePath(slide.videoFilePath)
+    setModalVideoError(null)
+    setModalDurationInput(slide.durationSeconds != null ? String(slide.durationSeconds) : '')
     setModalOpen(true)
   }
 
@@ -167,25 +205,82 @@ export function CustomerDisplaySettingsCard(): React.JSX.Element {
     }
   }
 
+  const handleUploadVideo = async (): Promise<void> => {
+    setModalVideoError(null)
+    setUploadingVideo(true)
+    try {
+      const result = await window.api.customerDisplay.uploadSlideVideo()
+      if (result) {
+        setModalVideoFilePath(result.videoFilePath)
+        // Default the slide's duration to the clip's own length — still editable below.
+        const clipSeconds = await probeVideoDurationSeconds(result.videoFilePath)
+        if (clipSeconds) setModalDurationInput(String(clipSeconds))
+      }
+    } catch (err) {
+      setModalVideoError(err instanceof Error ? err.message : 'Failed to upload video')
+    } finally {
+      setUploadingVideo(false)
+    }
+  }
+
   const remaining = CUSTOMER_DISPLAY_SLIDE_MAX_LENGTH - modalText.length
+  const parsedModalDuration = modalDurationInput.trim() === '' ? null : Number(modalDurationInput)
+  const modalDurationValid =
+    parsedModalDuration === null ||
+    (Number.isFinite(parsedModalDuration) && parsedModalDuration >= 1 && parsedModalDuration <= 300)
   const modalValid =
-    modalType === 'IMAGE'
+    modalDurationValid &&
+    (modalType === 'IMAGE'
       ? modalImageDataUrl !== null
-      : modalText.trim().length > 0 && remaining >= 0
+      : modalType === 'VIDEO'
+        ? modalVideoFilePath !== null
+        : modalText.trim().length > 0 && remaining >= 0)
 
   const handleModalSave = (): void => {
     if (!modalValid) return
     const next = [...slides]
+    const durationSeconds = parsedModalDuration !== null ? Math.round(parsedModalDuration) : null
     const slideData: Omit<CustomerDisplaySlideDTO, 'id' | 'sortOrder'> =
       modalType === 'IMAGE'
-        ? { type: 'IMAGE', text: '', imageDataUrl: modalImageDataUrl }
-        : { type: 'TEXT', text: modalText.trim(), imageDataUrl: null }
+        ? {
+            type: 'IMAGE',
+            text: '',
+            imageDataUrl: modalImageDataUrl,
+            videoFilePath: null,
+            durationSeconds
+          }
+        : modalType === 'VIDEO'
+          ? {
+              type: 'VIDEO',
+              text: '',
+              imageDataUrl: null,
+              videoFilePath: modalVideoFilePath,
+              durationSeconds
+            }
+          : {
+              type: 'TEXT',
+              text: modalText.trim(),
+              imageDataUrl: null,
+              videoFilePath: null,
+              durationSeconds
+            }
     if (editingIndex === null) {
       next.push({ id: -1, sortOrder: next.length, ...slideData })
     } else {
       next[editingIndex] = { ...next[editingIndex], ...slideData }
     }
     setModalOpen(false)
+    void persistSlides(next)
+  }
+
+  const applyDurationToAllSlides = (): void => {
+    const seconds = Number(bulkDurationInput)
+    if (!Number.isFinite(seconds) || seconds < 1 || seconds > 300) {
+      setError('Bulk slide duration must be between 1 and 300 seconds.')
+      return
+    }
+    const next = slides.map((s) => ({ ...s, durationSeconds: Math.round(seconds) }))
+    setSlides(next)
     void persistSlides(next)
   }
 
@@ -262,6 +357,30 @@ export function CustomerDisplaySettingsCard(): React.JSX.Element {
             </button>
           </div>
 
+          {slides.length > 1 && (
+            <div className="flex items-center gap-2 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 py-2">
+              <label className="shrink-0 text-xs text-[var(--muted-foreground)]">
+                Set all slide durations to
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={300}
+                value={bulkDurationInput}
+                onChange={(e) => setBulkDurationInput(e.target.value)}
+                placeholder={String(settings.slideDurationSeconds)}
+                className="input w-20"
+              />
+              <span className="shrink-0 text-xs text-[var(--muted-foreground)]">seconds</span>
+              <button
+                onClick={applyDurationToAllSlides}
+                className="min-h-9 shrink-0 rounded-[var(--radius)] border border-[var(--primary)]/30 px-3 text-xs text-[var(--primary)] hover:bg-[var(--muted)]"
+              >
+                Apply to all
+              </button>
+            </div>
+          )}
+
           {slides.length === 0 ? (
             <p className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-xs text-[var(--muted-foreground)]">
               No slides yet — the display shows your pharmacy name instead.
@@ -286,11 +405,20 @@ export function CustomerDisplaySettingsCard(): React.JSX.Element {
                         <ImageIcon className="icon-4" /> Image slide
                       </span>
                     </span>
+                  ) : slide.type === 'VIDEO' ? (
+                    <span className="flex flex-1 items-center gap-2 truncate text-sm text-[var(--foreground)]">
+                      <span className="flex items-center gap-1 text-[var(--muted-foreground)]">
+                        <Video className="icon-4" /> Video slide
+                      </span>
+                    </span>
                   ) : (
                     <span className="flex-1 truncate text-sm text-[var(--foreground)]">
                       {slide.text}
                     </span>
                   )}
+                  <span className="shrink-0 text-xs text-[var(--muted-foreground)]">
+                    {slide.durationSeconds ?? settings.slideDurationSeconds}s
+                  </span>
                   <button
                     onClick={() => move(index, -1)}
                     disabled={index === 0}
@@ -359,6 +487,16 @@ export function CustomerDisplaySettingsCard(): React.JSX.Element {
               >
                 Image
               </button>
+              <button
+                onClick={() => setModalType('VIDEO')}
+                className={
+                  modalType === 'VIDEO'
+                    ? 'min-h-11 flex-1 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-medium text-[var(--primary-foreground)]'
+                    : 'min-h-11 flex-1 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]'
+                }
+              >
+                Video
+              </button>
             </div>
 
             {modalType === 'TEXT' ? (
@@ -385,7 +523,7 @@ export function CustomerDisplaySettingsCard(): React.JSX.Element {
                   {remaining} characters remaining
                 </p>
               </>
-            ) : (
+            ) : modalType === 'IMAGE' ? (
               <div className="mt-3 space-y-2">
                 {modalImageDataUrl && (
                   <img
@@ -407,7 +545,52 @@ export function CustomerDisplaySettingsCard(): React.JSX.Element {
                 </button>
                 {modalImageError && <Alert variant="error">{modalImageError}</Alert>}
               </div>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {modalVideoFilePath && (
+                  <video
+                    key={modalVideoFilePath}
+                    src={customerDisplayMediaUrl(modalVideoFilePath)}
+                    controls
+                    muted
+                    className="max-h-40 w-full rounded-[var(--radius)] border border-[var(--border)] object-contain"
+                  />
+                )}
+                <button
+                  onClick={() => void handleUploadVideo()}
+                  disabled={uploadingVideo}
+                  className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--primary)]/30 px-3 text-sm text-[var(--primary)] hover:bg-[var(--muted)] disabled:opacity-50"
+                >
+                  {uploadingVideo
+                    ? 'Uploading…'
+                    : modalVideoFilePath
+                      ? 'Replace video'
+                      : 'Upload video (MP4, WebM, MOV — max 100MB)'}
+                </button>
+                {modalVideoError && <Alert variant="error">{modalVideoError}</Alert>}
+              </div>
             )}
+
+            <div className="mt-3">
+              <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
+                Slide duration (seconds)
+                {modalType === 'VIDEO' && ' — defaults to the video clip length'}
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={300}
+                value={modalDurationInput}
+                onChange={(e) => setModalDurationInput(e.target.value)}
+                placeholder={String(settings.slideDurationSeconds)}
+                className="input w-28"
+              />
+              {!modalDurationValid && (
+                <p className="mt-1 text-[11px] text-[var(--error)]">
+                  Duration must be between 1 and 300 seconds.
+                </p>
+              )}
+            </div>
 
             <div className="mt-4 flex justify-end gap-2">
               <button

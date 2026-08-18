@@ -382,6 +382,18 @@ export function SettingsScreen() {
     }
   }
 
+  const handleSaveStoreInfo = async () => {
+    setError(null)
+    setSettingsSaved(null)
+    try {
+      const result = await window.api.settings.saveStore(storeInfo)
+      setStoreInfo(result)
+      setSettingsSaved('Store information saved successfully.')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save store information.')
+    }
+  }
+
   const handleSaveHardwareSettings = async () => {
     setError(null)
     setSettingsSaved(null)
@@ -755,8 +767,8 @@ export function SettingsScreen() {
                         </div>
                         <p className="col-span-3 text-xs text-[var(--muted-foreground)]">
                           Top margin is blank space reserved at the top of every label for
-                          pre-printed stock (e.g. a logo). Receipts that don&apos;t fit on one
-                          label continue onto the next.
+                          pre-printed stock (e.g. a logo). Receipts that don&apos;t fit on one label
+                          continue onto the next.
                         </p>
                       </div>
                     )}
@@ -1037,6 +1049,15 @@ export function SettingsScreen() {
                   />
                 </div>
                 <div>
+                  <label className="mb-1 block text-xs text-[var(--muted-foreground)]">Fax</label>
+                  <input
+                    type="text"
+                    value={storeInfo.fax ?? ''}
+                    onChange={(e) => setStoreInfo((s) => ({ ...s, fax: e.target.value }))}
+                    className="input"
+                  />
+                </div>
+                <div>
                   <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
                     Pharmacy License Number
                   </label>
@@ -1095,6 +1116,12 @@ export function SettingsScreen() {
                     PNG, JPG, GIF, or WebP, up to 2MB. Appears at the top of every receipt.
                   </p>
                 </div>
+                <button
+                  onClick={() => void handleSaveStoreInfo()}
+                  className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
+                >
+                  Save Store Info
+                </button>
               </div>
             </Card>
           )}
@@ -1457,8 +1484,8 @@ export function SettingsScreen() {
                 Delete all data
               </CardTitle>
               <CardDescription className="text-xs text-[var(--error)]/80">
-                Permanently erases every product, customer, transaction, and setting in this
-                store. Requires manager re-authentication and a confirmation code.
+                Permanently erases every product, customer, transaction, and setting in this store.
+                Requires manager re-authentication and a confirmation code.
               </CardDescription>
             </div>
             <button

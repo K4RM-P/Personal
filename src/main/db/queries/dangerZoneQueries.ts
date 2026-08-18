@@ -1,10 +1,12 @@
 import { PrismaClient } from '@prisma/client'
+import { deleteAllSlideMedia } from '../../customerDisplay/slideMediaStore'
 
 /**
  * Full factory-reset wipe — every row in every table, in FK-dependency order
  * (children before parents) so this works regardless of whether SQLite
  * foreign-key enforcement is on. Wrapped in a single transaction: either the
- * whole store resets or nothing does.
+ * whole store resets or nothing does. Slide video files live on disk, not in
+ * a table, so they're cleaned up separately after the transaction commits.
  */
 export async function wipeAllData(db: PrismaClient): Promise<void> {
   await db.$transaction([
@@ -27,4 +29,5 @@ export async function wipeAllData(db: PrismaClient): Promise<void> {
     db.featureFlag.deleteMany(),
     db.setting.deleteMany()
   ])
+  await deleteAllSlideMedia()
 }

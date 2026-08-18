@@ -37,13 +37,17 @@ export type CustomerDisplayState =
     }
   | { mode: 'thank-you'; pharmacyName: string }
 
-export type CustomerDisplaySlideType = 'TEXT' | 'IMAGE'
+export type CustomerDisplaySlideType = 'TEXT' | 'IMAGE' | 'VIDEO'
 
 export interface CustomerDisplaySlideDTO {
   id: number
   type: CustomerDisplaySlideType
   text: string
   imageDataUrl: string | null
+  /** Relative path under userData/customerDisplayMedia — resolve to a playable URL with `mediaUrl()`. */
+  videoFilePath: string | null
+  /** Seconds this slide shows before advancing. Null = use the display's global default. */
+  durationSeconds: number | null
   sortOrder: number
 }
 
@@ -55,3 +59,11 @@ export interface CustomerDisplaySettingsDTO {
 }
 
 export const CUSTOMER_DISPLAY_SLIDE_MAX_LENGTH = 60
+
+/** Custom protocol scheme the customer-display window uses to load slide video files from disk. */
+export const CUSTOMER_DISPLAY_MEDIA_PROTOCOL = 'pos-media'
+
+/** Builds the URL a `<video>` element loads to play a slide's video file. */
+export function customerDisplayMediaUrl(videoFilePath: string): string {
+  return `${CUSTOMER_DISPLAY_MEDIA_PROTOCOL}://slide/${encodeURIComponent(videoFilePath)}`
+}

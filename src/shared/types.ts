@@ -219,6 +219,7 @@ export interface StoreInfo {
   name: string
   address: string
   phone: string
+  fax?: string
   licenseNumber?: string
   email?: string
   /** Data URL (base64) of the manager-uploaded receipt logo. */

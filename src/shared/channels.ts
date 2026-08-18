@@ -185,7 +185,8 @@ export const IPC = {
   CUSTOMER_DISPLAY_DELETE_SLIDE: 'customerDisplay:deleteSlide',
   CUSTOMER_DISPLAY_GET_SETTINGS: 'customerDisplay:getSettings',
   CUSTOMER_DISPLAY_SAVE_SETTINGS: 'customerDisplay:saveSettings',
-  CUSTOMER_DISPLAY_UPLOAD_SLIDE_IMAGE: 'customerDisplay:uploadSlideImage'
+  CUSTOMER_DISPLAY_UPLOAD_SLIDE_IMAGE: 'customerDisplay:uploadSlideImage',
+  CUSTOMER_DISPLAY_UPLOAD_SLIDE_VIDEO: 'customerDisplay:uploadSlideVideo'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

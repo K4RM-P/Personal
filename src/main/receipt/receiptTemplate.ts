@@ -177,7 +177,6 @@ function buildDefaultReceiptHtml(
   </table>
   <div class="divider"></div>
   <div class="footer">Thank you for choosing ${escapeHtml(store.name)}!</div>
-  <div class="footer">Please retain receipt for returns.</div>
   ${rxFooter}
 </body>
 </html>`
