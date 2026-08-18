@@ -211,7 +211,7 @@ export function buildZplReceiptBuffer(options: PrintReceiptOptions): Uint8Array 
   writer.row('Tendered', formatCurrency(transaction.tenderedCents), { fontHeight: 18 })
   writer.row('Change Due', formatCurrency(transaction.changeCents), { fontHeight: 18 })
   writer.divider()
-  writer.text('Thank you for choosing VantisPOS!', { fontHeight: 18, align: 'center' })
+  writer.text(`Thank you for choosing ${store.name}!`, { fontHeight: 18, align: 'center' })
 
   if (options.rxFooter) {
     writer.divider()
@@ -276,7 +276,7 @@ export function buildEscPosReceiptBuffer(options: PrintReceiptOptions): Uint8Arr
     .line(`Change Due: ${formatCurrency(transaction.changeCents)}`)
     .line('--------------------------------')
     .align('center')
-    .line('Thank you for choosing VantisPOS!')
+    .line(`Thank you for choosing ${store.name}!`)
 
   if (options.rxFooter) {
     encoder.line('--------------------------------').line(options.rxFooter)

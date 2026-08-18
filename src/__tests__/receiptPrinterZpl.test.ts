@@ -164,7 +164,7 @@ describe('buildZplReceiptBuffer', () => {
     expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FDTest Pharmacy\^FS/)
     expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FD1 Main St\^FS/)
     expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FD555-0000\^FS/)
-    expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FDThank you for choosing VantisPOS!\^FS/)
+    expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FDThank you for choosing Test Pharmacy!\^FS/)
     expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FDRx pickup/)
     // Receipt #/date/type stay left-aligned, same as the ESC/POS layout.
     expect(zpl).not.toMatch(/\^FB\d+,1,0,C,0\^FDReceipt:/)
