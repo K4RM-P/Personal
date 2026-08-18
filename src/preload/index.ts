@@ -11,6 +11,11 @@ import type {
   SendTestReportEmailResult
 } from '../shared/reportEmail'
 import type {
+  ReportCsvExportSettingsDTO,
+  SaveReportCsvExportSettingsInput,
+  RunReportCsvExportResult
+} from '../shared/reportCsvExport'
+import type {
   FeatureFlag,
   Product,
   Customer,
@@ -496,6 +501,18 @@ const api = {
       ipcRenderer.invoke(IPC.REPORT_EMAIL_SAVE_SETTINGS, input),
     sendTest: (): Promise<SendTestReportEmailResult> =>
       ipcRenderer.invoke(IPC.REPORT_EMAIL_SEND_TEST)
+  },
+  reportCsvExport: {
+    getSettings: (): Promise<ReportCsvExportSettingsDTO> =>
+      ipcRenderer.invoke(IPC.REPORT_CSV_EXPORT_GET_SETTINGS),
+    saveSettings: (
+      input: SaveReportCsvExportSettingsInput
+    ): Promise<ReportCsvExportSettingsDTO> =>
+      ipcRenderer.invoke(IPC.REPORT_CSV_EXPORT_SAVE_SETTINGS, input),
+    pickFolder: (): Promise<string | null> =>
+      ipcRenderer.invoke(IPC.REPORT_CSV_EXPORT_PICK_FOLDER),
+    runNow: (): Promise<RunReportCsvExportResult> =>
+      ipcRenderer.invoke(IPC.REPORT_CSV_EXPORT_RUN_NOW)
   }
 }
 

@@ -273,7 +273,7 @@ export function CustomersScreen(): React.JSX.Element {
                 action={
                   <button
                     onClick={openNew}
-                    className="min-h-9 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-xs font-semibold text-[var(--primary-foreground)]"
+                    className="min-h-9 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-xs font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
                   >
                     + Add customer
                   </button>

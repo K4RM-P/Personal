@@ -683,12 +683,12 @@ export function ProductsScreen(): React.JSX.Element {
                   <table className="w-full text-xs">
                     <thead className="sticky top-0 bg-[var(--card)]">
                       <tr className="border-b border-[var(--border)] text-left text-[var(--muted-foreground)]">
-                        <th className="py-2 pr-2 font-medium">SKU</th>
-                        <th className="py-2 pr-2 font-medium">Name</th>
-                        <th className="py-2 pr-2 text-right font-medium">Cost</th>
-                        <th className="py-2 pr-2 text-right font-medium">Retail Price</th>
-                        <th className="py-2 pr-2 font-medium">Barcode</th>
-                        <th className="py-2 text-right font-medium"></th>
+                        <th className="py-3 pr-4 font-medium">SKU</th>
+                        <th className="py-3 pr-4 font-medium">Name</th>
+                        <th className="py-3 pr-4 text-right font-medium">Cost</th>
+                        <th className="py-3 pr-4 text-right font-medium">Retail Price</th>
+                        <th className="py-3 pr-4 font-medium">Barcode</th>
+                        <th className="py-3 pr-4 text-right font-medium"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -700,10 +700,10 @@ export function ProductsScreen(): React.JSX.Element {
                             editingProductId === product.id ? 'bg-[var(--muted)]' : ''
                           }`}
                         >
-                          <td className="py-2 pr-2 font-mono text-[var(--foreground)]">
+                          <td className="py-3 pr-4 font-mono text-[var(--foreground)]">
                             {product.sku}
                           </td>
-                          <td className="py-2 pr-2 text-[var(--foreground)]">
+                          <td className="py-3 pr-4 text-[var(--foreground)]">
                             {product.name}
                             {product.isPinned && (
                               <Lock
@@ -712,16 +712,16 @@ export function ProductsScreen(): React.JSX.Element {
                               />
                             )}
                           </td>
-                          <td className="py-2 pr-2 text-right tabular-nums text-[var(--foreground)]">
+                          <td className="py-3 pr-4 text-right tabular-nums text-[var(--foreground)]">
                             {formatCurrency(product.costCents)}
                           </td>
-                          <td className="py-2 pr-2 text-right tabular-nums font-semibold text-[var(--primary)]">
+                          <td className="py-3 pr-4 text-right tabular-nums font-semibold text-[var(--primary)]">
                             {formatCurrency(product.priceCents)}
                           </td>
-                          <td className="py-2 pr-2 font-mono text-[var(--muted-foreground)]">
+                          <td className="py-3 pr-4 font-mono text-[var(--muted-foreground)]">
                             {product.barcode || '—'}
                           </td>
-                          <td className="py-2 text-right">
+                          <td className="py-3 text-right">
                             <button
                               type="button"
                               onClick={(e) => {
@@ -796,15 +796,15 @@ export function ProductsScreen(): React.JSX.Element {
                       <table className="w-full text-xs">
                         <thead className="sticky top-0 bg-[var(--card)]">
                           <tr className="border-b border-[var(--border)] text-left text-[var(--muted-foreground)]">
-                            <th className="py-2 pr-2 font-medium">Product Code</th>
-                            <th className="py-2 pr-2 font-medium">Description</th>
-                            <th className="py-2 pr-2 font-medium">Effective Date</th>
-                            <th className="py-2 pr-2 font-medium">Pack Size</th>
-                            <th className="py-2 pr-2 font-medium">Form / Strength</th>
-                            <th className="py-2 pr-2 font-medium">Vendor / Brand</th>
-                            <th className="py-2 pr-2 text-right font-medium">Unit Cost</th>
-                            <th className="py-2 pr-2 text-right font-medium">Retail Price</th>
-                            <th className="py-2 text-right font-medium">UPC / Barcode</th>
+                            <th className="py-3 pr-4 font-medium">Product Code</th>
+                            <th className="py-3 pr-4 font-medium">Description</th>
+                            <th className="py-3 pr-4 font-medium">Effective Date</th>
+                            <th className="py-3 pr-4 font-medium">Pack Size</th>
+                            <th className="py-3 pr-4 font-medium">Form / Strength</th>
+                            <th className="py-3 pr-4 font-medium">Vendor / Brand</th>
+                            <th className="py-3 pr-4 text-right font-medium">Unit Cost</th>
+                            <th className="py-3 pr-4 text-right font-medium">Retail Price</th>
+                            <th className="py-3 pr-4 text-right font-medium">UPC / Barcode</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -816,10 +816,10 @@ export function ProductsScreen(): React.JSX.Element {
                                 catalogEditItem?.id === item.id ? 'bg-[var(--muted)]' : ''
                               }`}
                             >
-                              <td className="py-2 pr-2 font-mono text-[var(--foreground)]">
+                              <td className="py-3 pr-4 font-mono text-[var(--foreground)]">
                                 {item.itemNumber}
                               </td>
-                              <td className="py-2 pr-2 text-[var(--foreground)]">
+                              <td className="py-3 pr-4 text-[var(--foreground)]">
                                 {item.displayName || item.description}
                                 {item.stockedProductId && (
                                   <Lock
@@ -828,22 +828,22 @@ export function ProductsScreen(): React.JSX.Element {
                                   />
                                 )}
                               </td>
-                              <td className="py-2 pr-2 text-[var(--muted-foreground)]">
+                              <td className="py-3 pr-4 text-[var(--muted-foreground)]">
                                 {item.effectiveDate || '—'}
                               </td>
-                              <td className="py-2 pr-2 text-[var(--muted-foreground)]">
+                              <td className="py-3 pr-4 text-[var(--muted-foreground)]">
                                 {item.packSize || '—'}
                               </td>
-                              <td className="py-2 pr-2 text-[var(--muted-foreground)]">
+                              <td className="py-3 pr-4 text-[var(--muted-foreground)]">
                                 {[item.dosageForm, item.strength].filter(Boolean).join(' ') || '—'}
                               </td>
-                              <td className="py-2 pr-2 text-[var(--muted-foreground)]">
+                              <td className="py-3 pr-4 text-[var(--muted-foreground)]">
                                 {item.vendorCode || '—'}
                               </td>
-                              <td className="py-2 pr-2 text-right tabular-nums text-[var(--foreground)]">
+                              <td className="py-3 pr-4 text-right tabular-nums text-[var(--foreground)]">
                                 {formatCurrency(item.costPriceCents)}
                               </td>
-                              <td className="py-2 pr-2 text-right tabular-nums font-semibold text-[var(--primary)]">
+                              <td className="py-3 pr-4 text-right tabular-nums font-semibold text-[var(--primary)]">
                                 {formatCurrency(item.stockedPriceCents ?? item.listPriceCents)}
                                 {item.stockedPriceCents === null && (
                                   <span className="ml-1 text-[10px] font-normal text-[var(--muted-foreground)]">

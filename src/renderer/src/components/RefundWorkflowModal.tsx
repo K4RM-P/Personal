@@ -205,7 +205,7 @@ export function RefundWorkflowModal({
                 setAmountCents(sale.refundableCents)
                 setStep('method')
               }}
-              className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
+              className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
             >
               Refund Entire Sale ({formatCurrency(sale.refundableCents)} remaining)
             </button>
@@ -273,7 +273,7 @@ export function RefundWorkflowModal({
                 setStep('method')
               }}
               disabled={selectedItemIds.size === 0}
-              className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+              className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:opacity-50"
             >
               Continue to Refund Method
             </button>
@@ -348,7 +348,7 @@ export function RefundWorkflowModal({
           <Alert variant="success">{successMessage}</Alert>
           <button
             onClick={() => onClose(true)}
-            className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
+            className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
           >
             Back to sales list
           </button>
@@ -396,7 +396,7 @@ export function RefundWorkflowModal({
             <button
               onClick={() => void processRefund('CASH')}
               disabled={processing}
-              className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+              className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:opacity-50"
             >
               {processing ? 'Processing…' : 'Confirm Refund'}
             </button>
@@ -434,7 +434,7 @@ export function RefundWorkflowModal({
             <button
               onClick={() => void processRefund('CARD')}
               disabled={processing}
-              className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+              className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:opacity-50"
             >
               {processing ? 'Processing…' : 'Process Card Refund'}
             </button>
@@ -477,7 +477,7 @@ export function RefundWorkflowModal({
                 void processRefund('E_TRANSFER', { customerEmail: customerEmail.trim() })
               }
               disabled={processing || !customerEmail.trim()}
-              className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+              className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:opacity-50"
             >
               {processing ? 'Processing…' : 'Confirm E-Transfer Refund'}
             </button>
@@ -632,7 +632,7 @@ export function RefundWorkflowModal({
                     setError(err instanceof Error ? err.message : 'Could not create customer.')
                   }
                 }}
-                className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
+                className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
               >
                 Create &amp; link
               </button>
@@ -681,7 +681,7 @@ export function RefundWorkflowModal({
                   )
                 }
                 disabled={processing}
-                className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+                className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:opacity-50"
               >
                 {processing ? 'Processing…' : 'Confirm Deposit'}
               </button>

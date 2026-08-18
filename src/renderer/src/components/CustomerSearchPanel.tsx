@@ -54,7 +54,7 @@ export function CustomerSearchPanel({
           <div className="mb-2 text-[var(--muted-foreground)]">Customer not found</div>
           <button
             onClick={onAddNew}
-            className="min-h-11 w-full rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
+            className="min-h-11 w-full rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
           >
             + Add new customer
           </button>

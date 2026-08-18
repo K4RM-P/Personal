@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Card, CardHeader, CardTitle, CardDescription } from './ui/Card'
+import { Alert } from './ui/Alert'
 import { TransactionDetailView } from './TransactionDetailView'
 import { formatCurrency } from '@shared/formatCurrency'
 import type { DebtBreakdown, DebtBreakdownEntry } from '@shared/types'
@@ -82,9 +83,15 @@ export function BringInBalanceModal({
           </CardDescription>
         </CardHeader>
 
-        {error && <div className="mt-3 text-sm text-[var(--error)]">{error}</div>}
+        {error && (
+          <Alert variant="error" className="mt-3">
+            {error}
+          </Alert>
+        )}
         {!breakdown && !error && (
-          <div className="mt-3 text-sm text-[var(--muted-foreground)]">Loading…</div>
+          <Alert variant="pending" className="mt-3">
+            Loading…
+          </Alert>
         )}
 
         {breakdown && (
@@ -203,7 +210,7 @@ export function BringInBalanceModal({
                       isValid && onAdd?.(Array.from(selected), selectedAmountCents, selectedEntries)
                     }
                     disabled={!isValid}
-                    className="min-h-11 flex-1 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+                    className="min-h-11 flex-1 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:opacity-50"
                   >
                     Add to Bill
                   </button>

@@ -5,6 +5,7 @@ import { Alert } from '../components/ui/Alert'
 import { EmptyState } from '../components/ui/EmptyState'
 import { cn } from '../lib/utils'
 import { formatCurrency } from '@shared/formatCurrency'
+import { buildCompleteProductSalesCsv } from '@shared/completeProductSalesCsv'
 import type {
   DashboardData,
   SalesSummary,
@@ -206,6 +207,19 @@ function downloadCsv(filename: string, headers: string[], rows: string[][]): voi
     ...rows.map((r) => r.map(csvEscape).join(','))
   ].join('\n')
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${filename}-${todayStr()}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+/** Downloads an already-built CSV string as-is — used for the Complete Products
+ *  Sales Report so the manual "Export CSV" button and the scheduled auto-export
+ *  (main/reports/reportCsvExporter.ts) produce byte-identical formatting. */
+function downloadCsvText(filename: string, csvText: string): void {
+  const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -454,6 +468,17 @@ function SalesReportsPage(): React.JSX.Element {
         </div>
         <button
           onClick={() => {
+            if (subTab === 'products') {
+              // Shared builder with main/reports/reportCsvExporter.ts — the manual export
+              // and the scheduled auto-export always produce identically-formatted CSVs.
+              const csv = buildCompleteProductSalesCsv(completeProductSales, {
+                fromDate,
+                toDate,
+                generatedAt: new Date()
+              })
+              downloadCsvText('sales-products', csv)
+              return
+            }
             const csvRows = (() => {
               if (subTab === 'daily')
                 return dailySales.map((r) => [
@@ -485,18 +510,8 @@ function SalesReportsPage(): React.JSX.Element {
                   String(r.quantitySold),
                   String(r.currentOnHand)
                 ])
-              return completeProductSales.map((r) => [
-                r.date,
-                r.receiptNumber,
-                r.productName,
-                String(r.quantity),
-                formatCurrency(r.supplierCostCents),
-                formatCurrency(r.retailCostCents),
-                formatCurrency(r.discountCents),
-                formatCurrency(r.hstCents),
-                formatCurrency(r.totalPriceCents),
-                formatCurrency(r.profitCents)
-              ])
+              // 'products' is handled by the early return above.
+              return []
             })()
             const csvHeaders = (() => {
               if (subTab === 'daily')
@@ -504,18 +519,8 @@ function SalesReportsPage(): React.JSX.Element {
               if (subTab === 'tender') return ['Tender', 'Amount', '%']
               if (subTab === 'top') return ['Item', 'SKU', 'Qty', 'Revenue', 'Margin%']
               if (subTab === 'slow') return ['Item', 'SKU', 'Qty Sold', 'On Hand']
-              return [
-                'Date',
-                'Receipt #',
-                'Product',
-                'Qty',
-                'Supplier Cost',
-                'Retail Cost',
-                'Discount',
-                'HST',
-                'Total Price',
-                'Profit'
-              ]
+              // 'products' is handled by the early return above.
+              return []
             })()
             downloadCsv(`sales-${subTab}`, csvHeaders, csvRows)
           }}

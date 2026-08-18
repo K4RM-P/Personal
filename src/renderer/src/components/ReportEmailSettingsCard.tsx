@@ -268,7 +268,7 @@ export function ReportEmailSettingsCard(): React.JSX.Element {
           <button
             onClick={() => void handleSave()}
             disabled={saving}
-            className="min-h-11 flex-1 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-medium text-[var(--primary-foreground)] disabled:opacity-50"
+            className="min-h-11 flex-1 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save Report Email Settings'}
           </button>

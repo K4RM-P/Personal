@@ -246,7 +246,7 @@ export function CustomerDisplaySettingsCard(): React.JSX.Element {
 
         <button
           onClick={handleSaveDetails}
-          className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-medium text-[var(--primary-foreground)]"
+          className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
         >
           Save Customer Display Settings
         </button>
@@ -419,7 +419,7 @@ export function CustomerDisplaySettingsCard(): React.JSX.Element {
               <button
                 onClick={handleModalSave}
                 disabled={!modalValid}
-                className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-medium text-[var(--primary-foreground)] disabled:opacity-50"
+                className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:opacity-50"
               >
                 Save slide
               </button>

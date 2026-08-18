@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Card, CardHeader, CardTitle, CardDescription } from './ui/Card'
+import { Alert } from './ui/Alert'
 import { formatCurrency } from '@shared/formatCurrency'
 import type { TransactionWithItems } from '@shared/types'
 
@@ -46,10 +47,16 @@ export function TransactionDetailView({
           )}
         </CardHeader>
 
-        {error && <div className="mt-3 text-sm text-[var(--error)]">{error}</div>}
+        {error && (
+          <Alert variant="error" className="mt-3">
+            {error}
+          </Alert>
+        )}
 
         {!detail && !error && (
-          <div className="mt-3 text-sm text-[var(--muted-foreground)]">Loading…</div>
+          <Alert variant="pending" className="mt-3">
+            Loading sale detail…
+          </Alert>
         )}
 
         {detail && (

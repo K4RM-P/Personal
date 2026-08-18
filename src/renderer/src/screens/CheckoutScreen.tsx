@@ -1093,7 +1093,7 @@ export function CheckoutScreen(): React.JSX.Element {
                     <div className="mt-2 flex items-center gap-1.5">
                       <button
                         onClick={() => handleResumeParkedSale(parked.id)}
-                        className="min-h-8 flex-1 rounded-[var(--radius)] bg-[var(--warning)] px-2 py-1 font-medium text-[var(--primary-foreground)]"
+                        className="min-h-8 flex-1 rounded-[var(--radius)] bg-[var(--warning)] px-2 py-1 font-medium text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
                       >
                         Resume
                       </button>
@@ -1378,7 +1378,7 @@ export function CheckoutScreen(): React.JSX.Element {
                         >
                           {itemHstOn && (
                             <Check
-                              className="icon-3_5 text-[var(--primary-foreground)]"
+                              className="icon-3_5 text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
                               aria-hidden="true"
                             />
                           )}
@@ -1661,7 +1661,7 @@ export function CheckoutScreen(): React.JSX.Element {
                       className="flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-2 text-xs font-semibold text-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <HeartHandshake className="icon-4 shrink-0" />
-                      {tenderLines.length === 0 ? '+ Add Pharmacy Credit' : 'Pay Rest with Tab'}
+                      {tenderLines.length === 0 ? '+ Add Pharmacy Credit' : 'Pay Rest with Pharmacy Credit'}
                     </button>
                   </div>
                 )}
@@ -1678,7 +1678,7 @@ export function CheckoutScreen(): React.JSX.Element {
                   <button
                     onClick={() => void completeSale()}
                     disabled={remainingCents !== 0 || tenderLines.length === 0 || cardProcessing}
-                    className="min-h-11 flex-1 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="min-h-11 flex-1 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {cardProcessing ? 'Completing…' : 'Complete Sale'}
                   </button>
@@ -1798,7 +1798,7 @@ export function CheckoutScreen(): React.JSX.Element {
                         lineAmountCents > remainingCents ||
                         cashGivenCents < lineAmountCents
                       }
-                      className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Add Cash Line
                     </button>
@@ -1855,7 +1855,7 @@ export function CheckoutScreen(): React.JSX.Element {
                       disabled={
                         lineAmountCents <= 0 || lineAmountCents > remainingCents || !eTransferConfirmed
                       }
-                      className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Add E-Transfer Line
                     </button>
@@ -1930,7 +1930,7 @@ export function CheckoutScreen(): React.JSX.Element {
                     <button
                       onClick={() => void startCardLineCharge()}
                       disabled={!cardType || lineAmountCents <= 0 || lineAmountCents > remainingCents || cardProcessing}
-                      className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {cardProcessing
                         ? 'Waiting for terminal response…'
@@ -2005,7 +2005,7 @@ export function CheckoutScreen(): React.JSX.Element {
                         <button
                           onClick={confirmPharmacyCreditLine}
                           disabled={lineAmountCents <= 0 || lineAmountCents > remainingCents}
-                          className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+                          className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Add Pharmacy Credit Line
                         </button>
@@ -2068,7 +2068,7 @@ export function CheckoutScreen(): React.JSX.Element {
               </button>
               <button
                 onClick={() => void confirmManualCardOutcome('approved')}
-                className="min-h-11 flex-1 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
+                className="min-h-11 flex-1 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
               >
                 Approved
               </button>
@@ -2161,7 +2161,7 @@ export function CheckoutScreen(): React.JSX.Element {
               </button>
               <button
                 onClick={() => confirmParkSale()}
-                className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
+                className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
               >
                 Skip &amp; Park
               </button>
@@ -2244,7 +2244,7 @@ export function CheckoutScreen(): React.JSX.Element {
               <button
                 onClick={() => void handleCreateCustomer()}
                 disabled={creatingCustomer}
-                className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-50"
+                className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:opacity-50"
               >
                 {creatingCustomer ? 'Saving…' : 'Create & attach'}
               </button>
@@ -2276,7 +2276,7 @@ export function CheckoutScreen(): React.JSX.Element {
               <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={() => void handlePrintReceipt()}
-                  className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
+                  className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
                 >
                   Print Receipt
                 </button>
@@ -2298,7 +2298,7 @@ export function CheckoutScreen(): React.JSX.Element {
               <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={() => void handlePrintReceipt()}
-                  className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)]"
+                  className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
                 >
                   Retry
                 </button>

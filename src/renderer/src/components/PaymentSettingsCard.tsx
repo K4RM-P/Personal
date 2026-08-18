@@ -206,7 +206,7 @@ export function PaymentSettingsCard(): React.JSX.Element {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => pickFromWizard('manual')}
-                className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-xs text-[var(--primary-foreground)]"
+                className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-xs font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
               >
                 No terminal / not integrated → Manual/External
               </button>
@@ -360,7 +360,7 @@ export function PaymentSettingsCard(): React.JSX.Element {
         <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={handleSave}
-            className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-medium text-[var(--primary-foreground)]"
+            className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
           >
             Save Payment Settings
           </button>

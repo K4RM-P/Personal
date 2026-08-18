@@ -124,7 +124,7 @@ export function RefundSalesScreen({ manager, onExit }: RefundSalesScreenProps): 
                           ? 'This sale has already been fully refunded or was voided.'
                           : undefined
                       }
-                      className="min-h-9 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-xs font-semibold text-[var(--primary-foreground)] disabled:opacity-40"
+                      className="min-h-9 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-xs font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:opacity-40"
                     >
                       Refund
                     </button>

@@ -13,6 +13,7 @@ import { FeatureFlagCard } from '../components/FeatureFlagCard'
 import { PaymentSettingsCard } from '../components/PaymentSettingsCard'
 import { CustomerDisplaySettingsCard } from '../components/CustomerDisplaySettingsCard'
 import { ReportEmailSettingsCard } from '../components/ReportEmailSettingsCard'
+import { ReportCsvExportSettingsCard } from '../components/ReportCsvExportSettingsCard'
 import { UpdateSettingsCard } from '../components/UpdateSettingsCard'
 import { BackupModal } from '../components/BackupModal'
 import { RestoreBackupModal } from '../components/RestoreBackupModal'
@@ -163,6 +164,14 @@ const SECTION_KEYWORDS: Record<string, string[]> = {
     'smtp',
     'recipient email'
   ],
+  reportCsvExport: [
+    'csv export',
+    'scheduled csv',
+    'auto export',
+    'sales report csv',
+    'complete products sales',
+    'export folder'
+  ],
   updates: ['software update', 'update', 'auto update', 'version', 'install update'],
   testMode: ['test mode', 'ipc error', 'force reject', 'debug', 'simulate error']
 }
@@ -189,7 +198,14 @@ const TIER_LABELS: Record<SettingsTier, { title: string; description: string }> 
 const TIER_SECTIONS: Record<SettingsTier, string[]> = {
   daily: ['payment', 'printer', 'backup'],
   setup: ['storeInfo', 'receiptTemplate', 'credit', 'density', 'customerDisplay'],
-  compliance: ['compliance', 'featureFlags', 'optionalModules', 'reportingSnapshot', 'reportEmail'],
+  compliance: [
+    'compliance',
+    'featureFlags',
+    'optionalModules',
+    'reportingSnapshot',
+    'reportEmail',
+    'reportCsvExport'
+  ],
   system: ['updates', 'testMode']
 }
 
@@ -728,7 +744,7 @@ export function SettingsScreen() {
 
               <button
                 onClick={handleSaveHardwareSettings}
-                className="min-h-11 mt-4 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-medium text-[var(--primary-foreground)]"
+                className="min-h-11 mt-4 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
               >
                 Save Hardware Settings
               </button>
@@ -837,7 +853,7 @@ export function SettingsScreen() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => setShowBackupModal(true)}
-                    className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-medium text-[var(--primary-foreground)]"
+                    className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
                   >
                     Manual Backup Now
                   </button>
@@ -1125,7 +1141,7 @@ export function SettingsScreen() {
                 </div>
                 <button
                   onClick={() => void saveCreditSettings()}
-                  className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-medium text-[var(--primary-foreground)]"
+                  className="min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
                 >
                   Save customer settings
                 </button>
@@ -1216,7 +1232,8 @@ export function SettingsScreen() {
 
           {(sectionVisible('optionalModules') ||
             sectionVisible('reportingSnapshot') ||
-            sectionVisible('reportEmail')) && (
+            sectionVisible('reportEmail') ||
+            sectionVisible('reportCsvExport')) && (
             <div className="grid gap-4 md:grid-cols-2">
               {sectionVisible('optionalModules') && (
                 <Card>
@@ -1256,9 +1273,7 @@ export function SettingsScreen() {
                     </div>
                     <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
                       <div>
-                        <p className="font-semibold text-[var(--foreground)]">
-                          Customer tab / store credit
-                        </p>
+                        <p className="font-semibold text-[var(--foreground)]">Pharmacy Credit</p>
                         <p className="text-[var(--muted-foreground)]">
                           Allow short-pay, advance-fill, and credit-ledger flows.
                         </p>
@@ -1299,6 +1314,12 @@ export function SettingsScreen() {
               {sectionVisible('reportEmail') && (
                 <Card>
                   <ReportEmailSettingsCard />
+                </Card>
+              )}
+
+              {sectionVisible('reportCsvExport') && (
+                <Card>
+                  <ReportCsvExportSettingsCard />
                 </Card>
               )}
             </div>
