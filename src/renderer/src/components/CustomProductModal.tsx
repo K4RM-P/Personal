@@ -22,7 +22,9 @@ export function CustomProductModal({
 
   const priceCents = Math.round((parseFloat(priceInput || '0') || 0) * 100)
   const nameValid = mode === 'RX' ? rxNumber.trim().length > 0 : itemName.trim().length > 0
-  const canSubmit = nameValid && priceCents > 0
+  // $0 is a valid price (free/fully-discounted RX or non-RX item) — only a
+  // negative price is actually invalid.
+  const canSubmit = nameValid && priceCents >= 0
 
   const handleSubmit = (): void => {
     if (!canSubmit) return

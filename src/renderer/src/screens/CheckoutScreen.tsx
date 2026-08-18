@@ -671,7 +671,9 @@ export function CheckoutScreen(): React.JSX.Element {
         setFailedLineNotice({
           method: 'Card',
           amountCents: chargeCents,
-          reason: result.message || (result.status === 'error' ? 'Payment timed out' : 'Card was not approved')
+          reason:
+            result.message ||
+            (result.status === 'error' ? 'Payment timed out' : 'Card was not approved')
         })
         backToTenderList()
       }
@@ -826,7 +828,10 @@ export function CheckoutScreen(): React.JSX.Element {
   /** Finalizes the sale — gated client-side on Remaining === 0 (also re-validated
    *  server-side in createTransaction; see posQueries.ts, non-negotiable #3). */
   const completeSale = async (): Promise<void> => {
-    if (remainingCents !== 0 || tenderLines.length === 0 || cardProcessing) return
+    // A genuine $0 sale (e.g. a fully-discounted or free RX item) needs no tender
+    // line at all — only a nonzero total requires at least one to have been applied.
+    if (remainingCents !== 0 || (tenderLines.length === 0 && effectiveTotal > 0) || cardProcessing)
+      return
     setCardProcessing(true)
     try {
       if (!window.api?.transaction) {
@@ -898,13 +903,20 @@ export function CheckoutScreen(): React.JSX.Element {
       showPayModal &&
       paymentMethod === null &&
       remainingCents === 0 &&
-      tenderLines.length > 0 &&
+      (tenderLines.length > 0 || effectiveTotal === 0) &&
       !cardProcessing
     ) {
       void completeSale()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remainingCents, tenderLines.length, showPayModal, paymentMethod, cardProcessing])
+  }, [
+    remainingCents,
+    tenderLines.length,
+    effectiveTotal,
+    showPayModal,
+    paymentMethod,
+    cardProcessing
+  ])
 
   const handleParkSale = (): void => {
     if (cart.length === 0) return
@@ -1316,129 +1328,131 @@ export function CheckoutScreen(): React.JSX.Element {
                 />
               ) : (
                 <>
-                {cart.map((item) => {
-                  const lineRawCents = item.unitPriceCents * item.quantity
-                  const lineDiscountCents = item.discountCents ?? 0
-                  const lineTotalCents = lineRawCents - lineDiscountCents
-                  const itemHstOn = item.hstApplied !== false
-                  return (
-                    <div
-                      key={item.product.id}
-                      className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-sm"
-                    >
-                      <div className="min-w-0 truncate font-medium text-[var(--foreground)]">
-                        <span title={item.product.name}>{item.product.name}</span>
-                        {lineDiscountCents > 0 && (
-                          <span className="ml-1 text-xs font-normal text-[var(--success)]">
-                            -{formatCurrency(lineDiscountCents)}
-                            <button
-                              type="button"
-                              onClick={() => handleClearItemDiscount(item.product.id)}
-                              title="Cancel discount on this item"
-                              className="ml-1 text-[10px] text-[var(--muted-foreground)] underline"
-                            >
-                              remove
-                            </button>
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex shrink-0 flex-nowrap items-center justify-end gap-1">
-                        <div className="flex min-h-8 items-center rounded-[var(--radius)] border border-[var(--border)]">
-                          <button
-                            onClick={() => handleQuantityChange(item.product.id, -1)}
-                            className="min-w-7 px-1 py-1 text-[var(--foreground)]"
-                          >
-                            −
-                          </button>
-                          <span className="px-1 text-[var(--foreground)]">{item.quantity}</span>
-                          <button
-                            onClick={() => handleQuantityChange(item.product.id, 1)}
-                            className="min-w-7 px-1 py-1 text-[var(--foreground)]"
-                          >
-                            +
-                          </button>
-                        </div>
-                        <button
-                          onClick={() => setDiscountItemTarget(item.product.id)}
-                          className={`min-h-8 rounded-[var(--radius)] border px-2 text-xs font-semibold ${lineDiscountCents > 0 ? 'border-[var(--success)] text-[var(--success)]' : 'border-[var(--border)] text-[var(--muted-foreground)]'}`}
-                        >
-                          {lineDiscountCents > 0 ? 'Edit' : 'Disc.'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => !item.hstLocked && handleToggleItemHst(item.product.id)}
-                          disabled={item.hstLocked}
-                          aria-pressed={itemHstOn}
-                          className={`flex min-h-8 items-center gap-0.5 rounded-[var(--radius)] border px-2 text-xs font-semibold ${itemHstOn ? 'border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)]' : 'border-[var(--warning)] text-[var(--warning)]'} ${item.hstLocked ? 'opacity-60' : ''}`}
-                          title={
-                            item.hstLocked
-                              ? 'RX items cannot be charged HST'
-                              : 'Charge HST on this item'
-                          }
-                        >
-                          {itemHstOn && (
-                            <Check
-                              className="icon-3_5 text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
-                              aria-hidden="true"
-                            />
+                  {cart.map((item) => {
+                    const lineRawCents = item.unitPriceCents * item.quantity
+                    const lineDiscountCents = item.discountCents ?? 0
+                    const lineTotalCents = lineRawCents - lineDiscountCents
+                    const itemHstOn = item.hstApplied !== false
+                    return (
+                      <div
+                        key={item.product.id}
+                        className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-sm"
+                      >
+                        <div className="min-w-0 truncate font-medium text-[var(--foreground)]">
+                          <span title={item.product.name}>{item.product.name}</span>
+                          {lineDiscountCents > 0 && (
+                            <span className="ml-1 text-xs font-normal text-[var(--success)]">
+                              -{formatCurrency(lineDiscountCents)}
+                              <button
+                                type="button"
+                                onClick={() => handleClearItemDiscount(item.product.id)}
+                                title="Cancel discount on this item"
+                                className="ml-1 text-[10px] text-[var(--muted-foreground)] underline"
+                              >
+                                remove
+                              </button>
+                            </span>
                           )}
-                          HST
-                        </button>
-                        <div className="w-16 text-right font-semibold text-[var(--foreground)]">
-                          {formatCurrency(lineTotalCents)}
+                        </div>
+                        <div className="flex shrink-0 flex-nowrap items-center justify-end gap-1">
+                          <div className="flex min-h-8 items-center rounded-[var(--radius)] border border-[var(--border)]">
+                            <button
+                              onClick={() => handleQuantityChange(item.product.id, -1)}
+                              className="min-w-7 px-1 py-1 text-[var(--foreground)]"
+                            >
+                              −
+                            </button>
+                            <span className="px-1 text-[var(--foreground)]">{item.quantity}</span>
+                            <button
+                              onClick={() => handleQuantityChange(item.product.id, 1)}
+                              className="min-w-7 px-1 py-1 text-[var(--foreground)]"
+                            >
+                              +
+                            </button>
+                          </div>
+                          <button
+                            onClick={() => setDiscountItemTarget(item.product.id)}
+                            className={`min-h-8 rounded-[var(--radius)] border px-2 text-xs font-semibold ${lineDiscountCents > 0 ? 'border-[var(--success)] text-[var(--success)]' : 'border-[var(--border)] text-[var(--muted-foreground)]'}`}
+                          >
+                            {lineDiscountCents > 0 ? 'Edit' : 'Disc.'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => !item.hstLocked && handleToggleItemHst(item.product.id)}
+                            disabled={item.hstLocked}
+                            aria-pressed={itemHstOn}
+                            className={`flex min-h-8 items-center gap-0.5 rounded-[var(--radius)] border px-2 text-xs font-semibold ${itemHstOn ? 'border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)]' : 'border-[var(--warning)] text-[var(--warning)]'} ${item.hstLocked ? 'opacity-60' : ''}`}
+                            title={
+                              item.hstLocked
+                                ? 'RX items cannot be charged HST'
+                                : 'Charge HST on this item'
+                            }
+                          >
+                            {itemHstOn && (
+                              <Check
+                                className="icon-3_5 text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
+                                aria-hidden="true"
+                              />
+                            )}
+                            HST
+                          </button>
+                          <div className="w-16 text-right font-semibold text-[var(--foreground)]">
+                            {formatCurrency(lineTotalCents)}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )
-                })}
-                {debtSettlement && attachedCustomer && (
-                  <div className="rounded-[var(--radius)] border border-[var(--warning)]/40 bg-[var(--warning-bg)] px-2 py-1.5 text-sm">
-                    <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-                      <div className="min-w-0 truncate font-medium text-[var(--foreground)]">
-                        {attachedCustomer.firstName} {attachedCustomer.lastName} — brought in from tab
-                      </div>
-                      <div className="flex shrink-0 flex-nowrap items-center justify-end gap-1">
-                        <button
-                          onClick={() => setShowDebtDetailsModal(true)}
-                          className="min-h-8 rounded-[var(--radius)] border border-[var(--border)] px-2 text-xs font-semibold text-[var(--muted-foreground)]"
-                        >
-                          Details
-                        </button>
-                        <button
-                          onClick={() => setDebtSettlement(null)}
-                          className="min-h-8 rounded-[var(--radius)] border border-[var(--border)] px-2 text-xs font-semibold text-[var(--error)]"
-                        >
-                          Remove
-                        </button>
-                        <div className="w-16 text-right font-semibold text-[var(--foreground)]">
-                          {formatCurrency(debtSettlement.amountCents)}
+                    )
+                  })}
+                  {debtSettlement && attachedCustomer && (
+                    <div className="rounded-[var(--radius)] border border-[var(--warning)]/40 bg-[var(--warning-bg)] px-2 py-1.5 text-sm">
+                      <div className="grid grid-cols-[1fr_auto] items-center gap-2">
+                        <div className="min-w-0 truncate font-medium text-[var(--foreground)]">
+                          {attachedCustomer.firstName} {attachedCustomer.lastName} — brought in from
+                          tab
+                        </div>
+                        <div className="flex shrink-0 flex-nowrap items-center justify-end gap-1">
+                          <button
+                            onClick={() => setShowDebtDetailsModal(true)}
+                            className="min-h-8 rounded-[var(--radius)] border border-[var(--border)] px-2 text-xs font-semibold text-[var(--muted-foreground)]"
+                          >
+                            Details
+                          </button>
+                          <button
+                            onClick={() => setDebtSettlement(null)}
+                            className="min-h-8 rounded-[var(--radius)] border border-[var(--border)] px-2 text-xs font-semibold text-[var(--error)]"
+                          >
+                            Remove
+                          </button>
+                          <div className="w-16 text-right font-semibold text-[var(--foreground)]">
+                            {formatCurrency(debtSettlement.amountCents)}
+                          </div>
                         </div>
                       </div>
+                      <div className="mt-1 space-y-0.5">
+                        {debtSettlement.entries.map((entry) => (
+                          <div
+                            key={entry.ledgerEntryId}
+                            className="flex items-center justify-between gap-2 text-xs text-[var(--muted-foreground)]"
+                          >
+                            <span className="min-w-0 truncate">
+                              {new Date(
+                                entry.type === 'SALE_CHARGE'
+                                  ? (entry.transactionDate ?? entry.createdAt)
+                                  : entry.createdAt
+                              ).toLocaleDateString()}{' '}
+                              —{' '}
+                              {entry.type === 'SALE_CHARGE'
+                                ? entry.items
+                                    ?.map((i) => `${i.productName} (${i.quantity})`)
+                                    .join(', ') || `Sale ${entry.receiptNumber ?? ''}`
+                                : entry.note || 'Manual adjustment'}
+                            </span>
+                            <span className="shrink-0">{formatCurrency(entry.amountCents)}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="mt-1 space-y-0.5">
-                      {debtSettlement.entries.map((entry) => (
-                        <div
-                          key={entry.ledgerEntryId}
-                          className="flex items-center justify-between gap-2 text-xs text-[var(--muted-foreground)]"
-                        >
-                          <span className="min-w-0 truncate">
-                            {new Date(
-                              entry.type === 'SALE_CHARGE'
-                                ? (entry.transactionDate ?? entry.createdAt)
-                                : entry.createdAt
-                            ).toLocaleDateString()}{' '}
-                            —{' '}
-                            {entry.type === 'SALE_CHARGE'
-                              ? entry.items?.map((i) => `${i.productName} (${i.quantity})`).join(', ') ||
-                                `Sale ${entry.receiptNumber ?? ''}`
-                              : entry.note || 'Manual adjustment'}
-                          </span>
-                          <span className="shrink-0">{formatCurrency(entry.amountCents)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                  )}
                 </>
               )}
             </div>
@@ -1556,7 +1570,12 @@ export function CheckoutScreen(): React.JSX.Element {
                 onKeyDown={(e) => {
                   // Enter completes the sale the instant it's fully tendered — the fastest
                   // path once the last line is added, no mouse trip to the button required.
-                  if (e.key === 'Enter' && remainingCents === 0 && tenderLines.length > 0 && !cardProcessing) {
+                  if (
+                    e.key === 'Enter' &&
+                    remainingCents === 0 &&
+                    (tenderLines.length > 0 || effectiveTotal === 0) &&
+                    !cardProcessing
+                  ) {
                     void completeSale()
                   }
                 }}
@@ -1571,7 +1590,9 @@ export function CheckoutScreen(): React.JSX.Element {
                 {failedLineNotice && (
                   <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--error)]/40 bg-[var(--error-bg)] px-2 py-1.5 text-xs text-[var(--error)]">
                     <span>
-                      {failedLineNotice.method} attempt for {formatCurrency(failedLineNotice.amountCents)} failed — {failedLineNotice.reason}
+                      {failedLineNotice.method} attempt for{' '}
+                      {formatCurrency(failedLineNotice.amountCents)} failed —{' '}
+                      {failedLineNotice.reason}
                     </span>
                     <button onClick={() => setFailedLineNotice(null)} aria-label="Dismiss">
                       <X className="icon-3_5" />
@@ -1661,12 +1682,16 @@ export function CheckoutScreen(): React.JSX.Element {
                       className="flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius)] border border-[var(--primary)] bg-[var(--background)] px-2 text-xs font-semibold text-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <HeartHandshake className="icon-4 shrink-0" />
-                      {tenderLines.length === 0 ? '+ Add Pharmacy Credit' : 'Pay Rest with Pharmacy Credit'}
+                      {tenderLines.length === 0
+                        ? '+ Add Pharmacy Credit'
+                        : 'Pay Rest with Pharmacy Credit'}
                     </button>
                   </div>
                 )}
 
-                {scanFeedback?.type === 'error' && <Alert variant="error">{scanFeedback.message}</Alert>}
+                {scanFeedback?.type === 'error' && (
+                  <Alert variant="error">{scanFeedback.message}</Alert>
+                )}
 
                 <div className="flex gap-2 pt-1">
                   <button
@@ -1713,7 +1738,8 @@ export function CheckoutScreen(): React.JSX.Element {
                         onChange={(e) => {
                           // Keep "cash given" tracking the amount as it's edited, as long as the
                           // cashier hasn't diverged it themselves (still exact-change by default).
-                          if (cashGivenDollars === tenderedDollars) setCashGivenDollars(e.target.value)
+                          if (cashGivenDollars === tenderedDollars)
+                            setCashGivenDollars(e.target.value)
                           setTenderedDollars(e.target.value)
                         }}
                         onKeyDown={confirmOnEnter(confirmCashLine)}
@@ -1759,7 +1785,8 @@ export function CheckoutScreen(): React.JSX.Element {
                               checked={cashOverageChoice === 'deposit'}
                               onChange={() => setCashOverageChoice('deposit')}
                             />
-                            Deposit {formatCurrency(cashOverageCents)} to {attachedCustomer.firstName}
+                            Deposit {formatCurrency(cashOverageCents)} to{' '}
+                            {attachedCustomer.firstName}
                             &apos;s Pharmacy Credit
                           </label>
                         ) : (
@@ -1853,7 +1880,9 @@ export function CheckoutScreen(): React.JSX.Element {
                     <button
                       onClick={confirmETransferLine}
                       disabled={
-                        lineAmountCents <= 0 || lineAmountCents > remainingCents || !eTransferConfirmed
+                        lineAmountCents <= 0 ||
+                        lineAmountCents > remainingCents ||
+                        !eTransferConfirmed
                       }
                       className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
@@ -1915,7 +1944,8 @@ export function CheckoutScreen(): React.JSX.Element {
                         </label>
                         {applySurcharge && (
                           <div className="mt-2">
-                            {formatCurrency(lineAmountCents)} + {checkoutSettings.cardSurchargePercent}% fee{' '}
+                            {formatCurrency(lineAmountCents)} +{' '}
+                            {checkoutSettings.cardSurchargePercent}% fee{' '}
                             {formatCurrency(pendingSurchargeCents)} = charge{' '}
                             {formatCurrency(lineAmountCents + pendingSurchargeCents)}
                           </div>
@@ -1923,13 +1953,24 @@ export function CheckoutScreen(): React.JSX.Element {
                       </div>
                     )}
                     {paymentMessage && (
-                      <Alert variant={paymentState === 'declined' || paymentState === 'timeout' ? 'error' : 'pending'}>
+                      <Alert
+                        variant={
+                          paymentState === 'declined' || paymentState === 'timeout'
+                            ? 'error'
+                            : 'pending'
+                        }
+                      >
                         {paymentMessage}
                       </Alert>
                     )}
                     <button
                       onClick={() => void startCardLineCharge()}
-                      disabled={!cardType || lineAmountCents <= 0 || lineAmountCents > remainingCents || cardProcessing}
+                      disabled={
+                        !cardType ||
+                        lineAmountCents <= 0 ||
+                        lineAmountCents > remainingCents ||
+                        cardProcessing
+                      }
                       className="w-full min-h-11 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {cardProcessing
@@ -2085,8 +2126,8 @@ export function CheckoutScreen(): React.JSX.Element {
             <div>
               <CardTitle className="text-[var(--foreground)]">Charges already made</CardTitle>
               <CardDescription className="text-[var(--muted-foreground)]">
-                This sale has {formatCurrency(chargedExternalCents)} already charged/confirmed across
-                card or e-transfer lines. Cancelling will require reversing those separately.
+                This sale has {formatCurrency(chargedExternalCents)} already charged/confirmed
+                across card or e-transfer lines. Cancelling will require reversing those separately.
               </CardDescription>
             </div>
             <button

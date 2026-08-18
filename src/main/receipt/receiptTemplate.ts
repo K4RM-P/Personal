@@ -71,6 +71,7 @@ function tenderLineLabel(tender: DBTransactionTender): string {
  */
 function buildTenderLinesHtml(transaction: TransactionWithItems): string {
   const tenders = transaction.tenders
+  if (transaction.tenderType === 'NONE') return '<div>No Payment Required</div>'
   if (!tenders || tenders.length === 0) {
     return `<div>Tender: ${escapeHtml(transaction.tenderType)}</div>`
   }
@@ -85,6 +86,7 @@ function buildTenderLinesHtml(transaction: TransactionWithItems): string {
 /** Plain-text (no HTML) version of the same itemization, for the `{{tenders}}` custom-template token. */
 function buildTenderLinesText(transaction: TransactionWithItems): string {
   const tenders = transaction.tenders
+  if (transaction.tenderType === 'NONE') return 'No Payment Required'
   if (!tenders || tenders.length === 0) {
     return `Tender: ${escapeHtml(transaction.tenderType)}`
   }

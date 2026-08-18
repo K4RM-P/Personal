@@ -32,7 +32,12 @@ describe('general split tender (arbitrary combination of cash/card/e-transfer/ph
     db = new PrismaClient({ datasources: { db: { url } } })
     await db.$connect()
     const product = await db.product.create({
-      data: { sku: 'SPLIT-TENDER-TEST', name: 'Split tender test item', costCents: 5000, priceCents: 10000 }
+      data: {
+        sku: 'SPLIT-TENDER-TEST',
+        name: 'Split tender test item',
+        costCents: 5000,
+        priceCents: 10000
+      }
     })
     productId = product.id
   }, 60_000)
@@ -54,10 +59,18 @@ describe('general split tender (arbitrary combination of cash/card/e-transfer/ph
     })
     expect(tx.totalCents).toBe(10000)
     expect(tx.tenderType).toBe('SPLIT')
-    const tenders = await db.transactionTender.findMany({ where: { transactionId: tx.id }, orderBy: { sequence: 'asc' } })
+    const tenders = await db.transactionTender.findMany({
+      where: { transactionId: tx.id },
+      orderBy: { sequence: 'asc' }
+    })
     expect(tenders).toHaveLength(2)
     expect(tenders[0]).toMatchObject({ method: 'CASH', amountCents: 500, sequence: 1 })
-    expect(tenders[1]).toMatchObject({ method: 'CARD', amountCents: 9500, sequence: 2, processorTransactionId: 'tx-1' })
+    expect(tenders[1]).toMatchObject({
+      method: 'CARD',
+      amountCents: 9500,
+      sequence: 2,
+      processorTransactionId: 'tx-1'
+    })
   })
 
   // Test 2: three-way split, arbitrary amounts summing exactly to total.
@@ -68,7 +81,12 @@ describe('general split tender (arbitrary combination of cash/card/e-transfer/ph
       tenders: [
         { method: 'CASH', amountCents: 3000 },
         { method: 'CARD', amountCents: 4000, processorTransactionId: 'tx-2' },
-        { method: 'E_TRANSFER', amountCents: 3000, eTransferConfirmed: true, eTransferEmail: 'a@b.com' }
+        {
+          method: 'E_TRANSFER',
+          amountCents: 3000,
+          eTransferConfirmed: true,
+          eTransferEmail: 'a@b.com'
+        }
       ]
     })
     expect(tx.totalCents).toBe(10000)
@@ -84,14 +102,35 @@ describe('general split tender (arbitrary combination of cash/card/e-transfer/ph
       items: [{ productId, quantity: 1, costCents: 5000, unitPriceCents: 10000 }],
       taxRatePercent: 0,
       tenders: [
-        { method: 'CARD', amountCents: 4000, processorTransactionId: 'card-A', cardLastFour: '1111' },
-        { method: 'CARD', amountCents: 6000, processorTransactionId: 'card-B', cardLastFour: '2222' }
+        {
+          method: 'CARD',
+          amountCents: 4000,
+          processorTransactionId: 'card-A',
+          cardLastFour: '1111'
+        },
+        {
+          method: 'CARD',
+          amountCents: 6000,
+          processorTransactionId: 'card-B',
+          cardLastFour: '2222'
+        }
       ]
     })
-    const tenders = await db.transactionTender.findMany({ where: { transactionId: tx.id }, orderBy: { sequence: 'asc' } })
+    const tenders = await db.transactionTender.findMany({
+      where: { transactionId: tx.id },
+      orderBy: { sequence: 'asc' }
+    })
     expect(tenders).toHaveLength(2)
-    expect(tenders[0]).toMatchObject({ processorTransactionId: 'card-A', cardLastFour: '1111', amountCents: 4000 })
-    expect(tenders[1]).toMatchObject({ processorTransactionId: 'card-B', cardLastFour: '2222', amountCents: 6000 })
+    expect(tenders[0]).toMatchObject({
+      processorTransactionId: 'card-A',
+      cardLastFour: '1111',
+      amountCents: 4000
+    })
+    expect(tenders[1]).toMatchObject({
+      processorTransactionId: 'card-B',
+      cardLastFour: '2222',
+      amountCents: 6000
+    })
   })
 
   // Test 5: cash given exceeds amount applied — change, or deposit to a linked customer's Pharmacy Credit.
@@ -102,7 +141,12 @@ describe('general split tender (arbitrary combination of cash/card/e-transfer/ph
       tenders: [{ method: 'CASH', amountCents: 10000, cashGivenCents: 12000, changeCents: 2000 }]
     })
     const tender = await db.transactionTender.findFirstOrThrow({ where: { transactionId: tx.id } })
-    expect(tender).toMatchObject({ cashGivenCents: 12000, amountCents: 10000, changeCents: 2000, depositedToTabCents: 0 })
+    expect(tender).toMatchObject({
+      cashGivenCents: 12000,
+      amountCents: 10000,
+      changeCents: 2000,
+      depositedToTabCents: 0
+    })
     expect(tx.changeCents).toBe(2000)
   })
 
@@ -112,11 +156,19 @@ describe('general split tender (arbitrary combination of cash/card/e-transfer/ph
       items: [{ productId, quantity: 1, costCents: 5000, unitPriceCents: 10000 }],
       taxRatePercent: 0,
       customerId: c.id,
-      tenders: [{ method: 'CASH', amountCents: 10000, cashGivenCents: 12500, depositedToTabCents: 2500 }]
+      tenders: [
+        { method: 'CASH', amountCents: 10000, cashGivenCents: 12500, depositedToTabCents: 2500 }
+      ]
     })
     const tender = await db.transactionTender.findFirstOrThrow({ where: { transactionId: tx.id } })
-    expect(tender).toMatchObject({ cashGivenCents: 12500, depositedToTabCents: 2500, changeCents: 0 })
-    const entry = await db.creditLedgerEntry.findFirst({ where: { customerId: c.id, type: 'FUNDS_ADDED' } })
+    expect(tender).toMatchObject({
+      cashGivenCents: 12500,
+      depositedToTabCents: 2500,
+      changeCents: 0
+    })
+    const entry = await db.creditLedgerEntry.findFirst({
+      where: { customerId: c.id, type: 'FUNDS_ADDED' }
+    })
     expect(entry).toMatchObject({ amountCents: 2500 })
   })
 
@@ -162,7 +214,9 @@ describe('general split tender (arbitrary combination of cash/card/e-transfer/ph
     })
     expect(tx.totalCents).toBe(10000 + surchargeCents)
     expect(tx.surchargeCents).toBe(surchargeCents)
-    const cashTender = await db.transactionTender.findFirst({ where: { transactionId: tx.id, method: 'CASH' } })
+    const cashTender = await db.transactionTender.findFirst({
+      where: { transactionId: tx.id, method: 'CASH' }
+    })
     expect(cashTender?.amountCents).toBe(5000) // untouched by the other line's surcharge
   })
 
@@ -172,7 +226,13 @@ describe('general split tender (arbitrary combination of cash/card/e-transfer/ph
         items: [{ productId, quantity: 1, costCents: 5000, unitPriceCents: 10000 }],
         taxRatePercent: 0,
         tenders: [
-          { method: 'CARD', amountCents: 10500, surchargeCents: 500, cardType: 'CREDIT', processorTransactionId: 'bad-surcharge' }
+          {
+            method: 'CARD',
+            amountCents: 10500,
+            surchargeCents: 500,
+            cardType: 'CREDIT',
+            processorTransactionId: 'bad-surcharge'
+          }
         ]
       })
     ).rejects.toThrow(/surcharge does not match/)
@@ -192,9 +252,13 @@ describe('general split tender (arbitrary combination of cash/card/e-transfer/ph
         { method: 'CASH', amountCents: 6000 }
       ]
     })
-    const entry = await db.creditLedgerEntry.findFirst({ where: { customerId: c.id, type: 'SALE_CHARGE' } })
+    const entry = await db.creditLedgerEntry.findFirst({
+      where: { customerId: c.id, type: 'SALE_CHARGE' }
+    })
     expect(entry).toMatchObject({ amountCents: -4000, transactionId: tx.id })
-    const tender = await db.transactionTender.findFirst({ where: { transactionId: tx.id, method: 'PHARMACY_CREDIT' } })
+    const tender = await db.transactionTender.findFirst({
+      where: { transactionId: tx.id, method: 'PHARMACY_CREDIT' }
+    })
     expect(tender?.creditLedgerEntryId).toBe(entry?.id)
   })
 
@@ -237,7 +301,7 @@ describe('general split tender (arbitrary combination of cash/card/e-transfer/ph
     ).rejects.toThrow(/Tender lines total/)
   })
 
-  it('rejects an empty tenders array', async () => {
+  it('rejects an empty tenders array when the sale has a nonzero total', async () => {
     await expect(
       createTransaction(db, {
         items: [{ productId, quantity: 1, costCents: 5000, unitPriceCents: 10000 }],
@@ -247,12 +311,33 @@ describe('general split tender (arbitrary combination of cash/card/e-transfer/ph
     ).rejects.toThrow(/At least one tender line/)
   })
 
+  it('allows a genuine $0 sale (a fully-discounted item) with no tender lines at all', async () => {
+    const tx = await createTransaction(db, {
+      items: [
+        { productId, quantity: 1, costCents: 5000, unitPriceCents: 10000, discountCents: 10000 }
+      ],
+      taxRatePercent: 13,
+      tenders: []
+    })
+    expect(tx.totalCents).toBe(0)
+    expect(tx.tenderType).toBe('NONE')
+    expect(tx.tenderedCents).toBe(0)
+    expect(tx.changeCents).toBe(0)
+  })
+
   // Test 14: a single-tender-line sale (the common case) still works exactly as before — no regression.
   it('still supports the simple single-card-tender case with no regression', async () => {
     const tx = await createTransaction(db, {
       items: [{ productId, quantity: 1, costCents: 5000, unitPriceCents: 10000 }],
       taxRatePercent: 0,
-      tenders: [{ method: 'CARD', amountCents: 10000, processorTransactionId: 'single-card', cardLastFour: '4242' }]
+      tenders: [
+        {
+          method: 'CARD',
+          amountCents: 10000,
+          processorTransactionId: 'single-card',
+          cardLastFour: '4242'
+        }
+      ]
     })
     expect(tx.tenderType).toBe('CARD')
     expect(tx.processorTransactionId).toBe('single-card')

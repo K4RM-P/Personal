@@ -6,8 +6,16 @@ import {
   PricingTier as EnginePricingTier,
   TierChangePreviewItem
 } from '../../../shared/pricingEngine'
-import { CreateTransactionPayload, BulkImportProductInput, TransactionWithItems } from '../../../shared/types'
-import { customerLedgerInternals, getCreditSettings, getCustomerDebtBreakdown } from './customerQueries'
+import {
+  CreateTransactionPayload,
+  BulkImportProductInput,
+  TransactionWithItems
+} from '../../../shared/types'
+import {
+  customerLedgerInternals,
+  getCreditSettings,
+  getCustomerDebtBreakdown
+} from './customerQueries'
 import { getCardSurchargePercent } from './settingsQueries'
 import { getSession } from '../../auth/session'
 import { gtinNorm } from '../../catalog/webcatParser'
@@ -81,7 +89,10 @@ export async function previewTierImpact(
   return { affectedCount: impact.length, sample: impact.slice(0, sampleSize) }
 }
 
-export async function getProductByBarcode(db: PrismaClient, barcode: string): Promise<Product | null> {
+export async function getProductByBarcode(
+  db: PrismaClient,
+  barcode: string
+): Promise<Product | null> {
   // Catalogue-promoted products store `barcode` leading-zero-stripped (see
   // catalog/webcatParser.ts gtinNorm, used consistently at promote-time). A scanner
   // emitting the same item as a longer code with a leading-zero padding convention
@@ -102,7 +113,14 @@ export async function getProductByBarcode(db: PrismaClient, barcode: string): Pr
 
 export async function createProduct(
   db: PrismaClient,
-  data: { sku: string; name: string; costCents: number; priceCents?: number; barcode?: string; isPinned?: boolean }
+  data: {
+    sku: string
+    name: string
+    costCents: number
+    priceCents?: number
+    barcode?: string
+    isPinned?: boolean
+  }
 ): Promise<Product> {
   let priceCents = data.priceCents
 
@@ -128,7 +146,14 @@ export async function createProduct(
 export async function updateProduct(
   db: PrismaClient,
   id: number,
-  data: { sku?: string; name?: string; costCents?: number; priceCents?: number; barcode?: string; isPinned?: boolean }
+  data: {
+    sku?: string
+    name?: string
+    costCents?: number
+    priceCents?: number
+    barcode?: string
+    isPinned?: boolean
+  }
 ): Promise<Product> {
   const existing = await db.product.findUniqueOrThrow({ where: { id } })
 
@@ -350,7 +375,11 @@ export async function createTransaction(
   const subtotalCents = rawSubtotalCents - itemDiscountTotal
 
   const billDiscountCents = payload.billDiscountCents ?? 0
-  if (!Number.isInteger(billDiscountCents) || billDiscountCents < 0 || billDiscountCents > subtotalCents) {
+  if (
+    !Number.isInteger(billDiscountCents) ||
+    billDiscountCents < 0 ||
+    billDiscountCents > subtotalCents
+  ) {
     throw new Error('Whole-bill discount cannot exceed the subtotal.')
   }
   const preTaxCents = subtotalCents - billDiscountCents
@@ -363,7 +392,9 @@ export async function createTransaction(
     return sum + (item.unitPriceCents * item.quantity - discountCents)
   }, 0)
   const taxableAfterBillDiscountCents =
-    subtotalCents > 0 ? taxableSubtotalCents - (billDiscountCents * taxableSubtotalCents) / subtotalCents : 0
+    subtotalCents > 0
+      ? taxableSubtotalCents - (billDiscountCents * taxableSubtotalCents) / subtotalCents
+      : 0
   const taxCents = Math.round((taxableAfterBillDiscountCents * payload.taxRatePercent) / 100)
   const sessionUserId = getSession()?.userId ?? null
   const debtSettlementLedgerEntryIds = payload.debtSettlementLedgerEntryIds ?? []
@@ -374,26 +405,33 @@ export async function createTransaction(
   let debtSettlementCents = 0
   let debtSettlementNote: string | null = null
   if (debtSettlementLedgerEntryIds.length > 0) {
-    if (!payload.customerId) throw new Error('A customer must be linked to bring in an outstanding balance.')
+    if (!payload.customerId)
+      throw new Error('A customer must be linked to bring in an outstanding balance.')
     const breakdown = await getCustomerDebtBreakdown(db, payload.customerId)
     const selected = debtSettlementLedgerEntryIds.map((id) => {
       const entry = breakdown.entries.find((e) => e.ledgerEntryId === id)
       if (!entry) {
         throw new Error(
-          "One or more selected balance items are no longer outstanding — reopen the balance breakdown."
+          'One or more selected balance items are no longer outstanding — reopen the balance breakdown.'
         )
       }
       return entry
     })
     debtSettlementCents = selected.reduce((sum, e) => sum + e.amountCents, 0)
     const covered = selected.map((entry) => {
-      const label = entry.type === 'SALE_CHARGE' ? `sale ${entry.receiptNumber}` : 'a manual adjustment'
+      const label =
+        entry.type === 'SALE_CHARGE' ? `sale ${entry.receiptNumber}` : 'a manual adjustment'
       return `${label} (${(entry.amountCents / 100).toFixed(2)})`
     })
     debtSettlementNote = `Debt settled via this sale — covers ${covered.join(', ')}`
   }
   const tenders = payload.tenders ?? []
-  if (tenders.length === 0) throw new Error('At least one tender line is required.')
+  // A genuine $0 sale (fully-discounted or free item(s)) needs no tender line at
+  // all — surcharge never applies with no tenders, so this total is already final.
+  const preliminaryTotalCents = preTaxCents + taxCents + debtSettlementCents
+  if (tenders.length === 0 && preliminaryTotalCents > 0) {
+    throw new Error('At least one tender line is required.')
+  }
 
   // Every CARD line's surcharge is validated (and totalled) independently — the
   // surcharge inflates the sale total itself, so it must be known before the
@@ -414,7 +452,9 @@ export async function createTransaction(
         }
       }
       if (!t.processorTransactionId) {
-        throw new Error('A card tender line must have a processor transaction id — it must be charged before being added.')
+        throw new Error(
+          'A card tender line must have a processor transaction id — it must be charged before being added.'
+        )
       }
       totalSurchargeCents += lineSurchargeCents
     } else if (t.surchargeCents) {
@@ -455,9 +495,12 @@ export async function createTransaction(
   // before the sum-equality check below so this specific reason always wins over a
   // generic "doesn't add up" error, regardless of what amount was on the line.
   if (debtSettlementCents > 0) {
-    if (!payload.customerId) throw new Error('A customer must be linked to bring in an outstanding balance.')
+    if (!payload.customerId)
+      throw new Error('A customer must be linked to bring in an outstanding balance.')
     if (tabAmountCents > 0) {
-      throw new Error('Cannot use Pharmacy Credit to pay off an outstanding balance — choose another payment method.')
+      throw new Error(
+        'Cannot use Pharmacy Credit to pay off an outstanding balance — choose another payment method.'
+      )
     }
   }
 
@@ -468,7 +511,8 @@ export async function createTransaction(
     )
   }
 
-  const tenderType = tenders.length === 1 ? tenders[0].method : 'SPLIT'
+  const tenderType =
+    tenders.length === 0 ? 'NONE' : tenders.length === 1 ? tenders[0].method : 'SPLIT'
   const tenderedCents = tenders.reduce(
     (sum, t) => sum + (t.method === 'CASH' ? (t.cashGivenCents ?? t.amountCents) : t.amountCents),
     0
@@ -544,7 +588,7 @@ export async function createTransaction(
           cardLastFour: t.cardLastFour ?? null,
           eTransferEmail: t.method === 'E_TRANSFER' ? (t.eTransferEmail ?? null) : null,
           eTransferConfirmed: t.method === 'E_TRANSFER' ? (t.eTransferConfirmed ?? false) : null,
-          customerId: t.method === 'PHARMACY_CREDIT' ? payload.customerId ?? null : null,
+          customerId: t.method === 'PHARMACY_CREDIT' ? (payload.customerId ?? null) : null,
           creditLedgerEntryId,
           status: 'COMPLETED',
           completedAt: new Date()
@@ -612,9 +656,12 @@ export async function createTransaction(
         where: { customerId: payload.customerId },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]
       })
-      const currentOutstandingCents = (latestEntry?.balanceAfterCents ?? 0) < 0 ? -(latestEntry?.balanceAfterCents ?? 0) : 0
+      const currentOutstandingCents =
+        (latestEntry?.balanceAfterCents ?? 0) < 0 ? -(latestEntry?.balanceAfterCents ?? 0) : 0
       if (debtSettlementCents > currentOutstandingCents) {
-        throw new Error("Outstanding balance changed and no longer covers this amount — reopen the balance breakdown.")
+        throw new Error(
+          'Outstanding balance changed and no longer covers this amount — reopen the balance breakdown.'
+        )
       }
 
       const debtItem = await tx.transactionItem.create({
@@ -632,10 +679,16 @@ export async function createTransaction(
       })
       items.push({ ...debtItem, product: null })
 
-      await customerLedgerInternals.appendCreditEntry(tx, payload.customerId, 'DEBT_SETTLED', debtSettlementCents, {
-        transactionId: transaction.id,
-        note: debtSettlementNote ?? undefined
-      })
+      await customerLedgerInternals.appendCreditEntry(
+        tx,
+        payload.customerId,
+        'DEBT_SETTLED',
+        debtSettlementCents,
+        {
+          transactionId: transaction.id,
+          note: debtSettlementNote ?? undefined
+        }
+      )
     }
 
     if (payload.customerId) {
@@ -644,12 +697,24 @@ export async function createTransaction(
       if (loyaltyFlag?.enabled && customer.loyaltyEnabled) {
         const creditSettings = await getCreditSettings(tx)
         const points = Math.floor((totalCents / 100) * creditSettings.loyaltyPointsPerDollar)
-        if (points > 0) await customerLedgerInternals.appendPointEvent(tx, customer.id, 'EARNED', points, { transactionId: transaction.id })
+        if (points > 0)
+          await customerLedgerInternals.appendPointEvent(tx, customer.id, 'EARNED', points, {
+            transactionId: transaction.id
+          })
       }
     }
 
     if (cashOverageToCreditCents > 0 && payload.customerId) {
-      await customerLedgerInternals.appendCreditEntry(tx, payload.customerId, 'FUNDS_ADDED', cashOverageToCreditCents, { transactionId: transaction.id, note: `Cash overpayment deposited from ${transaction.receiptNumber}` })
+      await customerLedgerInternals.appendCreditEntry(
+        tx,
+        payload.customerId,
+        'FUNDS_ADDED',
+        cashOverageToCreditCents,
+        {
+          transactionId: transaction.id,
+          note: `Cash overpayment deposited from ${transaction.receiptNumber}`
+        }
+      )
     }
 
     const createdTenders = await tx.transactionTender.findMany({
