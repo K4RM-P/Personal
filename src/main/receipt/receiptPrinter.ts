@@ -62,7 +62,16 @@ class ZplLabelWriter {
 
   private startPage(): void {
     this.pageCount += 1
-    this.current = `^XA\n^PW${this.widthDots}\n^LL${this.heightDots}\n`
+    // ^MNY: gap/notch media tracking, correct for die-cut label stock (vs. continuous
+    // roll) — if the printer is guessing this instead of being told, gap-sensing drift
+    // across labels is a real contributor to skewed/misregistered prints.
+    // ^PR3: a moderate, conservative print speed. Faster speeds increase the odds of
+    // the label slipping against the platen/rollers mid-print on media that isn't
+    // perfectly seated, which reads as a skewed print even though nothing in the
+    // content is misaligned.
+    // ^LH0,0: explicit label home, so no stale offset persisted on the printer via a
+    // prior manual front-panel calibration silently shifts our content.
+    this.current = `^XA\n^MNY\n^PR3\n^LH0,0\n^PW${this.widthDots}\n^LL${this.heightDots}\n`
     this.y = this.topMarginDots
   }
 

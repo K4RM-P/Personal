@@ -182,6 +182,23 @@ describe('buildZplReceiptBuffer', () => {
     expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FDTest Pharmacy \(cont'd\)\^FS/)
   })
 
+  it('sets gap/notch media tracking, a conservative print speed, and an explicit label home on every label page', () => {
+    const manyItems = Array.from({ length: 20 }, (_, i) => mockItem({ id: `item-${i}` }))
+    const zpl = decode(
+      buildZplReceiptBuffer({
+        transaction: mockTransaction({ items: manyItems }),
+        printerConfig: { type: 'NETWORK', labelHeightMm: 45 }
+      })
+    )
+    const pages = zpl.split('^XA').slice(1)
+    expect(pages.length).toBeGreaterThan(1)
+    for (const page of pages) {
+      expect(page).toContain('^MNY')
+      expect(page).toContain('^PR3')
+      expect(page).toContain('^LH0,0')
+    }
+  })
+
   it('includes receipt number, totals, and rx footer', () => {
     const zpl = decode(
       buildZplReceiptBuffer({
