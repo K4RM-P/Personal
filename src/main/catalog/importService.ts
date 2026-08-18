@@ -42,6 +42,8 @@ const BYTES_PER_RECORD = 398
 const MAX_REJECT_SAMPLES = 50
 /** Retention: keep the active batch plus the previous one for rollback. */
 const RETAINED_BATCHES = 2
+/** Cap on the new-items list shipped back over IPC in the import result (see AutoImportResult.newItemsTotal for the true count). */
+const IMPORT_RESULT_NEW_ITEMS_CAP = 500
 
 export type ProgressCallback = (progress: CatalogImportProgress) => void
 
@@ -905,7 +907,10 @@ export async function autoImportCatalog(
     batchId: batch.id,
     filename: basename(filePath),
     catalogProductsTotal: acc.productCount,
-    newItems: newProducts.map((p) => ({
+    // A full catalogue import can add tens of thousands of new items; shipping
+    // all of them over IPC (and mounting them as DOM rows) previously froze
+    // the renderer. Cap the payload and let the UI show the true total.
+    newItems: newProducts.slice(0, IMPORT_RESULT_NEW_ITEMS_CAP).map((p) => ({
       productId: p.id,
       sku: p.sku,
       name: p.name,
@@ -914,6 +919,7 @@ export async function autoImportCatalog(
       barcode: p.barcode,
       itemNumber: p.sourceItemNumber ?? ''
     })),
+    newItemsTotal: newProducts.length,
     repricedCount: preview.reference.priceChanged,
     discontinuedCount: preview.reference.removed,
     errors

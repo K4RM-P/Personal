@@ -185,7 +185,9 @@ export function McKessonCatalogTab(): React.JSX.Element {
           {result.newItems.length > 0 ? (
             <div>
               <h4 className="mb-3 text-xs font-semibold text-[var(--foreground)]">
-                New items added to catalogue ({result.newItems.length.toLocaleString()})
+                New items added to catalogue ({result.newItemsTotal.toLocaleString()})
+                {result.newItemsTotal > result.newItems.length &&
+                  ` — showing first ${result.newItems.length.toLocaleString()}`}
               </h4>
               <div className="max-h-96 overflow-y-auto pr-1">
                 <table className="w-full text-xs">

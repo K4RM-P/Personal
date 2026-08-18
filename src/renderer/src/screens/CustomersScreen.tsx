@@ -411,7 +411,12 @@ export function CustomersScreen(): React.JSX.Element {
               <Card>
                 <CardHeader>
                   <CardTitle>Activity</CardTitle>
-                  <CardDescription>Credit and loyalty events, newest first.</CardDescription>
+                  <CardDescription>
+                    Credit and loyalty events, newest first.
+                    {(selected.ledgerEntryCount ?? 0) + (selected.pointEventCount ?? 0) >
+                      selected.ledgerEntries.length + selected.pointEvents.length &&
+                      ` Showing the most recent ${(selected.ledgerEntries.length + selected.pointEvents.length).toLocaleString()} of ${(selected.ledgerEntryCount + selected.pointEventCount).toLocaleString()}.`}
+                  </CardDescription>
                 </CardHeader>
                 <div className="space-y-1">
                   {[
@@ -453,7 +458,11 @@ export function CustomersScreen(): React.JSX.Element {
               <Card>
                 <CardHeader>
                   <CardTitle>Purchase history</CardTitle>
-                  <CardDescription>All sales attached to this customer.</CardDescription>
+                  <CardDescription>
+                    {selected.transactionCount > selected.transactions.length
+                      ? `Showing the most recent ${selected.transactions.length.toLocaleString()} of ${selected.transactionCount.toLocaleString()} sales.`
+                      : 'All sales attached to this customer.'}
+                  </CardDescription>
                 </CardHeader>
                 <div className="space-y-1">
                   {selected.transactions.map((sale: any) => (

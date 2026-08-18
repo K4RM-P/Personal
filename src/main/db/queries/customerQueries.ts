@@ -277,22 +277,38 @@ export async function getCustomerDebtBreakdown(
   return { customerId: customer.id, totalOutstandingCents, entries }
 }
 
+// Detail-panel history is capped: a loyal customer can accumulate thousands
+// of ledger/loyalty entries and sales over years, and the panel only ever
+// shows the most recent slice. Loading everything (previously unbounded, plus
+// every transaction's line items + product) froze the panel for long-tenure
+// customers. `currentBalanceCents`/`currentPoints` still reflect the true
+// latest state since both lists are ordered newest-first.
+const CUSTOMER_DETAIL_HISTORY_LIMIT = 200
+
 export async function getCustomerDetail(db: PrismaClient, id: number) {
-  const customer = await db.customer.findUniqueOrThrow({
-    where: { id },
-    include: {
-      ledgerEntries: { orderBy: { createdAt: 'desc' } },
-      pointEvents: { orderBy: { createdAt: 'desc' } },
-      transactions: {
-        orderBy: { createdAt: 'desc' },
-        include: { items: { include: { product: true } } }
+  const [customer, ledgerEntryCount, pointEventCount, transactionCount] = await Promise.all([
+    db.customer.findUniqueOrThrow({
+      where: { id },
+      include: {
+        ledgerEntries: { orderBy: { createdAt: 'desc' }, take: CUSTOMER_DETAIL_HISTORY_LIMIT },
+        pointEvents: { orderBy: { createdAt: 'desc' }, take: CUSTOMER_DETAIL_HISTORY_LIMIT },
+        // Purchase history only ever renders receiptNumber/createdAt/totalCents —
+        // line items/product were fetched but never used, doubling this query's cost.
+        transactions: { orderBy: { createdAt: 'desc' }, take: CUSTOMER_DETAIL_HISTORY_LIMIT }
       }
-    }
-  })
+    }),
+    db.creditLedgerEntry.count({ where: { customerId: id } }),
+    db.loyaltyPointEvent.count({ where: { customerId: id } }),
+    db.transaction.count({ where: { customerId: id } })
+  ])
   return {
     ...customer,
     currentBalanceCents: customer.ledgerEntries[0]?.balanceAfterCents ?? 0,
-    currentPoints: customer.pointEvents[0]?.pointsAfter ?? 0
+    currentPoints: customer.pointEvents[0]?.pointsAfter ?? 0,
+    ledgerEntryCount,
+    pointEventCount,
+    transactionCount,
+    historyLimit: CUSTOMER_DETAIL_HISTORY_LIMIT
   }
 }
 

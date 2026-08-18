@@ -175,6 +175,10 @@ app.whenReady().then(async () => {
   // main/reports/reportEmailScheduler.ts. Fire-and-forget, same lifecycle as
   // initAutoUpdater above (no explicit teardown; Electron just kills the timer on quit).
   initReportEmailScheduler(db)
+
+  // Polls for a due scheduled Complete Products Sales Report CSV export — see
+  // main/reports/reportCsvExportScheduler.ts. Same fire-and-forget lifecycle.
+  initReportCsvExportScheduler(db)
 })
 
 app.on('window-all-closed', () => {

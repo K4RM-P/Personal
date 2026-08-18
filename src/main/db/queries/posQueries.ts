@@ -238,29 +238,49 @@ export async function saveAllPricingTiers(
   // pinned only because no tier matched their cost at promote time (fallbackPinned) —
   // those should re-enter the tier engine the moment a matching tier exists.
   const products = await db.product.findMany({
-    where: { OR: [{ isPinned: false }, { fallbackPinned: true }] }
+    where: { OR: [{ isPinned: false }, { fallbackPinned: true }] },
+    select: { id: true, costCents: true, priceCents: true, fallbackPinned: true }
   })
+
+  // With 50k+ catalogue products, most are unpinned, so a tier save previously
+  // issued one `db.product.update()` per affected product sequentially — up
+  // to tens of thousands of individual round trips per save. Products that
+  // land on the same recalculated price (the overwhelming majority, since a
+  // handful of tiers apply to a huge cost range each) are now updated in one
+  // batched `updateMany` per distinct target price instead.
+  const releaseFallback = new Map<number, number[]>() // newPriceCents -> product ids
+  const repriceOnly = new Map<number, number[]>()
 
   for (const p of products) {
     if (p.fallbackPinned) {
       const tierNowMatches = findPricingTier(p.costCents, tiers) !== undefined
       if (!tierNowMatches) continue // still nothing to compute from — stays pinned to McKesson list price
       const newPriceCents = calculateRetailPriceCents(p.costCents, tiers)
-      await db.product.update({
-        where: { id: p.id },
-        data: { priceCents: newPriceCents, isPinned: false, fallbackPinned: false }
-      })
+      const ids = releaseFallback.get(newPriceCents) ?? []
+      ids.push(p.id)
+      releaseFallback.set(newPriceCents, ids)
       continue
     }
 
     const newPriceCents = calculateRetailPriceCents(p.costCents, tiers)
     if (newPriceCents !== p.priceCents) {
-      await db.product.update({
-        where: { id: p.id },
-        data: { priceCents: newPriceCents }
-      })
+      const ids = repriceOnly.get(newPriceCents) ?? []
+      ids.push(p.id)
+      repriceOnly.set(newPriceCents, ids)
     }
   }
+
+  await Promise.all([
+    ...Array.from(repriceOnly.entries()).map(([priceCents, ids]) =>
+      db.product.updateMany({ where: { id: { in: ids } }, data: { priceCents } })
+    ),
+    ...Array.from(releaseFallback.entries()).map(([priceCents, ids]) =>
+      db.product.updateMany({
+        where: { id: { in: ids } },
+        data: { priceCents, isPinned: false, fallbackPinned: false }
+      })
+    )
+  ])
 
   return getAllPricingTiers(db)
 }

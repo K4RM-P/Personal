@@ -201,8 +201,10 @@ export interface AutoImportResult {
   batchId: number
   filename: string
   catalogProductsTotal: number
-  /** Products that are entirely new — didn't exist in the previous catalogue. */
+  /** Products that are entirely new — didn't exist in the previous catalogue. Capped; see newItemsTotal. */
   newItems: AutoImportNewItem[]
+  /** True count of new items, which can exceed newItems.length when capped. */
+  newItemsTotal: number
   repricedCount: number
   discontinuedCount: number
   errors: number

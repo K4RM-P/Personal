@@ -148,7 +148,11 @@ export async function getDailySalesSummary(
         createdAt: { gte: from, lte: to },
         status: { in: ['COMPLETED', 'REFUNDED'] }
       },
-      include: { items: true }
+      select: {
+        totalCents: true,
+        customerId: true,
+        items: { select: { isVoided: true, costCents: true, quantity: true } }
+      }
     }),
     db.refund.findMany({
       where: {
@@ -315,9 +319,15 @@ export async function getSlowItems(
   const from = startOfDay(parseDate(fromDate))
   const to = endOfDay(parseDate(toDate))
 
+  // Every non-discontinued product has to be considered (a slow-item report is
+  // inherently a full scan against the threshold), but only the columns this
+  // report actually reads need to cross the Prisma boundary — the previous
+  // unfiltered findMany() pulled every column (cost, price, barcode, etc.) for
+  // all 50k+ catalogue-origin products just to read four fields from each.
   const products = await db.product.findMany({
     where: { discontinued: false },
-    orderBy: { name: 'asc' }
+    orderBy: { name: 'asc' },
+    select: { id: true, name: true, sku: true, categoryCode: true, currentOnHand: true }
   })
 
   const salesCounts = await db.transactionItem.groupBy({
@@ -598,7 +608,12 @@ export async function getCashierTotals(
   }
 
   const userIds = Array.from(byUser.keys()).filter((id) => id !== 0)
-  const users = userIds.length > 0 ? await db.user.findMany({ where: { id: { in: userIds } } }) : []
+  // Only id + name are used below — avoid pulling passwordHash and other
+  // unused columns for every cashier on every cashier-totals report.
+  const users =
+    userIds.length > 0
+      ? await db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, fullName: true } })
+      : []
   const userMap = new Map(users.map((u) => [u.id, u.fullName]))
 
   const result: CashierTotalRow[] = Array.from(byUser.entries())
@@ -852,11 +867,26 @@ export async function getCustomerDebtReport(db: PrismaClient): Promise<CustomerD
 
   const now = Date.now()
   const byBalance: CustomerDebtRow[] = []
+
+  // One batched query for every debtor's ledger history instead of a
+  // per-customer findMany in the loop below — avoids an N+1 round trip when
+  // there are many customers with an outstanding balance.
+  const allLedgerEntries =
+    debtorIds.length > 0
+      ? await db.creditLedgerEntry.findMany({
+          where: { customerId: { in: debtorIds } },
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }]
+        })
+      : []
+  const ledgerEntriesByCustomer = new Map<number, typeof allLedgerEntries>()
+  for (const entry of allLedgerEntries) {
+    const list = ledgerEntriesByCustomer.get(entry.customerId)
+    if (list) list.push(entry)
+    else ledgerEntriesByCustomer.set(entry.customerId, [entry])
+  }
+
   for (const customerId of debtorIds) {
-    const ledgerEntries = await db.creditLedgerEntry.findMany({
-      where: { customerId },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }]
-    })
+    const ledgerEntries = ledgerEntriesByCustomer.get(customerId) ?? []
 
     const outstanding: { remainingCents: number; createdAt: Date }[] = []
     for (const entry of ledgerEntries) {
@@ -1087,11 +1117,22 @@ async function getDebtPayoffAttributedSales(
 
   const zeroedTransactionIds: { transactionId: string; payoffDate: Date }[] = []
 
+  // One batched query for all candidate customers' ledger histories, instead
+  // of a findMany per customer inside the loop (N+1).
+  const candidateIds = candidates.map((c) => c.customerId)
+  const allLedgerEntries = await db.creditLedgerEntry.findMany({
+    where: { customerId: { in: candidateIds } },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }]
+  })
+  const ledgerEntriesByCustomer = new Map<number, typeof allLedgerEntries>()
+  for (const entry of allLedgerEntries) {
+    const list = ledgerEntriesByCustomer.get(entry.customerId)
+    if (list) list.push(entry)
+    else ledgerEntriesByCustomer.set(entry.customerId, [entry])
+  }
+
   for (const { customerId } of candidates) {
-    const ledgerEntries = await db.creditLedgerEntry.findMany({
-      where: { customerId },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }]
-    })
+    const ledgerEntries = ledgerEntriesByCustomer.get(customerId) ?? []
 
     type DebitRecord = { remainingCents: number; transactionId: string | null }
     const outstanding: DebitRecord[] = []

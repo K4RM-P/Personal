@@ -8,7 +8,12 @@ const ROLES: UserRole[] = ['MANAGER', 'CASHIER']
 // by fullName are done by scanning and comparing lowercased names in JS.
 async function findUserByFullNameCI(db: PrismaClient, fullName: string) {
   const target = fullName.toLowerCase()
-  const rows = await db.user.findMany()
+  // Only the columns this lookup actually compares/returns need to cross the
+  // Prisma boundary — the previous unfiltered findMany() pulled every user's
+  // passwordHash into memory on every name-uniqueness check and login lookup.
+  const rows = await db.user.findMany({
+    select: { id: true, fullName: true, role: true, lastLogin: true, createdAt: true, passwordHash: true }
+  })
   return rows.find((row) => row.fullName.toLowerCase() === target) ?? null
 }
 
@@ -37,7 +42,10 @@ export async function countManagers(db: PrismaClient): Promise<number> {
 }
 
 export async function listUsers(db: PrismaClient): Promise<AuthUser[]> {
-  const rows = await db.user.findMany({ orderBy: [{ fullName: 'asc' }] })
+  const rows = await db.user.findMany({
+    orderBy: [{ fullName: 'asc' }],
+    select: { id: true, fullName: true, role: true, lastLogin: true, createdAt: true }
+  })
   return rows.map(toAuthUser)
 }
 

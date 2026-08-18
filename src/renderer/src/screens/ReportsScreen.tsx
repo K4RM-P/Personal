@@ -659,7 +659,13 @@ function CompleteProductSalesTable({
       )
     )
   }, [rows, search])
-  const { sorted, sortKey, sortDir, toggleSort } = useSort(filtered, 'date', 'desc')
+  const { sorted: sortedAll, sortKey, sortDir, toggleSort } = useSort(filtered, 'date', 'desc')
+  // A wide date range on a busy pharmacy can produce tens of thousands of line
+  // items; mounting them all as table rows freezes the tab. CSV export (above,
+  // in the parent) still uses the full unsliced `rows`/`filtered` data — only
+  // the DOM table is capped.
+  const DISPLAY_CAP = 500
+  const sorted = sortedAll.slice(0, DISPLAY_CAP)
   const th = (
     label: string,
     key: keyof CompleteProductSaleRow,
@@ -681,6 +687,8 @@ function CompleteProductSalesTable({
         <CardDescription>
           Every product line item sold, one row per line. Debt-financed products appear on the date
           their tab was fully paid off, not the original sale date. Click a column to sort.
+          {sortedAll.length > DISPLAY_CAP &&
+            ` Showing the first ${DISPLAY_CAP.toLocaleString()} of ${sortedAll.length.toLocaleString()} — use Export CSV for the full list.`}
         </CardDescription>
       </CardHeader>
       <div className="relative mb-3">

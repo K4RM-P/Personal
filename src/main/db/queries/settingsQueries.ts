@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import type { PrinterConfig, StoreInfo } from '../../../shared/types'
 import type { ReportEmailInterval, ReportEmailSettingsDTO } from '../../../shared/reportEmail'
+import type { ReportCsvExportSettingsDTO } from '../../../shared/reportCsvExport'
 import { encryptSecret, decryptSecret } from '../../payment/credentialStore'
 
 const DEFAULTS = {
@@ -53,7 +54,11 @@ const DEFAULTS = {
   'reportEmail.smtpUsername': '',
   'reportEmail.smtpPasswordEnc': '',
   'reportEmail.smtpFromAddress': '',
-  'reportEmail.lastSentAt': ''
+  'reportEmail.lastSentAt': '',
+  'reportCsvExport.enabled': 'false',
+  'reportCsvExport.folderPath': '',
+  'reportCsvExport.interval': 'DAILY',
+  'reportCsvExport.lastExportedAt': ''
 } as const
 
 async function getSetting(db: PrismaClient, key: string): Promise<string> {
@@ -350,4 +355,49 @@ export async function getReportEmailSettingsInternal(
 
 export async function recordReportEmailSent(db: PrismaClient, sentAt: Date): Promise<void> {
   await setSetting(db, 'reportEmail.lastSentAt', sentAt.toISOString())
+}
+
+/**
+ * Scheduled CSV auto-export of the Complete Products Sales Report to a folder on
+ * disk — same enable/interval/last-run shape as the report-email settings above,
+ * minus the email-specific fields, plus a destination folder instead of a
+ * recipient.
+ */
+export async function getReportCsvExportSettings(
+  db: PrismaClient
+): Promise<ReportCsvExportSettingsDTO> {
+  const [enabled, folderPath, interval, lastExportedAt] = await Promise.all([
+    getSetting(db, 'reportCsvExport.enabled'),
+    getSetting(db, 'reportCsvExport.folderPath'),
+    getSetting(db, 'reportCsvExport.interval'),
+    getSetting(db, 'reportCsvExport.lastExportedAt')
+  ])
+  return {
+    enabled: enabled === 'true',
+    folderPath,
+    interval: REPORT_EMAIL_INTERVALS.has(interval) ? (interval as ReportEmailInterval) : 'DAILY',
+    lastExportedAt: lastExportedAt || null
+  }
+}
+
+export async function saveReportCsvExportSettings(
+  db: PrismaClient,
+  input: { enabled: boolean; folderPath: string; interval: ReportEmailInterval }
+): Promise<ReportCsvExportSettingsDTO> {
+  if (input.enabled && !input.folderPath.trim()) {
+    throw new Error('A destination folder is required to enable scheduled CSV export.')
+  }
+  if (!REPORT_EMAIL_INTERVALS.has(input.interval)) {
+    throw new Error('Invalid report CSV export interval.')
+  }
+  await Promise.all([
+    setSetting(db, 'reportCsvExport.enabled', String(input.enabled)),
+    setSetting(db, 'reportCsvExport.folderPath', input.folderPath.trim()),
+    setSetting(db, 'reportCsvExport.interval', input.interval)
+  ])
+  return getReportCsvExportSettings(db)
+}
+
+export async function recordReportCsvExportSent(db: PrismaClient, sentAt: Date): Promise<void> {
+  await setSetting(db, 'reportCsvExport.lastExportedAt', sentAt.toISOString())
 }

@@ -146,6 +146,12 @@ export const IPC = {
   REPORT_EMAIL_SAVE_SETTINGS: 'reportEmail:saveSettings',
   REPORT_EMAIL_SEND_TEST: 'reportEmail:sendTest',
 
+  // Scheduled Complete Products Sales Report CSV auto-export
+  REPORT_CSV_EXPORT_GET_SETTINGS: 'reportCsvExport:getSettings',
+  REPORT_CSV_EXPORT_SAVE_SETTINGS: 'reportCsvExport:saveSettings',
+  REPORT_CSV_EXPORT_PICK_FOLDER: 'reportCsvExport:pickFolder',
+  REPORT_CSV_EXPORT_RUN_NOW: 'reportCsvExport:runNow',
+
   // Data Backup System (docs/data-backup-system-spec.md)
   BACKUP_GET_EXTERNAL_DRIVES: 'backup:getExternalDrives',
   BACKUP_PICK_FOLDER: 'backup:pickFolder',
