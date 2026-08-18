@@ -4,7 +4,12 @@ import * as net from 'net'
 import { writeFile } from 'fs/promises'
 import { join } from 'path'
 import { formatCurrency } from '../../shared/formatCurrency'
-import { PrintReceiptOptions, PrintReceiptResult, PrinterConfig, SystemPrinterInfo } from '../../shared/types'
+import {
+  PrintReceiptOptions,
+  PrintReceiptResult,
+  PrinterConfig,
+  SystemPrinterInfo
+} from '../../shared/types'
 import { buildReceiptHtml, DEFAULT_STORE_INFO } from './receiptTemplate'
 
 /** Zebra 203dpi label printers (ZD421 included) address content in dots at ~8 dots/mm. */
@@ -84,12 +89,29 @@ class ZplLabelWriter {
     }
   }
 
-  /** Left-aligned text field at the current y, then advances y by lineHeight. */
-  text(value: string, opts: { fontHeight?: number; fontWidth?: number; bold?: boolean } = {}): void {
+  /**
+   * A text field at the current y, then advances y by lineHeight. Left-aligned
+   * by default; pass `align: 'center'` for header/footer lines — matching the
+   * ESC/POS encoder's `.align('center')` calls for the same content, so the
+   * printed layout doesn't depend on which printer language is configured.
+   */
+  text(
+    value: string,
+    opts: {
+      fontHeight?: number
+      fontWidth?: number
+      bold?: boolean
+      align?: 'left' | 'center'
+    } = {}
+  ): void {
     const h = opts.fontHeight ?? 22
     const w = opts.fontWidth ?? h
     this.ensureSpace(h + 6)
-    this.current += `^FO${this.leftDots},${this.y}^A0N,${h},${w}^FD${zplEscape(value)}^FS\n`
+    if (opts.align === 'center') {
+      this.current += `^FO${this.leftDots},${this.y}^A0N,${h},${w}^FB${this.contentWidthDots},1,0,C,0^FD${zplEscape(value)}^FS\n`
+    } else {
+      this.current += `^FO${this.leftDots},${this.y}^A0N,${h},${w}^FD${zplEscape(value)}^FS\n`
+    }
     this.y += h + 6
   }
 
@@ -146,10 +168,13 @@ export function buildZplReceiptBuffer(options: PrintReceiptOptions): Uint8Array 
   const writer = new ZplLabelWriter(labelConfig)
 
   const writeHeader = (continuation: boolean): void => {
-    writer.text(continuation ? `${store.name} (cont'd)` : store.name, { fontHeight: 26 })
+    writer.text(continuation ? `${store.name} (cont'd)` : store.name, {
+      fontHeight: 26,
+      align: 'center'
+    })
     if (!continuation) {
-      writer.text(store.address, { fontHeight: 18 })
-      writer.text(store.phone, { fontHeight: 18 })
+      writer.text(store.address, { fontHeight: 18, align: 'center' })
+      writer.text(store.phone, { fontHeight: 18, align: 'center' })
     }
     writer.divider()
     writer.text(`Receipt: #${transaction.receiptNumber}`, { fontHeight: 18 })
@@ -164,9 +189,12 @@ export function buildZplReceiptBuffer(options: PrintReceiptOptions): Uint8Array 
   writeHeader(false)
 
   transaction.items.forEach((item) => {
-    const displayName = item.lineType === 'DEBT_SETTLEMENT' ? 'Previous Balance' : (item.product?.name ?? '(item)')
+    const displayName =
+      item.lineType === 'DEBT_SETTLEMENT' ? 'Previous Balance' : (item.product?.name ?? '(item)')
     writer.ensureSpace(28)
-    writer.row(displayName, `x${item.quantity}  ${formatCurrency(item.totalCents)}`, { fontHeight: 20 })
+    writer.row(displayName, `x${item.quantity}  ${formatCurrency(item.totalCents)}`, {
+      fontHeight: 20
+    })
   })
 
   writer.divider()
@@ -176,11 +204,11 @@ export function buildZplReceiptBuffer(options: PrintReceiptOptions): Uint8Array 
   writer.row('Tendered', formatCurrency(transaction.tenderedCents), { fontHeight: 18 })
   writer.row('Change Due', formatCurrency(transaction.changeCents), { fontHeight: 18 })
   writer.divider()
-  writer.text('Thank you for choosing VantisPOS!', { fontHeight: 18 })
+  writer.text('Thank you for choosing VantisPOS!', { fontHeight: 18, align: 'center' })
 
   if (options.rxFooter) {
     writer.divider()
-    writer.text(options.rxFooter, { fontHeight: 18 })
+    writer.text(options.rxFooter, { fontHeight: 18, align: 'center' })
   }
 
   return writer.finish()
@@ -188,7 +216,9 @@ export function buildZplReceiptBuffer(options: PrintReceiptOptions): Uint8Array 
 
 /** Picks the byte-encoder for a NETWORK printer based on its configured command language. */
 export function buildNetworkReceiptBuffer(options: PrintReceiptOptions): Uint8Array {
-  return options.printerConfig?.language === 'zpl' ? buildZplReceiptBuffer(options) : buildEscPosReceiptBuffer(options)
+  return options.printerConfig?.language === 'zpl'
+    ? buildZplReceiptBuffer(options)
+    : buildEscPosReceiptBuffer(options)
 }
 
 /**
@@ -219,7 +249,8 @@ export function buildEscPosReceiptBuffer(options: PrintReceiptOptions): Uint8Arr
     .line('--------------------------------')
 
   transaction.items.forEach((item) => {
-    const displayName = item.lineType === 'DEBT_SETTLEMENT' ? 'Previous Balance' : (item.product?.name ?? '(item)')
+    const displayName =
+      item.lineType === 'DEBT_SETTLEMENT' ? 'Previous Balance' : (item.product?.name ?? '(item)')
     const itemName = displayName.slice(0, 20).padEnd(20)
     const qtyStr = `x${item.quantity}`.padStart(3)
     const priceStr = formatCurrency(item.totalCents).padStart(8)
@@ -276,7 +307,9 @@ export function printToNetworkSocket(
       if (!handled) {
         handled = true
         client.destroy()
-        reject(new Error(`Network receipt printer socket timeout connecting to ${ipAddress}:${port}`))
+        reject(
+          new Error(`Network receipt printer socket timeout connecting to ${ipAddress}:${port}`)
+        )
       }
     })
 
@@ -302,7 +335,10 @@ async function loadHtmlInHiddenWindow(html: string): Promise<BrowserWindow> {
 /**
  * Generates a PDF receipt file and returns its path + data URL for on-screen preview.
  */
-export async function printToPdf(html: string, receiptNumber: string): Promise<{ pdfPath: string; pdfDataUrl: string }> {
+export async function printToPdf(
+  html: string,
+  receiptNumber: string
+): Promise<{ pdfPath: string; pdfDataUrl: string }> {
   const win = await loadHtmlInHiddenWindow(html)
   try {
     const pdfBuffer = await win.webContents.printToPDF({ printBackground: true })
@@ -338,11 +374,14 @@ export async function listSystemPrinters(): Promise<SystemPrinterInfo[]> {
 export async function printToSystemPrinter(html: string, deviceName?: string): Promise<void> {
   const win = await loadHtmlInHiddenWindow(html)
   return new Promise((resolve, reject) => {
-    win.webContents.print({ silent: true, ...(deviceName ? { deviceName } : {}) }, (success, failureReason) => {
-      win.close()
-      if (success) resolve()
-      else reject(new Error(failureReason || 'System print failed'))
-    })
+    win.webContents.print(
+      { silent: true, ...(deviceName ? { deviceName } : {}) },
+      (success, failureReason) => {
+        win.close()
+        if (success) resolve()
+        else reject(new Error(failureReason || 'System print failed'))
+      }
+    )
   })
 }
 
@@ -377,7 +416,9 @@ export async function printReceipt(options: PrintReceiptOptions): Promise<PrintR
       await printToSystemPrinter(html, config.deviceName)
       return {
         success: true,
-        message: config.deviceName ? `Receipt printed to ${config.deviceName}.` : 'Receipt sent to system printer.'
+        message: config.deviceName
+          ? `Receipt printed to ${config.deviceName}.`
+          : 'Receipt sent to system printer.'
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)

@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { buildZplReceiptBuffer, buildNetworkReceiptBuffer } from '../main/receipt/receiptPrinter'
 import type { TransactionWithItems, PrintReceiptOptions } from '../shared/types'
 
-function mockItem(overrides: Partial<TransactionWithItems['items'][number]> = {}): TransactionWithItems['items'][number] {
+function mockItem(
+  overrides: Partial<TransactionWithItems['items'][number]> = {}
+): TransactionWithItems['items'][number] {
   return {
     id: 'item-1',
     transactionId: 'tx-1',
@@ -114,13 +116,18 @@ describe('buildZplReceiptBuffer', () => {
     expect(zpl.match(/cont'd/g)?.length).toBe(opens.length - 1)
   })
 
-  it('never places a field beyond a label\'s own height', () => {
+  it("never places a field beyond a label's own height", () => {
     const manyItems = Array.from({ length: 15 }, (_, i) => mockItem({ id: `item-${i}` }))
     const heightMm = 60
     const zpl = decode(
       buildZplReceiptBuffer({
         transaction: mockTransaction({ items: manyItems }),
-        printerConfig: { type: 'NETWORK', labelWidthMm: 85, labelHeightMm: heightMm, topMarginMm: 10 }
+        printerConfig: {
+          type: 'NETWORK',
+          labelWidthMm: 85,
+          labelHeightMm: heightMm,
+          topMarginMm: 10
+        }
       })
     )
     const labels = zpl.split('^XA').slice(1) // drop empty leading split
@@ -142,6 +149,37 @@ describe('buildZplReceiptBuffer', () => {
     )
     expect(zpl).not.toContain('Weird^Name~With\\Chars')
     expect(zpl).toContain('Weird\\5EName\\7EWith\\\\Chars')
+  })
+
+  it('centers the store name/address/phone header and the thank-you/rx footer lines', () => {
+    const zpl = decode(
+      buildZplReceiptBuffer({
+        transaction: mockTransaction(),
+        storeInfo: { name: 'Test Pharmacy', address: '1 Main St', phone: '555-0000' },
+        rxFooter: 'Rx pickup: Ask pharmacist for counseling.'
+      })
+    )
+    // Centered fields use a full-content-width ^FB with 'C' justification, unlike
+    // the plain ^FO...^FD used for left-aligned lines (receipt #, date, items).
+    expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FDTest Pharmacy\^FS/)
+    expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FD1 Main St\^FS/)
+    expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FD555-0000\^FS/)
+    expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FDThank you for choosing VantisPOS!\^FS/)
+    expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FDRx pickup/)
+    // Receipt #/date/type stay left-aligned, same as the ESC/POS layout.
+    expect(zpl).not.toMatch(/\^FB\d+,1,0,C,0\^FDReceipt:/)
+  })
+
+  it('centers the continuation-label header on overflow pages too', () => {
+    const manyItems = Array.from({ length: 20 }, (_, i) => mockItem({ id: `item-${i}` }))
+    const zpl = decode(
+      buildZplReceiptBuffer({
+        transaction: mockTransaction({ items: manyItems }),
+        storeInfo: { name: 'Test Pharmacy', address: '1 Main St', phone: '555-0000' },
+        printerConfig: { type: 'NETWORK', labelHeightMm: 45 }
+      })
+    )
+    expect(zpl).toMatch(/\^FB\d+,1,0,C,0\^FDTest Pharmacy \(cont'd\)\^FS/)
   })
 
   it('includes receipt number, totals, and rx footer', () => {
