@@ -2,6 +2,7 @@ import * as React from 'react'
 import { CheckCircle2, Copy, Loader2, Receipt, XCircle } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
 import { RefundWorkflowModal } from '../components/RefundWorkflowModal'
+import { ViewSaleModal } from '../components/ViewSaleModal'
 import { EmptyState } from '../components/ui/EmptyState'
 import { formatCurrency } from '@shared/formatCurrency'
 import { useCurrentUser } from '../context/CurrentUserContext'
@@ -65,6 +66,23 @@ export function SalesHistoryScreen(): React.JSX.Element {
   const [toDate, setToDate] = React.useState(today)
   const [query, setQuery] = React.useState('')
   const [refundTargetId, setRefundTargetId] = React.useState<string | null>(null)
+  const [viewTargetId, setViewTargetId] = React.useState<string | null>(null)
+  const [printingId, setPrintingId] = React.useState<string | null>(null)
+  const [printError, setPrintError] = React.useState<string | null>(null)
+
+  const handlePrintReceipt = async (saleId: string): Promise<void> => {
+    if (!user) return
+    setPrintingId(saleId)
+    setPrintError(null)
+    try {
+      const detail = await window.api.refund.getSaleDetails(saleId, user.id)
+      await window.api.receipt.print(detail)
+    } catch (err) {
+      setPrintError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setPrintingId(null)
+    }
+  }
 
   const load = React.useCallback(async (): Promise<void> => {
     if (!window.api?.refund) return
@@ -230,18 +248,33 @@ export function SalesHistoryScreen(): React.JSX.Element {
                         {formatCurrency(sale.totalCents)}
                       </span>
                       {isManager && (
-                        <button
-                          onClick={() => setRefundTargetId(sale.id)}
-                          disabled={!isRefundable}
-                          title={
-                            !isRefundable
-                              ? 'This sale has already been fully refunded or was voided.'
-                              : undefined
-                          }
-                          className="min-h-11 w-24 shrink-0 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-xs font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          Refund
-                        </button>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <button
+                            onClick={() => setViewTargetId(sale.id)}
+                            className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-xs font-semibold text-[var(--foreground)] transition-colors duration-150 hover:bg-[var(--muted)]"
+                          >
+                            View Sale
+                          </button>
+                          <button
+                            onClick={() => void handlePrintReceipt(sale.id)}
+                            disabled={printingId === sale.id}
+                            className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-xs font-semibold text-[var(--foreground)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {printingId === sale.id ? 'Printing…' : 'Print Receipt'}
+                          </button>
+                          <button
+                            onClick={() => setRefundTargetId(sale.id)}
+                            disabled={!isRefundable}
+                            title={
+                              !isRefundable
+                                ? 'This sale has already been fully refunded or was voided.'
+                                : undefined
+                            }
+                            className="min-h-11 w-24 shrink-0 rounded-[var(--radius)] bg-[var(--primary)] px-3 text-xs font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Refund
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -251,6 +284,12 @@ export function SalesHistoryScreen(): React.JSX.Element {
         </div>
       </Card>
 
+      {printError && (
+        <div className="rounded-[var(--radius)] border border-[var(--error)] bg-[var(--error-bg)] p-3 text-sm text-[var(--error)]">
+          {printError}
+        </div>
+      )}
+
       {refundTargetId && user && (
         <RefundWorkflowModal
           transactionId={refundTargetId}
@@ -259,6 +298,14 @@ export function SalesHistoryScreen(): React.JSX.Element {
             setRefundTargetId(null)
             if (refunded) void load()
           }}
+        />
+      )}
+
+      {viewTargetId && user && (
+        <ViewSaleModal
+          transactionId={viewTargetId}
+          managerId={user.id}
+          onClose={() => setViewTargetId(null)}
         />
       )}
     </div>
