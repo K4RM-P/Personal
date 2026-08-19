@@ -165,11 +165,6 @@ export const IPC = {
   BACKUP_LIST_RESTORABLE: 'backup:listRestorable',
   BACKUP_RESTORE: 'backup:restore',
   BACKUP_RELAUNCH: 'backup:relaunch',
-  BACKUP_DRIVE_CONNECT: 'backup:drive:connect',
-  BACKUP_DRIVE_DISCONNECT: 'backup:drive:disconnect',
-  BACKUP_DRIVE_GET_STATUS: 'backup:drive:getStatus',
-  BACKUP_DRIVE_SAVE_SETTINGS: 'backup:drive:saveSettings',
-  BACKUP_DRIVE_RUN_NOW: 'backup:drive:runNow',
 
   // Danger zone — irreversible full-store reset (Settings, very bottom of page)
   DANGER_ZONE_DELETE_ALL_DATA: 'dangerZone:deleteAllData',

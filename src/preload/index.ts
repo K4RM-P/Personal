@@ -44,7 +44,6 @@ import type {
   ExternalDrive,
   BackupRunResult,
   BackupLogSummary,
-  DriveBackupStatus,
   BackupDestination,
   RestorableBackup,
   RestoreBackupResult,
@@ -410,16 +409,7 @@ const api = {
       ipcRenderer.invoke(IPC.BACKUP_LIST_RESTORABLE, drivePath),
     restore: (backupDir: string): Promise<RestoreBackupResult> =>
       ipcRenderer.invoke(IPC.BACKUP_RESTORE, { backupDir }),
-    relaunch: (): Promise<void> => ipcRenderer.invoke(IPC.BACKUP_RELAUNCH),
-    drive: {
-      connect: (): Promise<{ email: string }> => ipcRenderer.invoke(IPC.BACKUP_DRIVE_CONNECT),
-      disconnect: (): Promise<void> => ipcRenderer.invoke(IPC.BACKUP_DRIVE_DISCONNECT),
-      getStatus: (): Promise<DriveBackupStatus> => ipcRenderer.invoke(IPC.BACKUP_DRIVE_GET_STATUS),
-      saveSettings: (args: { autoBackupEnabled: boolean; intervalHours: number }): Promise<void> =>
-        ipcRenderer.invoke(IPC.BACKUP_DRIVE_SAVE_SETTINGS, args),
-      runNow: (args: { initiatedByUserId: number }): Promise<void> =>
-        ipcRenderer.invoke(IPC.BACKUP_DRIVE_RUN_NOW, args)
-    }
+    relaunch: (): Promise<void> => ipcRenderer.invoke(IPC.BACKUP_RELAUNCH)
   },
   dangerZone: {
     deleteAllData: (code: string): Promise<{ ok: boolean; message: string }> =>

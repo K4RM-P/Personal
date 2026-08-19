@@ -1,7 +1,6 @@
 import { app, dialog, ipcMain, shell } from 'electron'
 import { PrismaClient } from '@prisma/client'
-import { hostname, tmpdir } from 'os'
-import { mkdtempSync, rmSync } from 'fs'
+import { hostname } from 'os'
 import { basename, join } from 'path'
 import { IPC } from '../../shared/channels'
 import { getExternalDrives } from '../backup/drives'
@@ -12,13 +11,6 @@ import {
   restoreBackup,
   type BackupEnv
 } from '../backup/backupService'
-import {
-  connectGoogleDrive,
-  disconnectGoogleDrive,
-  getDriveStatus,
-  saveDriveBackupSettings,
-  uploadBackupToDrive
-} from '../backup/googleDrive'
 import { resolveDbFilePath } from '../backup/dbPath'
 import {
   getBackupPromptOnLogout,
@@ -29,7 +21,7 @@ import {
 import { requireManager } from '../auth/session'
 import { log } from '../logging/logger'
 
-export function buildBackupEnv(): BackupEnv {
+function buildBackupEnv(): BackupEnv {
   return {
     dbFilePath: resolveDbFilePath(),
     posVersion: app.getVersion(),
@@ -171,66 +163,5 @@ export function registerBackupHandlers(db: PrismaClient): void {
       app.relaunch()
       app.exit(0)
     })
-  )
-
-  ipcMain.handle(
-    IPC.BACKUP_DRIVE_CONNECT,
-    guard('Connect Google Drive', async () => {
-      requireManager()
-      return connectGoogleDrive(db)
-    })
-  )
-
-  ipcMain.handle(
-    IPC.BACKUP_DRIVE_DISCONNECT,
-    guard('Disconnect Google Drive', async () => {
-      requireManager()
-      await disconnectGoogleDrive(db)
-    })
-  )
-
-  ipcMain.handle(
-    IPC.BACKUP_DRIVE_GET_STATUS,
-    guard('Get Google Drive backup status', async () => getDriveStatus(db))
-  )
-
-  ipcMain.handle(
-    IPC.BACKUP_DRIVE_SAVE_SETTINGS,
-    guard(
-      'Save Google Drive backup settings',
-      async (
-        _e: Electron.IpcMainInvokeEvent,
-        args: { autoBackupEnabled: boolean; intervalHours: number }
-      ) => {
-        requireManager()
-        await saveDriveBackupSettings(db, args)
-      }
-    )
-  )
-
-  ipcMain.handle(
-    IPC.BACKUP_DRIVE_RUN_NOW,
-    guard(
-      'Back up to Google Drive now',
-      async (_e: Electron.IpcMainInvokeEvent, args: { initiatedByUserId: number }) => {
-        const stagingDir = mkdtempSync(join(tmpdir(), 'pharmacy-pos-backup-'))
-        try {
-          const result = await performBackup(
-            db,
-            {
-              drivePath: stagingDir,
-              driveName: 'Google Drive staging',
-              initiatedByUserId: args.initiatedByUserId
-            },
-            buildBackupEnv()
-          )
-          await uploadBackupToDrive(db, result.backupDir, {
-            initiatedByUserId: args.initiatedByUserId
-          })
-        } finally {
-          rmSync(stagingDir, { recursive: true, force: true })
-        }
-      }
-    )
   )
 }

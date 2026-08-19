@@ -33,12 +33,6 @@ const DEFAULTS = {
   'backup.promptOnLogout': 'true',
   'backup.drivePath': '',
   'backup.driveName': '',
-  // Google Drive auto-backup (docs/superpowers/specs/2026-08-19-google-drive-backup-design.md)
-  'backup.driveAccountEmail': '',
-  'backup.driveFolderId': '',
-  'backup.driveRefreshTokenEnc': '',
-  'backup.driveAutoBackupEnabled': 'false',
-  'backup.driveIntervalHours': '24',
   // A15 — idle auto-logout. A checkout terminal left signed in as a manager,
   // unattended, can process refunds or adjust customer balances.
   'session.idleTimeoutMinutes': '20',
@@ -176,9 +170,21 @@ export async function savePrinterConfig(
   await setSetting(db, 'printer.networkPort', String(config.port ?? 9100))
   await setSetting(db, 'printer.deviceName', config.deviceName ?? '')
   await setSetting(db, 'printer.language', config.language === 'zpl' ? 'zpl' : 'escpos')
-  await setSetting(db, 'printer.labelWidthMm', config.labelWidthMm != null ? String(config.labelWidthMm) : '')
-  await setSetting(db, 'printer.labelHeightMm', config.labelHeightMm != null ? String(config.labelHeightMm) : '')
-  await setSetting(db, 'printer.topMarginMm', config.topMarginMm != null ? String(config.topMarginMm) : '')
+  await setSetting(
+    db,
+    'printer.labelWidthMm',
+    config.labelWidthMm != null ? String(config.labelWidthMm) : ''
+  )
+  await setSetting(
+    db,
+    'printer.labelHeightMm',
+    config.labelHeightMm != null ? String(config.labelHeightMm) : ''
+  )
+  await setSetting(
+    db,
+    'printer.topMarginMm',
+    config.topMarginMm != null ? String(config.topMarginMm) : ''
+  )
   return getPrinterConfig(db)
 }
 

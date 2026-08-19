@@ -16,7 +16,6 @@ import { ReportEmailSettingsCard } from '../components/ReportEmailSettingsCard'
 import { ReportCsvExportSettingsCard } from '../components/ReportCsvExportSettingsCard'
 import { UpdateSettingsCard } from '../components/UpdateSettingsCard'
 import { BackupModal } from '../components/BackupModal'
-import { GoogleDriveBackupCard } from '../components/GoogleDriveBackupCard'
 import { RestoreBackupModal } from '../components/RestoreBackupModal'
 import { DeleteAllDataModal } from '../components/DeleteAllDataModal'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
@@ -994,8 +993,6 @@ export function SettingsScreen() {
               </div>
             </Card>
           )}
-
-          {sectionVisible('backup') && <GoogleDriveBackupCard />}
         </div>
       )}
 
