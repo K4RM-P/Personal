@@ -33,6 +33,12 @@ const DEFAULTS = {
   'backup.promptOnLogout': 'true',
   'backup.drivePath': '',
   'backup.driveName': '',
+  // Google Drive auto-backup (docs/superpowers/specs/2026-08-19-google-drive-backup-design.md)
+  'backup.driveAccountEmail': '',
+  'backup.driveFolderId': '',
+  'backup.driveRefreshTokenEnc': '',
+  'backup.driveAutoBackupEnabled': 'false',
+  'backup.driveIntervalHours': '24',
   // A15 — idle auto-logout. A checkout terminal left signed in as a manager,
   // unattended, can process refunds or adjust customer balances.
   'session.idleTimeoutMinutes': '20',
