@@ -15,6 +15,27 @@ export function LogoutConfirmModal({ onCancel }: LogoutConfirmModalProps): React
   const updateStatus = useUpdateStatus()
   const updateReadyVersion = updateStatus.state === 'ready' ? (updateStatus.version ?? '') : null
 
+  // Fire-and-forget: if Google Drive is connected and auto-backup is on, kick off a
+  // background upload before logging out. Never awaited — logout should not wait on
+  // the upload, and the main process keeps running the IPC handler after the window
+  // navigates away.
+  const maybeBackupToDrive = React.useCallback(async (): Promise<void> => {
+    if (!user) return
+    try {
+      const status = await window.api.backup.drive.getStatus()
+      if (status.connected && status.autoBackupEnabled) {
+        void window.api.backup.drive.runNow({ initiatedByUserId: user.id })
+      }
+    } catch {
+      // best-effort — never block logout on a Drive backup failure
+    }
+  }, [user])
+
+  const logoutWithDriveBackup = React.useCallback((): void => {
+    void maybeBackupToDrive()
+    void logout()
+  }, [maybeBackupToDrive, logout])
+
   // Only cancelable from the base confirm view — once a backup run has started
   // (showBackup), BackupModal owns its own lifecycle and shouldn't be Escape-dismissed
   // mid-copy.
@@ -28,7 +49,9 @@ export function LogoutConfirmModal({ onCancel }: LogoutConfirmModalProps): React
   }, [onCancel, showBackup])
 
   if (showBackup && user) {
-    return <BackupModal userId={user.id} standalone={false} onClose={() => void logout()} />
+    return (
+      <BackupModal userId={user.id} standalone={false} onClose={() => logoutWithDriveBackup()} />
+    )
   }
 
   // Logout is a safe, natural moment to apply a downloaded update — the cashier is
@@ -57,7 +80,7 @@ export function LogoutConfirmModal({ onCancel }: LogoutConfirmModalProps): React
           </CardDescription>
           <div className="grid grid-cols-2 gap-3 pt-2">
             <button
-              onClick={() => void logout()}
+              onClick={() => logoutWithDriveBackup()}
               className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)] hover:bg-[var(--muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
             >
               Not Now, Just Log Out
@@ -103,7 +126,7 @@ export function LogoutConfirmModal({ onCancel }: LogoutConfirmModalProps): React
             Cancel
           </button>
           <button
-            onClick={() => void logout()}
+            onClick={() => logoutWithDriveBackup()}
             className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)] hover:bg-[var(--muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
           >
             No, Just Logout

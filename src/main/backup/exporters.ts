@@ -48,7 +48,10 @@ export async function exportSales(db: PrismaClient): Promise<{ sales: unknown[] 
       saleType: tx.saleType,
       lineItems: tx.items.map((item) => ({
         productId: item.productId,
-        productName: item.lineType === 'DEBT_SETTLEMENT' ? 'Previous Balance' : (item.product?.name ?? '(item)'),
+        productName:
+          item.lineType === 'DEBT_SETTLEMENT'
+            ? 'Previous Balance'
+            : (item.product?.name ?? '(item)'),
         quantity: item.quantity,
         costCents: item.costCents,
         unitPriceCents: item.unitPriceCents,
@@ -132,8 +135,13 @@ export async function exportDiscounts(db: PrismaClient): Promise<{ discounts: un
     include: { transaction: { include: { items: true } } }
   })
 
-  const userIds = [...new Set(discounts.map((d) => d.appliedByUserId).filter((id): id is number => id !== null))]
-  const users = await db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, fullName: true } })
+  const userIds = [
+    ...new Set(discounts.map((d) => d.appliedByUserId).filter((id): id is number => id !== null))
+  ]
+  const users = await db.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, fullName: true }
+  })
   const userLookup = Object.fromEntries(users.map((u) => [u.id, u.fullName]))
 
   return {
@@ -176,9 +184,7 @@ export async function exportRefunds(db: PrismaClient): Promise<{ refunds: unknow
   }
 }
 
-export async function exportInventorySnapshot(
-  db: PrismaClient
-): Promise<{
+export async function exportInventorySnapshot(db: PrismaClient): Promise<{
   snapshotTimestamp: string
   products: unknown[]
   totalInventoryValueCost: number

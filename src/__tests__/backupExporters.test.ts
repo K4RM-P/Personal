@@ -1,5 +1,9 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   exportSettings,
   exportFeatureFlags,
@@ -8,13 +12,28 @@ import {
   exportCompleteSalesReportCsv
 } from '../main/backup/exporters'
 
-const db = new PrismaClient()
-
 describe('backup exporters — new file set', () => {
-  beforeEach(async () => {
-    await db.setting.deleteMany()
-    await db.featureFlag.deleteMany()
-    await db.pricingTier.deleteMany()
+  let db: PrismaClient
+  let workDir: string
+
+  beforeAll(async () => {
+    workDir = mkdtempSync(join(tmpdir(), 'backup-exporters-it-'))
+    const url = `file:${join(workDir, 'test.db')}`
+    const env = { ...process.env, DATABASE_URL: url }
+
+    execFileSync('npx', ['prisma', 'db', 'push', '--skip-generate', '--accept-data-loss'], {
+      cwd: process.cwd(),
+      env,
+      stdio: 'pipe'
+    })
+
+    db = new PrismaClient({ datasources: { db: { url } } })
+    await db.$connect()
+  })
+
+  afterAll(async () => {
+    await db?.$disconnect()
+    rmSync(workDir, { recursive: true, force: true })
   })
 
   it('exportSettings excludes any *Enc secret key', async () => {

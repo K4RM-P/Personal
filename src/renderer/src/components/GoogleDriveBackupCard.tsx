@@ -83,8 +83,8 @@ export function GoogleDriveBackupCard(): React.JSX.Element {
       <CardHeader>
         <CardTitle>Google Drive Backup</CardTitle>
         <CardDescription>
-          Connect a Google account once — backups then upload to Drive automatically on logout
-          and on a schedule, no further action needed.
+          Connect a Google account once — backups then upload to Drive automatically on logout and
+          on a schedule, no further action needed.
         </CardDescription>
       </CardHeader>
 
