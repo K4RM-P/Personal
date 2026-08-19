@@ -153,7 +153,7 @@ describe('data backup system', () => {
     rmSync(driveDir, { recursive: true, force: true })
   })
 
-  it('writes all 8 backup files with correct, checksummed, catalogue-free content', async () => {
+  it('writes all 13 backup files with correct, checksummed, catalogue-free content', async () => {
     const user = await db.user.findFirstOrThrow()
     const result = await performBackup(
       db,
@@ -169,6 +169,11 @@ describe('data backup system', () => {
       'discounts.json',
       'refunds.json',
       'inventory-snapshot.json',
+      'settings.json',
+      'feature-flags.json',
+      'pricing-tiers.json',
+      'inventory-adjustments.json',
+      'complete-sales-report.csv',
       'backup-metadata.json'
     ]
     expect(result.files.map((f) => f.name).sort()).toEqual([...requiredFiles].sort())
@@ -205,7 +210,7 @@ describe('data backup system', () => {
     const metadata = JSON.parse(
       readFileSync(join(result.backupDir, 'backup-metadata.json'), 'utf-8')
     )
-    expect(metadata.dataSnapshot).toEqual({
+    expect(metadata.dataSnapshot).toMatchObject({
       salesCount: 1,
       customersCount: 1,
       usersCount: 1,
@@ -215,6 +220,10 @@ describe('data backup system', () => {
       loyaltyPointEventsCount: 1,
       productsCount: 1
     })
+    expect(typeof metadata.dataSnapshot.settingsCount).toBe('number')
+    expect(typeof metadata.dataSnapshot.featureFlagsCount).toBe('number')
+    expect(typeof metadata.dataSnapshot.pricingTiersCount).toBe('number')
+    expect(typeof metadata.dataSnapshot.inventoryAdjustmentsCount).toBe('number')
     for (const name of [
       'backup.sqlite',
       'sales.json',
@@ -222,7 +231,12 @@ describe('data backup system', () => {
       'users.json',
       'discounts.json',
       'refunds.json',
-      'inventory-snapshot.json'
+      'inventory-snapshot.json',
+      'settings.json',
+      'feature-flags.json',
+      'pricing-tiers.json',
+      'inventory-adjustments.json',
+      'complete-sales-report.csv'
     ]) {
       const recomputed = `sha256:${await sha256File(join(result.backupDir, name))}`
       expect(metadata.checksums[name]).toBe(recomputed)

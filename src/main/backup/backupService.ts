@@ -18,7 +18,12 @@ import {
   exportUsers,
   exportDiscounts,
   exportRefunds,
-  exportInventorySnapshot
+  exportInventorySnapshot,
+  exportSettings,
+  exportFeatureFlags,
+  exportPricingTiers,
+  exportInventoryAdjustments,
+  exportCompleteSalesReportCsv
 } from './exporters'
 import type {
   BackupLogSummary,
@@ -33,9 +38,18 @@ const JSON_FILES = [
   'users.json',
   'discounts.json',
   'refunds.json',
-  'inventory-snapshot.json'
+  'inventory-snapshot.json',
+  'settings.json',
+  'feature-flags.json',
+  'pricing-tiers.json',
+  'inventory-adjustments.json'
 ] as const
-const ALL_FILES = ['backup.sqlite', ...JSON_FILES, 'backup-metadata.json'] as const
+const ALL_FILES = [
+  'backup.sqlite',
+  ...JSON_FILES,
+  'complete-sales-report.csv',
+  'backup-metadata.json'
+] as const
 
 /**
  * Everything about the running app that performBackup needs but shouldn't reach for
@@ -181,14 +195,30 @@ export async function performBackup(
     await stripCatalogueFromCopy(destDb)
 
     // 2. Human-readable JSON exports, straight from the live (connected) db.
-    const [sales, customers, users, discounts, refunds, inventory] = await Promise.all([
+    const [
+      sales,
+      customers,
+      users,
+      discounts,
+      refunds,
+      inventory,
+      settings,
+      featureFlags,
+      pricingTiers,
+      inventoryAdjustments
+    ] = await Promise.all([
       exportSales(db),
       exportCustomers(db),
       exportUsers(db),
       exportDiscounts(db),
       exportRefunds(db),
-      exportInventorySnapshot(db)
+      exportInventorySnapshot(db),
+      exportSettings(db),
+      exportFeatureFlags(db),
+      exportPricingTiers(db),
+      exportInventoryAdjustments(db)
     ])
+    const salesReportCsv = await exportCompleteSalesReportCsv(db)
 
     writeFileSync(join(backupDir, 'sales.json'), JSON.stringify(sales, null, 2))
     writeFileSync(join(backupDir, 'customers.json'), JSON.stringify(customers, null, 2))
@@ -196,10 +226,18 @@ export async function performBackup(
     writeFileSync(join(backupDir, 'discounts.json'), JSON.stringify(discounts, null, 2))
     writeFileSync(join(backupDir, 'refunds.json'), JSON.stringify(refunds, null, 2))
     writeFileSync(join(backupDir, 'inventory-snapshot.json'), JSON.stringify(inventory, null, 2))
+    writeFileSync(join(backupDir, 'settings.json'), JSON.stringify(settings, null, 2))
+    writeFileSync(join(backupDir, 'feature-flags.json'), JSON.stringify(featureFlags, null, 2))
+    writeFileSync(join(backupDir, 'pricing-tiers.json'), JSON.stringify(pricingTiers, null, 2))
+    writeFileSync(
+      join(backupDir, 'inventory-adjustments.json'),
+      JSON.stringify(inventoryAdjustments, null, 2)
+    )
+    writeFileSync(join(backupDir, 'complete-sales-report.csv'), salesReportCsv)
 
     // 3. Checksum every file written so far (metadata excluded — it can't checksum itself).
     const checksums: Record<string, string> = {}
-    for (const file of ['backup.sqlite', ...JSON_FILES] as const) {
+    for (const file of ['backup.sqlite', ...JSON_FILES, 'complete-sales-report.csv'] as const) {
       checksums[file] = `sha256:${await sha256File(join(backupDir, file))}`
     }
 
@@ -221,7 +259,11 @@ export async function performBackup(
         (sum, c) => sum + c.loyaltyHistory.length,
         0
       ),
-      productsCount: inventory.products.length
+      productsCount: inventory.products.length,
+      settingsCount: settings.settings.length,
+      featureFlagsCount: featureFlags.featureFlags.length,
+      pricingTiersCount: pricingTiers.pricingTiers.length,
+      inventoryAdjustmentsCount: inventoryAdjustments.inventoryAdjustments.length
     }
 
     let databaseVersion = 0
