@@ -374,14 +374,6 @@ export interface RestorableBackup {
   dataSnapshot: Record<string, number>
 }
 
-export interface DriveBackupStatus {
-  connected: boolean
-  email?: string
-  autoBackupEnabled: boolean
-  intervalHours: number
-  lastBackup?: BackupLogSummary
-}
-
 export interface RestoreBackupResult {
   backupDir: string
   restoredAt: string

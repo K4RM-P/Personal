@@ -14,8 +14,6 @@ import { initAutoUpdater, setUpdateWindow } from './update/autoUpdate'
 import { initCustomerDisplayWindow, teardownCustomerDisplayWindow } from './customerDisplayWindow'
 import { initReportEmailScheduler } from './reports/reportEmailScheduler'
 import { initReportCsvExportScheduler } from './reports/reportCsvExportScheduler'
-import { initDriveBackupScheduler } from './backup/driveBackupScheduler'
-import { buildBackupEnv } from './ipc/backupHandlers'
 import {
   registerSlideMediaProtocolPrivileges,
   registerSlideMediaProtocolHandler
@@ -191,10 +189,6 @@ app.whenReady().then(async () => {
   // Polls for a due scheduled Complete Products Sales Report CSV export — see
   // main/reports/reportCsvExportScheduler.ts. Same fire-and-forget lifecycle.
   initReportCsvExportScheduler(db)
-
-  // Polls for a due scheduled Google Drive backup — see main/backup/driveBackupScheduler.ts.
-  // Same fire-and-forget lifecycle; no-ops until a manager connects Drive in Settings.
-  initDriveBackupScheduler(db, buildBackupEnv)
 })
 
 app.on('window-all-closed', () => {
