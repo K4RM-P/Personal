@@ -1,10 +1,32 @@
 import type { PrismaClient } from '@prisma/client'
-import { existsSync, readdirSync, readFileSync } from 'fs'
+import { copyFileSync, existsSync, readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
+import { resolveDbFilePath } from '../backup/dbPath'
+import { log } from '../logging/logger'
 
 function migrationsDir(): string {
   return join(app.getAppPath(), 'prisma', 'migrations')
+}
+
+/**
+ * Snapshots the live DB file once, right before the first not-yet-applied migration of
+ * this run is executed. If an update ships a destructive migration, this file is the only
+ * way to recover the pre-update data/settings — the runner itself has no down-migrations.
+ */
+function backupDbBeforeMigrating(): void {
+  const dbPath = resolveDbFilePath()
+  if (!existsSync(dbPath)) return
+  const backupPath = `${dbPath}.pre-migrate.bak`
+  try {
+    copyFileSync(dbPath, backupPath)
+  } catch (err) {
+    // Non-fatal: don't block startup on a failed backup, but surface it for diagnosis.
+    log('ERROR', {
+      message: err instanceof Error ? err.message : String(err),
+      source: 'backupDbBeforeMigrating'
+    })
+  }
 }
 
 function splitStatements(sql: string): string[] {
@@ -38,8 +60,13 @@ export async function runPendingMigrations(db: PrismaClient): Promise<void> {
     .filter((name) => existsSync(join(dir, name, 'migration.sql')))
     .sort()
 
+  let backedUp = false
   for (const name of migrationNames) {
     if (applied.has(name)) continue
+    if (!backedUp) {
+      backupDbBeforeMigrating()
+      backedUp = true
+    }
     const sql = readFileSync(join(dir, name, 'migration.sql'), 'utf-8')
     for (const statement of splitStatements(sql)) {
       await db.$executeRawUnsafe(statement)
