@@ -47,6 +47,7 @@ import type {
   BackupDestination,
   RestorableBackup,
   RestoreBackupResult,
+  DriveBackupStatus,
   SalesSummary,
   TopItemRow,
   SlowItemRow,
@@ -409,7 +410,16 @@ const api = {
       ipcRenderer.invoke(IPC.BACKUP_LIST_RESTORABLE, drivePath),
     restore: (backupDir: string): Promise<RestoreBackupResult> =>
       ipcRenderer.invoke(IPC.BACKUP_RESTORE, { backupDir }),
-    relaunch: (): Promise<void> => ipcRenderer.invoke(IPC.BACKUP_RELAUNCH)
+    relaunch: (): Promise<void> => ipcRenderer.invoke(IPC.BACKUP_RELAUNCH),
+    drive: {
+      connect: (): Promise<DriveBackupStatus> => ipcRenderer.invoke(IPC.BACKUP_DRIVE_CONNECT),
+      disconnect: (): Promise<void> => ipcRenderer.invoke(IPC.BACKUP_DRIVE_DISCONNECT),
+      getStatus: (): Promise<DriveBackupStatus> => ipcRenderer.invoke(IPC.BACKUP_DRIVE_GET_STATUS),
+      saveSettings: (enabled: boolean, intervalHours: number): Promise<DriveBackupStatus> =>
+        ipcRenderer.invoke(IPC.BACKUP_DRIVE_SAVE_SETTINGS, { enabled, intervalHours }),
+      runNow: (initiatedByUserId: number): Promise<{ fileCount: number }> =>
+        ipcRenderer.invoke(IPC.BACKUP_DRIVE_RUN_NOW, { initiatedByUserId })
+    }
   },
   dangerZone: {
     deleteAllData: (code: string): Promise<{ ok: boolean; message: string }> =>

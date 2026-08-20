@@ -33,6 +33,12 @@ const DEFAULTS = {
   'backup.promptOnLogout': 'true',
   'backup.drivePath': '',
   'backup.driveName': '',
+  // Google Drive auto-backup — refresh token is encrypted via safeStorage (see credentialStore.ts).
+  'backup.driveAccountEmail': '',
+  'backup.driveRefreshTokenEnc': '',
+  'backup.driveAutoBackupEnabled': 'false',
+  'backup.driveIntervalHours': '24',
+  'backup.driveLastBackupAt': '',
   // A15 — idle auto-logout. A checkout terminal left signed in as a manager,
   // unattended, can process refunds or adjust customer balances.
   'session.idleTimeoutMinutes': '20',
@@ -258,6 +264,67 @@ export async function saveBackupDestination(
 ): Promise<void> {
   await setSetting(db, 'backup.drivePath', drivePath)
   await setSetting(db, 'backup.driveName', driveName)
+}
+
+export interface DriveBackupSettings {
+  connected: boolean
+  accountEmail: string
+  refreshTokenEnc: string
+  enabled: boolean
+  intervalHours: number
+  lastBackupAt: string
+}
+
+export async function getDriveBackupSettings(db: PrismaClient): Promise<DriveBackupSettings> {
+  const [accountEmail, refreshTokenEnc, enabled, intervalHoursRaw, lastBackupAt] =
+    await Promise.all([
+      getSetting(db, 'backup.driveAccountEmail'),
+      getSetting(db, 'backup.driveRefreshTokenEnc'),
+      getSetting(db, 'backup.driveAutoBackupEnabled'),
+      getSetting(db, 'backup.driveIntervalHours'),
+      getSetting(db, 'backup.driveLastBackupAt')
+    ])
+  const intervalHours = parseInt(intervalHoursRaw, 10) || 24
+  return {
+    connected: !!refreshTokenEnc,
+    accountEmail,
+    refreshTokenEnc,
+    enabled: enabled === 'true',
+    intervalHours,
+    lastBackupAt
+  }
+}
+
+/** Stores the refresh token pre-encrypted (see credentialStore.ts) — never plaintext. */
+export async function saveDriveBackupConnection(
+  db: PrismaClient,
+  accountEmail: string,
+  refreshTokenEnc: string
+): Promise<void> {
+  await setSetting(db, 'backup.driveAccountEmail', accountEmail)
+  await setSetting(db, 'backup.driveRefreshTokenEnc', refreshTokenEnc)
+}
+
+export async function clearDriveBackupConnection(db: PrismaClient): Promise<void> {
+  await setSetting(db, 'backup.driveAccountEmail', '')
+  await setSetting(db, 'backup.driveRefreshTokenEnc', '')
+  await setSetting(db, 'backup.driveAutoBackupEnabled', 'false')
+}
+
+export async function saveDriveBackupAutoSettings(
+  db: PrismaClient,
+  enabled: boolean,
+  intervalHours: number
+): Promise<void> {
+  await setSetting(db, 'backup.driveAutoBackupEnabled', String(enabled))
+  await setSetting(db, 'backup.driveIntervalHours', String(intervalHours))
+}
+
+export async function saveDriveBackupLastRunAt(
+  db: PrismaClient,
+  isoTimestamp: string
+): Promise<void> {
+  await setSetting(db, 'backup.driveLastBackupAt', isoTimestamp)
 }
 
 /** Minutes of inactivity before the session is force-logged-out. Manager-configurable, default 20. */

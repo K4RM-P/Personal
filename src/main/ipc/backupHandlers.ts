@@ -12,16 +12,24 @@ import {
   type BackupEnv
 } from '../backup/backupService'
 import { resolveDbFilePath } from '../backup/dbPath'
+import { runOAuthLoginFlow } from '../backup/googleDrive'
+import { runDriveBackupNow } from '../backup/driveBackupScheduler'
 import {
   getBackupPromptOnLogout,
   saveBackupPromptOnLogout,
   getBackupDestination,
-  saveBackupDestination
+  saveBackupDestination,
+  getDriveBackupSettings,
+  saveDriveBackupConnection,
+  clearDriveBackupConnection,
+  saveDriveBackupAutoSettings
 } from '../db/queries/settingsQueries'
+import { encryptSecret } from '../payment/credentialStore'
+import type { DriveBackupStatus } from '../../shared/types'
 import { requireManager } from '../auth/session'
 import { log } from '../logging/logger'
 
-function buildBackupEnv(): BackupEnv {
+export function buildBackupEnv(): BackupEnv {
   return {
     dbFilePath: resolveDbFilePath(),
     posVersion: app.getVersion(),
@@ -163,5 +171,83 @@ export function registerBackupHandlers(db: PrismaClient): void {
       app.relaunch()
       app.exit(0)
     })
+  )
+
+  ipcMain.handle(
+    IPC.BACKUP_DRIVE_CONNECT,
+    guard('Connect Google Drive', async (): Promise<DriveBackupStatus> => {
+      requireManager()
+      const { refreshToken, email } = await runOAuthLoginFlow((url) => shell.openExternal(url))
+      await saveDriveBackupConnection(db, email, encryptSecret(refreshToken))
+      const settings = await getDriveBackupSettings(db)
+      return {
+        connected: settings.connected,
+        accountEmail: settings.accountEmail,
+        enabled: settings.enabled,
+        intervalHours: settings.intervalHours,
+        lastBackupAt: settings.lastBackupAt
+      }
+    })
+  )
+
+  ipcMain.handle(
+    IPC.BACKUP_DRIVE_DISCONNECT,
+    guard('Disconnect Google Drive', async () => {
+      requireManager()
+      await clearDriveBackupConnection(db)
+    })
+  )
+
+  ipcMain.handle(
+    IPC.BACKUP_DRIVE_GET_STATUS,
+    guard('Get Google Drive backup status', async (): Promise<DriveBackupStatus> => {
+      const settings = await getDriveBackupSettings(db)
+      return {
+        connected: settings.connected,
+        accountEmail: settings.accountEmail,
+        enabled: settings.enabled,
+        intervalHours: settings.intervalHours,
+        lastBackupAt: settings.lastBackupAt
+      }
+    })
+  )
+
+  ipcMain.handle(
+    IPC.BACKUP_DRIVE_SAVE_SETTINGS,
+    guard(
+      'Save Google Drive backup settings',
+      async (
+        _e: Electron.IpcMainInvokeEvent,
+        args: { enabled: boolean; intervalHours: number }
+      ): Promise<DriveBackupStatus> => {
+        requireManager()
+        const settings = await getDriveBackupSettings(db)
+        if (args.enabled && !settings.connected) {
+          throw new Error('Connect a Google account before enabling automatic Drive backups.')
+        }
+        await saveDriveBackupAutoSettings(db, args.enabled, args.intervalHours)
+        const updated = await getDriveBackupSettings(db)
+        return {
+          connected: updated.connected,
+          accountEmail: updated.accountEmail,
+          enabled: updated.enabled,
+          intervalHours: updated.intervalHours,
+          lastBackupAt: updated.lastBackupAt
+        }
+      }
+    )
+  )
+
+  ipcMain.handle(
+    IPC.BACKUP_DRIVE_RUN_NOW,
+    guard(
+      'Back up to Google Drive now',
+      async (_e: Electron.IpcMainInvokeEvent, args: { initiatedByUserId: number }) => {
+        requireManager()
+        const result = await runDriveBackupNow(db, buildBackupEnv(), args.initiatedByUserId)
+        log('BACKUP_RUN', { source: 'driveManual', fileCount: result.fileCount })
+        return result
+      }
+    )
   )
 }

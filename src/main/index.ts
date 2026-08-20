@@ -9,6 +9,8 @@ import { runPendingMigrations } from './db/migrate'
 import { registerAllHandlers } from './ipc'
 import { applyPendingRestoreIfStaged } from './backup/backupService'
 import { resolveDbFilePath } from './backup/dbPath'
+import { initDriveBackupScheduler } from './backup/driveBackupScheduler'
+import { buildBackupEnv } from './ipc/backupHandlers'
 import { initLogger, log } from './logging/logger'
 import { initAutoUpdater, setUpdateWindow } from './update/autoUpdate'
 import { initCustomerDisplayWindow, teardownCustomerDisplayWindow } from './customerDisplayWindow'
@@ -189,6 +191,10 @@ app.whenReady().then(async () => {
   // Polls for a due scheduled Complete Products Sales Report CSV export — see
   // main/reports/reportCsvExportScheduler.ts. Same fire-and-forget lifecycle.
   initReportCsvExportScheduler(db)
+
+  // Polls for a due scheduled Google Drive auto-backup — see
+  // main/backup/driveBackupScheduler.ts. Same fire-and-forget lifecycle.
+  initDriveBackupScheduler(db, buildBackupEnv())
 })
 
 app.on('window-all-closed', () => {

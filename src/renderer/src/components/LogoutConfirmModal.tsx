@@ -15,6 +15,28 @@ export function LogoutConfirmModal({ onCancel }: LogoutConfirmModalProps): React
   const updateStatus = useUpdateStatus()
   const updateReadyVersion = updateStatus.state === 'ready' ? (updateStatus.version ?? '') : null
 
+  // Fire-and-forget: if Google Drive auto-backup is connected and enabled, kick off a
+  // silent upload on logout. Never blocks or fails the logout itself — this is a
+  // best-effort convenience on top of the explicit local-backup flow below.
+  const maybeBackupToDrive = React.useCallback((): void => {
+    if (!user) return
+    void window.api.backup.drive
+      .getStatus()
+      .then((status) => {
+        if (status.connected && status.enabled) {
+          void window.api.backup.drive.runNow(user.id)
+        }
+      })
+      .catch(() => {
+        // best-effort — logout must never be blocked by a Drive backup failure
+      })
+  }, [user])
+
+  const logoutWithDriveBackup = React.useCallback((): void => {
+    maybeBackupToDrive()
+    void logout()
+  }, [logout, maybeBackupToDrive])
+
   // Only cancelable from the base confirm view — once a backup run has started
   // (showBackup), BackupModal owns its own lifecycle and shouldn't be Escape-dismissed
   // mid-copy.
@@ -28,7 +50,7 @@ export function LogoutConfirmModal({ onCancel }: LogoutConfirmModalProps): React
   }, [onCancel, showBackup])
 
   if (showBackup && user) {
-    return <BackupModal userId={user.id} standalone={false} onClose={() => void logout()} />
+    return <BackupModal userId={user.id} standalone={false} onClose={logoutWithDriveBackup} />
   }
 
   // Logout is a safe, natural moment to apply a downloaded update — the cashier is
@@ -57,7 +79,7 @@ export function LogoutConfirmModal({ onCancel }: LogoutConfirmModalProps): React
           </CardDescription>
           <div className="grid grid-cols-2 gap-3 pt-2">
             <button
-              onClick={() => void logout()}
+              onClick={logoutWithDriveBackup}
               className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-sm text-[var(--foreground)] hover:bg-[var(--muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
             >
               Not Now, Just Log Out

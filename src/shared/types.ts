@@ -366,6 +366,14 @@ export interface BackupLogSummary {
   errorMessage: string | null
 }
 
+export interface DriveBackupStatus {
+  connected: boolean
+  accountEmail: string
+  enabled: boolean
+  intervalHours: number
+  lastBackupAt: string
+}
+
 /** A `PHARMACY_POS_BACKUP_*` folder found on a drive, valid enough to consider restoring. */
 export interface RestorableBackup {
   backupDir: string
