@@ -11,7 +11,14 @@ import http from 'http'
 import { createReadStream, readdirSync } from 'fs'
 import { join } from 'path'
 
-const SCOPES = ['https://www.googleapis.com/auth/drive.file']
+// drive.file is the actual backup permission (least privilege); userinfo.email is only
+// used to label the connection in Settings as "Connected as x@y.com" — without it the
+// userinfo endpoint rejects the request entirely ("missing required authentication credential"),
+// since an access token's scope set determines which APIs it's valid for at all.
+const SCOPES = [
+  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/userinfo.email'
+]
 const REDIRECT_PORT_RANGE = { min: 42813, max: 42823 }
 const DRIVE_BACKUP_FOLDER_NAME = 'PharmacyPOS Backups'
 
