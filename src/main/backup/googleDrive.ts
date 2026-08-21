@@ -21,6 +21,10 @@ const SCOPES = [
 ]
 const REDIRECT_PORT_RANGE = { min: 42813, max: 42823 }
 const DRIVE_BACKUP_FOLDER_NAME = 'PharmacyPOS Backups'
+// Every individual Drive API call gets this as a per-request gaxios timeout — without it,
+// a stalled connection (e.g. uploading backup.sqlite over a slow network) hangs the request
+// forever with no error, leaving the renderer's "Back Up Now" button permanently disabled.
+const REQUEST_TIMEOUT_MS = 3 * 60 * 1000
 
 export interface GoogleDriveCredentials {
   clientId: string
@@ -134,7 +138,8 @@ async function findFreePort(): Promise<number> {
 
 async function fetchAccountEmail(client: OAuth2Client): Promise<string> {
   const res = await client.request<{ email?: string }>({
-    url: 'https://www.googleapis.com/oauth2/v2/userinfo'
+    url: 'https://www.googleapis.com/oauth2/v2/userinfo',
+    timeout: REQUEST_TIMEOUT_MS
   })
   return res.data.email ?? 'Unknown Google account'
 }
@@ -146,21 +151,27 @@ function driveClientFromRefreshToken(refreshToken: string): drive_v3.Drive {
 }
 
 async function findOrCreateBackupFolder(drive: drive_v3.Drive): Promise<string> {
-  const existing = await drive.files.list({
-    q: `name='${DRIVE_BACKUP_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-    fields: 'files(id, name)',
-    spaces: 'drive'
-  })
+  const existing = await drive.files.list(
+    {
+      q: `name='${DRIVE_BACKUP_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+      fields: 'files(id, name)',
+      spaces: 'drive'
+    },
+    { timeout: REQUEST_TIMEOUT_MS }
+  )
   const found = existing.data.files?.[0]?.id
   if (found) return found
 
-  const created = await drive.files.create({
-    requestBody: {
-      name: DRIVE_BACKUP_FOLDER_NAME,
-      mimeType: 'application/vnd.google-apps.folder'
+  const created = await drive.files.create(
+    {
+      requestBody: {
+        name: DRIVE_BACKUP_FOLDER_NAME,
+        mimeType: 'application/vnd.google-apps.folder'
+      },
+      fields: 'id'
     },
-    fields: 'id'
-  })
+    { timeout: REQUEST_TIMEOUT_MS }
+  )
   if (!created.data.id) throw new Error('Google Drive did not return a folder id after creation.')
   return created.data.id
 }
@@ -178,25 +189,36 @@ export async function uploadBackupFolderToDrive(
   const rootFolderId = await findOrCreateBackupFolder(drive)
 
   const folderName = backupDir.split(/[/\\]/).filter(Boolean).pop() ?? `backup-${Date.now()}`
-  const dated = await drive.files.create({
-    requestBody: {
-      name: folderName,
-      mimeType: 'application/vnd.google-apps.folder',
-      parents: [rootFolderId]
+  const dated = await drive.files.create(
+    {
+      requestBody: {
+        name: folderName,
+        mimeType: 'application/vnd.google-apps.folder',
+        parents: [rootFolderId]
+      },
+      fields: 'id'
     },
-    fields: 'id'
-  })
+    { timeout: REQUEST_TIMEOUT_MS }
+  )
   const folderId = dated.data.id
   if (!folderId) throw new Error('Google Drive did not return a folder id for the backup upload.')
 
   const entries = readdirSync(backupDir, { withFileTypes: true }).filter((e) => e.isFile())
   for (const entry of entries) {
     const filePath = join(backupDir, entry.name)
-    await drive.files.create({
-      requestBody: { name: entry.name, parents: [folderId] },
-      media: { body: createReadStream(filePath) },
-      fields: 'id'
-    })
+    try {
+      await drive.files.create(
+        {
+          requestBody: { name: entry.name, parents: [folderId] },
+          media: { body: createReadStream(filePath) },
+          fields: 'id'
+        },
+        { timeout: REQUEST_TIMEOUT_MS }
+      )
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to upload "${entry.name}" to Google Drive: ${message}`)
+    }
   }
 
   return { folderId, fileCount: entries.length }
@@ -211,17 +233,20 @@ export async function cleanupExpiredDriveBackups(
   const rootFolderId = await findOrCreateBackupFolder(drive)
   const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000
 
-  const list = await drive.files.list({
-    q: `'${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-    fields: 'files(id, name, createdTime)',
-    spaces: 'drive',
-    pageSize: 1000
-  })
+  const list = await drive.files.list(
+    {
+      q: `'${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+      fields: 'files(id, name, createdTime)',
+      spaces: 'drive',
+      pageSize: 1000
+    },
+    { timeout: REQUEST_TIMEOUT_MS }
+  )
 
   for (const file of list.data.files ?? []) {
     if (!file.id || !file.createdTime) continue
     const created = Date.parse(file.createdTime)
     if (Number.isNaN(created) || created >= cutoff) continue
-    await drive.files.delete({ fileId: file.id })
+    await drive.files.delete({ fileId: file.id }, { timeout: REQUEST_TIMEOUT_MS })
   }
 }
