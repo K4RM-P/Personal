@@ -29,6 +29,9 @@ const UsersScreen = React.lazy(() =>
 const SalesHistoryScreen = React.lazy(() =>
   import('./screens/SalesHistoryScreen').then((m) => ({ default: m.SalesHistoryScreen }))
 )
+const BlisterScreen = React.lazy(() =>
+  import('./screens/BlisterScreen').then((m) => ({ default: m.BlisterScreen }))
+)
 
 const MANAGER_ONLY: NavTab[] = ['products', 'customers', 'settings', 'reports', 'users', 'sales']
 
@@ -69,6 +72,8 @@ function AuthedApp(): React.JSX.Element {
     switch (activeTab) {
       case 'checkout':
         return <CheckoutScreen />
+      case 'blister':
+        return <BlisterScreen />
       case 'sales':
         return <SalesHistoryScreen />
       case 'products':

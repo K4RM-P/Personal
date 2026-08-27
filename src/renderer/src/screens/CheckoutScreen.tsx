@@ -4,6 +4,7 @@ import { Alert } from '../components/ui/Alert'
 import { EmptyState } from '../components/ui/EmptyState'
 import { DiscountModal } from '../components/DiscountModal'
 import { CustomProductModal } from '../components/CustomProductModal'
+import { BlisterDispenseModal } from '../components/BlisterDispenseModal'
 import { CustomerSearchPanel } from '../components/CustomerSearchPanel'
 import { BringInBalanceModal } from '../components/BringInBalanceModal'
 import { RefundsScreen } from './RefundsScreen'
@@ -32,6 +33,7 @@ import {
   ChevronLeft,
   Pill,
   PackagePlus,
+  LayoutGrid,
   Trash2,
   MoreVertical,
   Check,
@@ -132,6 +134,7 @@ export function CheckoutScreen(): React.JSX.Element {
   const [showRefunds, setShowRefunds] = React.useState(false)
   const [showPayModal, setShowPayModal] = React.useState(false)
   const [customProductMode, setCustomProductMode] = React.useState<'RX' | 'NONRX' | null>(null)
+  const [showBlisterModal, setShowBlisterModal] = React.useState(false)
   const [customProductError, setCustomProductError] = React.useState<string | null>(null)
 
   // `paymentMethod` now doubles as "which tender line's amount-entry screen is
@@ -481,6 +484,7 @@ export function CheckoutScreen(): React.JSX.Element {
     const onKeyDown = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return
       if (customProductMode) setCustomProductMode(null)
+      else if (showBlisterModal) setShowBlisterModal(false)
       else if (discountItemTarget !== null) setDiscountItemTarget(null)
       else if (showBillDiscountModal) setShowBillDiscountModal(false)
       else if (showAddCustomer) setShowAddCustomer(false)
@@ -492,6 +496,7 @@ export function CheckoutScreen(): React.JSX.Element {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [
     customProductMode,
+    showBlisterModal,
     discountItemTarget,
     showBillDiscountModal,
     showAddCustomer,
@@ -1210,6 +1215,15 @@ export function CheckoutScreen(): React.JSX.Element {
                 className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-xs font-semibold text-[var(--foreground)]"
               >
                 <PackagePlus className="icon-4" /> Add Non-Rx
+              </button>
+              <button
+                type="button"
+                title="Dispense blister pack"
+                aria-label="Dispense blister pack"
+                onClick={() => setShowBlisterModal(true)}
+                className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] px-3 text-xs font-semibold text-[var(--foreground)]"
+              >
+                <LayoutGrid className="icon-4" /> Blister
               </button>
 
               {/* Link Customer — persistent, independent of the Pharmacy Credit tender's
@@ -2460,6 +2474,8 @@ export function CheckoutScreen(): React.JSX.Element {
           <Alert variant="error">{customProductError}</Alert>
         </div>
       )}
+
+      {showBlisterModal && <BlisterDispenseModal onClose={() => setShowBlisterModal(false)} />}
 
       {showBringInBalanceModal && attachedCustomer && (
         <BringInBalanceModal

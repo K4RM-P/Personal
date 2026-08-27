@@ -492,6 +492,60 @@ export interface InventoryValuation {
   totalVariancePercent: number
 }
 
+export type BlisterFrequency = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY'
+
+export interface BlisterPackCustomer {
+  id: number
+  firstName: string
+  lastName: string
+  phone: string
+}
+
+export interface BlisterPack {
+  id: number
+  customerId: number
+  customer: BlisterPackCustomer
+  frequency: BlisterFrequency
+  prepDate: string
+  dueDate: string
+  pickupDate: string | null
+  preparedBy: string
+  numPrescriptions: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateBlisterPackInput {
+  customerId: number
+  frequency: BlisterFrequency
+  dueDate: string
+  numPrescriptions: number
+  preparedBy: string
+}
+
+export interface UpdateBlisterPackInput {
+  customerId?: number
+  frequency?: BlisterFrequency
+  dueDate?: string
+  numPrescriptions?: number
+  preparedBy?: string
+  pickupDate?: string | null
+}
+
+export type BlisterDateField = 'prep' | 'due' | 'pickup'
+
+export interface ListBlisterPacksFilters {
+  dateField?: BlisterDateField
+  fromDate?: string
+  toDate?: string
+  patientQuery?: string
+}
+
+export interface DispenseBlisterPackResult {
+  dispensed: BlisterPack
+  next: BlisterPack
+}
+
 export interface CheckoutSettings {
   allowCreditCardSurcharge: boolean
   cardSurchargePercent: number

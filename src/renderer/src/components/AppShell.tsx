@@ -9,7 +9,8 @@ import {
   UserCog,
   LogOut,
   Menu,
-  X
+  X,
+  LayoutGrid
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useCurrentUser } from '../context/CurrentUserContext'
@@ -19,7 +20,14 @@ import vantisLogo from '../assets/vantis-logo.png'
 import vantisIcon from '../assets/vantis-icon.png'
 
 export type NavTab =
-  'checkout' | 'products' | 'customers' | 'settings' | 'reports' | 'users' | 'sales'
+  | 'checkout'
+  | 'products'
+  | 'customers'
+  | 'settings'
+  | 'reports'
+  | 'users'
+  | 'sales'
+  | 'blister'
 
 interface AppShellProps {
   activeTab: NavTab
@@ -33,6 +41,7 @@ interface AppShellProps {
 const allNavItems: { id: NavTab; label: string; icon: React.ElementType; managerOnly: boolean }[] =
   [
     { id: 'checkout', label: 'Checkout', icon: ShoppingCart, managerOnly: false },
+    { id: 'blister', label: 'Blister', icon: LayoutGrid, managerOnly: false },
     { id: 'sales', label: 'Past Sales', icon: Receipt, managerOnly: true },
     { id: 'customers', label: 'Customers', icon: Users, managerOnly: true },
     { id: 'products', label: 'Products', icon: Package, managerOnly: true },

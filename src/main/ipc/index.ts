@@ -15,6 +15,7 @@ import { registerCustomerDisplayHandlers } from './customerDisplayHandlers'
 import { registerReportEmailHandlers } from './reportEmailHandlers'
 import { registerReportCsvExportHandlers } from './reportCsvExportHandlers'
 import { registerDangerZoneHandlers } from './dangerZoneHandlers'
+import { registerBlisterHandlers } from './blisterHandlers'
 
 export function registerAllHandlers(db: PrismaClient): void {
   registerUserHandlers(db)
@@ -33,4 +34,5 @@ export function registerAllHandlers(db: PrismaClient): void {
   registerReportEmailHandlers(db)
   registerReportCsvExportHandlers(db)
   registerDangerZoneHandlers(db)
+  registerBlisterHandlers(db)
 }

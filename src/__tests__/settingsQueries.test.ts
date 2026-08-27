@@ -28,8 +28,8 @@ describe('settingsQueries — idle timeout (A15)', () => {
     rmSync(workDir, { recursive: true, force: true })
   })
 
-  it('defaults to 20 minutes when never configured', async () => {
-    expect(await getIdleTimeoutMinutes(prisma)).toBe(20)
+  it('defaults to 0 (disabled) when never configured', async () => {
+    expect(await getIdleTimeoutMinutes(prisma)).toBe(0)
   })
 
   it('saves and reads back a configured value', async () => {
@@ -37,9 +37,20 @@ describe('settingsQueries — idle timeout (A15)', () => {
     expect(await getIdleTimeoutMinutes(prisma)).toBe(30)
   })
 
+  it('accepts 0 to disable idle logout', async () => {
+    await saveIdleTimeoutMinutes(prisma, 0)
+    expect(await getIdleTimeoutMinutes(prisma)).toBe(0)
+  })
+
   it('rejects an out-of-range value', async () => {
-    await expect(saveIdleTimeoutMinutes(prisma, 0)).rejects.toThrow(/between 1 and 240/)
-    await expect(saveIdleTimeoutMinutes(prisma, 241)).rejects.toThrow(/between 1 and 240/)
-    await expect(saveIdleTimeoutMinutes(prisma, Number.NaN)).rejects.toThrow(/between 1 and 240/)
+    await expect(saveIdleTimeoutMinutes(prisma, -1)).rejects.toThrow(
+      /0 \(disabled\) or between 1 and 240/
+    )
+    await expect(saveIdleTimeoutMinutes(prisma, 241)).rejects.toThrow(
+      /0 \(disabled\) or between 1 and 240/
+    )
+    await expect(saveIdleTimeoutMinutes(prisma, Number.NaN)).rejects.toThrow(
+      /0 \(disabled\) or between 1 and 240/
+    )
   })
 })

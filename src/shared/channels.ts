@@ -11,6 +11,14 @@ export const IPC = {
   PRODUCT_BULK_IMPORT: 'product:bulkImport',
   PRODUCT_GET_BY_BARCODE: 'product:getByBarcode',
 
+  // Blister Pack Channels
+  BLISTER_LIST: 'blister:list',
+  BLISTER_CREATE: 'blister:create',
+  BLISTER_UPDATE: 'blister:update',
+  BLISTER_DELETE: 'blister:delete',
+  BLISTER_GET_PENDING_FOR_CUSTOMER: 'blister:getPendingForCustomer',
+  BLISTER_DISPENSE: 'blister:dispense',
+
   // Barcode Scanner Channels (Stage 3)
   BARCODE_SCAN: 'barcode:scan',
 

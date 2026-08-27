@@ -72,7 +72,12 @@ import type {
   ProcessRefundPayload,
   ProcessRefundResult,
   UpdateStatus,
-  DebtBreakdown
+  DebtBreakdown,
+  BlisterPack,
+  CreateBlisterPackInput,
+  UpdateBlisterPackInput,
+  ListBlisterPacksFilters,
+  DispenseBlisterPackResult
 } from '../shared/types'
 import type {
   AutoImportResult,
@@ -532,6 +537,19 @@ const api = {
     pickFolder: (): Promise<string | null> => ipcRenderer.invoke(IPC.REPORT_CSV_EXPORT_PICK_FOLDER),
     runNow: (): Promise<RunReportCsvExportResult> =>
       ipcRenderer.invoke(IPC.REPORT_CSV_EXPORT_RUN_NOW)
+  },
+  blister: {
+    list: (filters?: ListBlisterPacksFilters): Promise<BlisterPack[]> =>
+      ipcRenderer.invoke(IPC.BLISTER_LIST, filters ?? {}),
+    create: (input: CreateBlisterPackInput): Promise<BlisterPack> =>
+      ipcRenderer.invoke(IPC.BLISTER_CREATE, input),
+    update: (id: number, input: UpdateBlisterPackInput): Promise<BlisterPack> =>
+      ipcRenderer.invoke(IPC.BLISTER_UPDATE, { id, input }),
+    delete: (id: number): Promise<void> => ipcRenderer.invoke(IPC.BLISTER_DELETE, id),
+    getPendingForCustomer: (customerId: number): Promise<BlisterPack | null> =>
+      ipcRenderer.invoke(IPC.BLISTER_GET_PENDING_FOR_CUSTOMER, customerId),
+    dispense: (id: number, preparedBy: string): Promise<DispenseBlisterPackResult> =>
+      ipcRenderer.invoke(IPC.BLISTER_DISPENSE, { id, preparedBy })
   }
 }
 

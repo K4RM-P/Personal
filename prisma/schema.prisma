@@ -207,6 +207,29 @@ model Customer {
 
   @@index([phoneNormalized])
   @@index([lastName, firstName])
+  blisterPacks BlisterPack[]
+}
+
+model BlisterPack {
+  id               Int       @id @default(autoincrement())
+  customerId       Int
+  customer         Customer  @relation(fields: [customerId], references: [id])
+  // WEEKLY | BIWEEKLY | MONTHLY — drives the +7/+14/+28 day math for the next cycle
+  frequency        String
+  // Always dueDate - 7 days, computed — never entered directly
+  prepDate         DateTime
+  dueDate          DateTime
+  // Null = pending (not yet picked up). Set by the checkout dispense action.
+  pickupDate       DateTime?
+  // Free-text initials, manually entered — not tied to the logged-in session
+  preparedBy       String
+  numPrescriptions Int
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([customerId])
+  @@index([dueDate])
+  @@index([pickupDate])
 }
 
 model CreditLedgerEntry {
