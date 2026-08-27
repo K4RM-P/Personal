@@ -44,7 +44,9 @@ const DEFAULTS = {
   'backup.driveLastBackupAt': '',
   // A15 — idle auto-logout. A checkout terminal left signed in as a manager,
   // unattended, can process refunds or adjust customer balances.
-  'session.idleTimeoutMinutes': '20',
+  // Idle auto-logout is off by default — logout only happens when a user
+  // explicitly clicks Log Out. Set to 1-240 to re-enable a timeout.
+  'session.idleTimeoutMinutes': '0',
   // Display density — device-level, not per-user (see docs/superpowers UI guide).
   // Stores the density level number (1-8); the level -> scale multiplier mapping
   // lives in the renderer (src/renderer/src/lib/density.ts).
@@ -341,16 +343,20 @@ export async function saveDriveBackupLastRunAt(
   await setSetting(db, 'backup.driveLastBackupAt', isoTimestamp)
 }
 
-/** Minutes of inactivity before the session is force-logged-out. Manager-configurable, default 20. */
+/**
+ * Minutes of inactivity before the session is force-logged-out. 0 disables
+ * idle auto-logout entirely (logout only happens on an explicit click) —
+ * that is the default. Manager-configurable.
+ */
 export async function getIdleTimeoutMinutes(db: PrismaClient): Promise<number> {
   const raw = await getSetting(db, 'session.idleTimeoutMinutes')
   const n = Number(raw)
-  return Number.isFinite(n) && n > 0 ? n : 20
+  return Number.isFinite(n) && n > 0 ? n : 0
 }
 
 export async function saveIdleTimeoutMinutes(db: PrismaClient, minutes: number): Promise<void> {
-  if (!Number.isFinite(minutes) || minutes < 1 || minutes > 240) {
-    throw new Error('Idle timeout must be between 1 and 240 minutes.')
+  if (!Number.isFinite(minutes) || minutes < 0 || minutes > 240) {
+    throw new Error('Idle timeout must be 0 (disabled) or between 1 and 240 minutes.')
   }
   await setSetting(db, 'session.idleTimeoutMinutes', String(Math.round(minutes)))
 }

@@ -53,7 +53,7 @@ function AuthedApp(): React.JSX.Element {
     window.api.settings
       .getIdleTimeoutMinutes()
       .then(setIdleTimeoutMinutes)
-      .catch(() => setIdleTimeoutMinutes(20))
+      .catch(() => setIdleTimeoutMinutes(0))
   }, [])
   const handleIdle = React.useCallback((): void => {
     void logout()
