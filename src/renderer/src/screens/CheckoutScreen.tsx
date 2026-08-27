@@ -359,6 +359,27 @@ export function CheckoutScreen(): React.JSX.Element {
     productSearchRef.current?.focus()
   }, [])
 
+  // After any click that doesn't land the cursor in a typeable field (cart
+  // buttons, product tiles, background, etc.), snap focus back to the item
+  // search bar so a barcode scan always works without clicking back into it.
+  // Clicks that DO focus an input/textarea/select (customer search, tender
+  // amount, custom item modal, ...) are left alone so typing still works.
+  React.useEffect(() => {
+    const handleGlobalClick = (): void => {
+      setTimeout(() => {
+        const active = document.activeElement as HTMLElement | null
+        const tag = active?.tagName
+        const isTypeable =
+          tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || active?.isContentEditable
+        if (!isTypeable) {
+          productSearchRef.current?.focus()
+        }
+      }, 0)
+    }
+    window.addEventListener('click', handleGlobalClick)
+    return () => window.removeEventListener('click', handleGlobalClick)
+  }, [])
+
   const addProductToCart = (product: Product): void => {
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id)
