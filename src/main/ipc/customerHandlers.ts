@@ -1,5 +1,5 @@
 import { dialog, ipcMain } from 'electron'
-import { writeFileSync } from 'fs'
+import { readFileSync, writeFileSync } from 'fs'
 import type { PrismaClient } from '@prisma/client'
 import { IPC } from '../../shared/channels'
 import {
@@ -13,10 +13,12 @@ import {
   getCreditSettings,
   getCustomerDebtBreakdown,
   getCustomerDetail,
+  importCustomers,
   saveCreditSettings,
   searchCustomers,
   updateCustomer
 } from '../db/queries/customerQueries'
+import { parsePatientListCsv } from '../customers/patientListCsv'
 import { requireManager } from '../auth/session'
 import { log } from '../logging/logger'
 
@@ -68,5 +70,26 @@ export function registerCustomerHandlers(db: PrismaClient): void {
     const updated = await deleteCustomerData(db, customerId)
     log('CUSTOMER_DATA_DELETED', { customerId })
     return updated
+  })
+
+  ipcMain.handle(IPC.CUSTOMER_IMPORT_CSV, async () => {
+    requireManager()
+    const result = await dialog.showOpenDialog({
+      title: 'Select patient list CSV',
+      properties: ['openFile'],
+      filters: [{ name: 'CSV', extensions: ['csv'] }]
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    const buffer = readFileSync(result.filePaths[0])
+    const { customers, skipped, total } = parsePatientListCsv(buffer)
+    const { imported, skippedDuplicates } = await importCustomers(db, customers)
+    log('CUSTOMER_CSV_IMPORTED', {
+      path: result.filePaths[0],
+      total,
+      imported,
+      skippedDuplicates,
+      skippedNoName: skipped
+    })
+    return { total, imported, skippedDuplicates, skippedNoName: skipped }
   })
 }

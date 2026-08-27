@@ -492,22 +492,24 @@ export interface InventoryValuation {
   totalVariancePercent: number
 }
 
-export type BlisterFrequency = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY'
-
 export interface BlisterPackCustomer {
   id: number
   firstName: string
   lastName: string
-  phone: string
+  phone: string | null
 }
 
 export interface BlisterPack {
   id: number
   customerId: number
   customer: BlisterPackCustomer
-  frequency: BlisterFrequency
+  // Days between refills — drives the next due date after pickup.
+  intervalDays: number
+  // Always dueDate - 7 days unless explicitly overridden at creation.
   prepDate: string
+  // The date the customer is SUPPOSED to pick up this pack.
   dueDate: string
+  // The date the customer ACTUALLY picked it up. Null = still pending.
   pickupDate: string | null
   preparedBy: string
   numPrescriptions: number
@@ -517,15 +519,21 @@ export interface BlisterPack {
 
 export interface CreateBlisterPackInput {
   customerId: number
-  frequency: BlisterFrequency
-  dueDate: string
+  intervalDays: number
+  // Provide at least one of prepDate/dueDate/pickupDate — any left out are
+  // auto-calculated (prepDate = dueDate - 7; dueDate = pickupDate +
+  // intervalDays if only pickupDate is given).
+  prepDate?: string
+  dueDate?: string
+  pickupDate?: string | null
   numPrescriptions: number
   preparedBy: string
 }
 
 export interface UpdateBlisterPackInput {
   customerId?: number
-  frequency?: BlisterFrequency
+  intervalDays?: number
+  prepDate?: string
   dueDate?: string
   numPrescriptions?: number
   preparedBy?: string

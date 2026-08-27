@@ -5,16 +5,10 @@ import { Alert } from '../components/ui/Alert'
 import { EmptyState } from '../components/ui/EmptyState'
 import { CustomerSearchPanel } from '../components/CustomerSearchPanel'
 import { cn } from '../lib/utils'
-import type { BlisterPack, BlisterFrequency, BlisterDateField, Customer } from '@shared/types'
+import type { BlisterPack, BlisterDateField, Customer } from '@shared/types'
 
 const FOCUS_RING =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2'
-
-const FREQUENCY_LABEL: Record<BlisterFrequency, string> = {
-  WEEKLY: 'Weekly',
-  BIWEEKLY: 'Bi-weekly',
-  MONTHLY: 'Monthly'
-}
 
 function formatDate(iso: string | null): string {
   if (!iso) return '—'
@@ -81,8 +75,10 @@ function BlisterDatabaseTab(): React.JSX.Element {
   const [patient, setPatient] = React.useState<Customer | null>(null)
   const [patientQuery, setPatientQuery] = React.useState('')
   const [patientResults, setPatientResults] = React.useState<Customer[]>([])
-  const [frequency, setFrequency] = React.useState<BlisterFrequency>('WEEKLY')
-  const [dueDate, setDueDate] = React.useState(todayStr())
+  const [intervalDays, setIntervalDays] = React.useState('7')
+  const [prepDate, setPrepDate] = React.useState('')
+  const [dueDate, setDueDate] = React.useState('')
+  const [pickupDate, setPickupDate] = React.useState('')
   const [numPrescriptions, setNumPrescriptions] = React.useState('1')
   const [preparedBy, setPreparedBy] = React.useState('')
   const [formError, setFormError] = React.useState<string | null>(null)
@@ -123,8 +119,10 @@ function BlisterDatabaseTab(): React.JSX.Element {
     setPatient(null)
     setPatientQuery('')
     setPatientResults([])
-    setFrequency('WEEKLY')
-    setDueDate(todayStr())
+    setIntervalDays('7')
+    setPrepDate('')
+    setDueDate('')
+    setPickupDate('')
     setNumPrescriptions('1')
     setPreparedBy('')
     setFormError(null)
@@ -139,8 +137,10 @@ function BlisterDatabaseTab(): React.JSX.Element {
       phone: pack.customer.phone
     } as Customer)
     setPatientQuery(`${pack.customer.firstName} ${pack.customer.lastName}`)
-    setFrequency(pack.frequency)
+    setIntervalDays(String(pack.intervalDays))
+    setPrepDate(pack.prepDate.slice(0, 10))
     setDueDate(pack.dueDate.slice(0, 10))
+    setPickupDate(pack.pickupDate ? pack.pickupDate.slice(0, 10) : '')
     setNumPrescriptions(String(pack.numPrescriptions))
     setPreparedBy(pack.preparedBy)
     setFormError(null)
@@ -162,6 +162,15 @@ function BlisterDatabaseTab(): React.JSX.Element {
       setFormError('Attach a patient first.')
       return
     }
+    const days = parseInt(intervalDays, 10)
+    if (!Number.isFinite(days) || days < 1) {
+      setFormError('Interval (days) must be a positive number.')
+      return
+    }
+    if (!prepDate && !dueDate && !pickupDate) {
+      setFormError('Enter at least one of Prep Date, Due Date, or Pickup Date.')
+      return
+    }
     const count = parseInt(numPrescriptions, 10)
     if (!Number.isFinite(count) || count < 0) {
       setFormError('# of prescriptions must be a non-negative number.')
@@ -172,22 +181,19 @@ function BlisterDatabaseTab(): React.JSX.Element {
       return
     }
     try {
+      const payload = {
+        customerId: patient.id,
+        intervalDays: days,
+        prepDate: prepDate || undefined,
+        dueDate: dueDate || undefined,
+        pickupDate: pickupDate || null,
+        numPrescriptions: count,
+        preparedBy: preparedBy.trim()
+      }
       if (editingId) {
-        await window.api.blister.update(editingId, {
-          customerId: patient.id,
-          frequency,
-          dueDate,
-          numPrescriptions: count,
-          preparedBy: preparedBy.trim()
-        })
+        await window.api.blister.update(editingId, payload)
       } else {
-        await window.api.blister.create({
-          customerId: patient.id,
-          frequency,
-          dueDate,
-          numPrescriptions: count,
-          preparedBy: preparedBy.trim()
-        })
+        await window.api.blister.create(payload)
       }
       resetForm()
       await load()
@@ -196,12 +202,35 @@ function BlisterDatabaseTab(): React.JSX.Element {
     }
   }
 
-  const prepDatePreview = React.useMemo(() => {
-    if (!dueDate) return null
-    const d = new Date(dueDate)
-    d.setDate(d.getDate() - 7)
-    return d.toLocaleDateString()
-  }, [dueDate])
+  // Live preview of what auto-calculation will fill in, mirroring the
+  // backend's resolveDates rule: due priority, then prep = due - 7.
+  const autoCalcPreview = React.useMemo(() => {
+    const toDate = (s: string): Date | null => (s ? new Date(s) : null)
+    const addDays = (d: Date, n: number): Date => {
+      const r = new Date(d)
+      r.setDate(r.getDate() + n)
+      return r
+    }
+    let due = toDate(dueDate)
+    const prep = toDate(prepDate)
+    const pickup = toDate(pickupDate)
+    const days = parseInt(intervalDays, 10) || 7
+    const notes: string[] = []
+    if (!due) {
+      if (prep) {
+        due = addDays(prep, 7)
+        notes.push(`Due date will be set to ${due.toLocaleDateString()} (prep + 7 days).`)
+      } else if (pickup) {
+        due = addDays(pickup, days)
+        notes.push(`Due date will be set to ${due.toLocaleDateString()} (pickup + ${days} days).`)
+      }
+    }
+    if (!prep && due) {
+      const computedPrep = addDays(due, -7)
+      notes.push(`Prep date will be set to ${computedPrep.toLocaleDateString()} (due - 7 days).`)
+    }
+    return notes
+  }, [prepDate, dueDate, pickupDate, intervalDays])
 
   const filtered = React.useMemo(() => {
     const q = search.trim().toLowerCase()

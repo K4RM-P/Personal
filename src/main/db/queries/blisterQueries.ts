@@ -1,11 +1,4 @@
 import type { Prisma, PrismaClient } from '@prisma/client'
-import type { BlisterFrequency } from '../../../shared/types'
-
-const FREQUENCY_DAYS: Record<BlisterFrequency, number> = {
-  WEEKLY: 7,
-  BIWEEKLY: 14,
-  MONTHLY: 28
-}
 
 const PREP_LEAD_DAYS = 7
 
@@ -25,23 +18,50 @@ const blisterInclude = {
 
 export type CreateBlisterPackInput = {
   customerId: number
-  frequency: BlisterFrequency
-  dueDate: Date
+  intervalDays: number
+  prepDate?: Date
+  dueDate?: Date
+  pickupDate?: Date | null
   numPrescriptions: number
   preparedBy: string
 }
 
-export type UpdateBlisterPackInput = Partial<CreateBlisterPackInput> & {
-  pickupDate?: Date | null
+export type UpdateBlisterPackInput = Partial<CreateBlisterPackInput>
+
+/**
+ * Fills in whichever of prep/due date wasn't explicitly given, per the
+ * standing rule that prep date = due date - 7 days. If only a pickup date is
+ * given (e.g. backfilling a historical record), due date is derived as
+ * pickup + intervalDays. At least one of the three dates must be given.
+ */
+function resolveDates(
+  input: { prepDate?: Date; dueDate?: Date; pickupDate?: Date | null },
+  intervalDays: number
+): { prepDate: Date; dueDate: Date; pickupDate: Date | null } {
+  let dueDate = input.dueDate
+  if (!dueDate) {
+    if (input.prepDate) {
+      dueDate = addDays(input.prepDate, PREP_LEAD_DAYS)
+    } else if (input.pickupDate) {
+      dueDate = addDays(input.pickupDate, intervalDays)
+    } else {
+      throw new Error('Provide at least a prep date, due date, or pickup date.')
+    }
+  }
+  const prepDate = input.prepDate ?? computePrepDate(dueDate)
+  const pickupDate = input.pickupDate ?? null
+  return { prepDate, dueDate, pickupDate }
 }
 
 export async function createBlisterPack(db: PrismaClient, data: CreateBlisterPackInput) {
+  const { prepDate, dueDate, pickupDate } = resolveDates(data, data.intervalDays)
   return db.blisterPack.create({
     data: {
       customerId: data.customerId,
-      frequency: data.frequency,
-      dueDate: data.dueDate,
-      prepDate: computePrepDate(data.dueDate),
+      intervalDays: data.intervalDays,
+      prepDate,
+      dueDate,
+      pickupDate,
       numPrescriptions: data.numPrescriptions,
       preparedBy: data.preparedBy
     },
@@ -55,14 +75,29 @@ export async function updateBlisterPack(
   data: UpdateBlisterPackInput
 ) {
   const existing = await db.blisterPack.findUniqueOrThrow({ where: { id } })
-  const dueDate = data.dueDate ?? existing.dueDate
+  const intervalDays = data.intervalDays ?? existing.intervalDays
+
+  let dueDate = data.dueDate ?? existing.dueDate
+  let prepDate: Date
+  if (data.prepDate) {
+    prepDate = data.prepDate
+  } else if (data.dueDate) {
+    // Due date explicitly changed and prep wasn't — recompute from the rule.
+    prepDate = computePrepDate(dueDate)
+  } else {
+    prepDate = existing.prepDate
+  }
+  if (!data.dueDate && !data.prepDate && data.pickupDate === undefined) {
+    dueDate = existing.dueDate
+  }
+
   return db.blisterPack.update({
     where: { id },
     data: {
       customerId: data.customerId ?? existing.customerId,
-      frequency: data.frequency ?? existing.frequency,
+      intervalDays,
+      prepDate,
       dueDate,
-      prepDate: computePrepDate(dueDate),
       numPrescriptions: data.numPrescriptions ?? existing.numPrescriptions,
       preparedBy: data.preparedBy ?? existing.preparedBy,
       pickupDate: data.pickupDate === undefined ? existing.pickupDate : data.pickupDate
@@ -141,12 +176,11 @@ export async function dispenseBlisterPack(
       data: { pickupDate, preparedBy: preparedByInitials },
       include: blisterInclude
     })
-    const frequency = pending.frequency as BlisterFrequency
-    const nextDueDate = addDays(pickupDate, FREQUENCY_DAYS[frequency])
+    const nextDueDate = addDays(pickupDate, pending.intervalDays)
     const next = await tx.blisterPack.create({
       data: {
         customerId: pending.customerId,
-        frequency: pending.frequency,
+        intervalDays: pending.intervalDays,
         dueDate: nextDueDate,
         prepDate: computePrepDate(nextDueDate),
         numPrescriptions: pending.numPrescriptions,

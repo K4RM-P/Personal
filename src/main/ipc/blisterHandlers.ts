@@ -26,7 +26,12 @@ export function registerBlisterHandlers(db: PrismaClient): void {
   )
 
   ipcMain.handle(IPC.BLISTER_CREATE, (_e, input: CreateBlisterPackInput) =>
-    createBlisterPack(db, { ...input, dueDate: new Date(input.dueDate) })
+    createBlisterPack(db, {
+      ...input,
+      prepDate: input.prepDate ? new Date(input.prepDate) : undefined,
+      dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
+      pickupDate: input.pickupDate ? new Date(input.pickupDate) : null
+    })
   )
 
   ipcMain.handle(
@@ -34,6 +39,7 @@ export function registerBlisterHandlers(db: PrismaClient): void {
     (_e, { id, input }: { id: number; input: UpdateBlisterPackInput }) =>
       updateBlisterPack(db, id, {
         ...input,
+        prepDate: input.prepDate ? new Date(input.prepDate) : undefined,
         dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
         pickupDate:
           input.pickupDate === undefined

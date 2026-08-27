@@ -6,6 +6,7 @@ import {
   Lock,
   Plus,
   Search,
+  Upload,
   UserPlus,
   Users as UsersIcon
 } from 'lucide-react'
@@ -63,6 +64,7 @@ export function CustomersScreen(): React.JSX.Element {
   const isManager = useHasRole('MANAGER')
   const [confirmingDelete, setConfirmingDelete] = React.useState(false)
   const [searching, setSearching] = React.useState(false)
+  const [importing, setImporting] = React.useState(false)
 
   const refresh = React.useCallback(
     async (id?: number) => {
@@ -208,6 +210,25 @@ export function CustomersScreen(): React.JSX.Element {
     }
   }
 
+  const importCsv = async (): Promise<void> => {
+    setImporting(true)
+    setMessage(null)
+    try {
+      const result = await window.api.customer.importCsv()
+      if (!result) return
+      setMessage({
+        type: 'success',
+        text: `Imported ${result.imported} of ${result.total} customers. Skipped ${result.skippedDuplicates} duplicates${
+          result.skippedNoName ? `, ${result.skippedNoName} rows with no name` : ''
+        }.`
+      })
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.message })
+    } finally {
+      setImporting(false)
+    }
+  }
+
   const editing = newCustomer || Boolean(selected)
 
   return (
@@ -219,13 +240,25 @@ export function CustomersScreen(): React.JSX.Element {
             Profiles, Pharmacy Credit, loyalty, and purchase history.
           </p>
         </div>
-        <button
-          onClick={openNew}
-          className="flex min-h-11 items-center gap-2 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
-        >
-          <UserPlus className="icon-4" />
-          New customer
-        </button>
+        <div className="flex items-center gap-2">
+          {isManager && (
+            <button
+              onClick={() => void importCsv()}
+              disabled={importing}
+              className="flex min-h-11 items-center gap-2 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] px-4 text-sm font-semibold text-[var(--foreground)] transition-colors duration-150 hover:bg-[var(--muted)] disabled:opacity-60"
+            >
+              <Upload className="icon-4" />
+              {importing ? 'Importing...' : 'Import CSV'}
+            </button>
+          )}
+          <button
+            onClick={openNew}
+            className="flex min-h-11 items-center gap-2 rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)] transition-colors duration-150 hover:bg-[var(--primary-hover)]"
+          >
+            <UserPlus className="icon-4" />
+            New customer
+          </button>
+        </div>
       </div>
 
       {message && <Alert variant={message.type}>{message.text}</Alert>}

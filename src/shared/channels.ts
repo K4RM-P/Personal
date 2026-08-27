@@ -48,6 +48,7 @@ export const IPC = {
   CUSTOMER_EXPORT_DATA: 'customer:exportData',
   CUSTOMER_DELETE_DATA: 'customer:deleteData',
   CUSTOMER_GET_DEBT_BREAKDOWN: 'customer:getDebtBreakdown',
+  CUSTOMER_IMPORT_CSV: 'customer:importCsv',
 
   // Receipt Printing Channels (Stage 4)
   RECEIPT_PRINT: 'receipt:print',

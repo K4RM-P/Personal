@@ -204,6 +204,12 @@ const api = {
       ipcRenderer.invoke(IPC.CUSTOMER_EXPORT_DATA, customerId),
     deleteData: (customerId: number): Promise<Customer> =>
       ipcRenderer.invoke(IPC.CUSTOMER_DELETE_DATA, customerId),
+    importCsv: (): Promise<{
+      total: number
+      imported: number
+      skippedDuplicates: number
+      skippedNoName: number
+    } | null> => ipcRenderer.invoke(IPC.CUSTOMER_IMPORT_CSV),
     getDebtBreakdown: (customerId: number): Promise<DebtBreakdown> =>
       ipcRenderer.invoke(IPC.CUSTOMER_GET_DEBT_BREAKDOWN, customerId)
   },

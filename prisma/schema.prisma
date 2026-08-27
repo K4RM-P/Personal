@@ -183,8 +183,8 @@ model Customer {
   id              Int                 @id @default(autoincrement())
   firstName       String
   lastName        String
-  phone           String
-  phoneNormalized String
+  phone           String?
+  phoneNormalized String?
   address         String
   email           String?
   loyaltyEnabled  Boolean             @default(true)
@@ -214,12 +214,15 @@ model BlisterPack {
   id               Int       @id @default(autoincrement())
   customerId       Int
   customer         Customer  @relation(fields: [customerId], references: [id])
-  // WEEKLY | BIWEEKLY | MONTHLY — drives the +7/+14/+28 day math for the next cycle
-  frequency        String
-  // Always dueDate - 7 days, computed — never entered directly
+  // Number of days between refills — drives the next due date after pickup
+  // (nextDueDate = pickupDate + intervalDays).
+  intervalDays     Int
+  // Always dueDate - 7 days unless explicitly overridden at creation.
   prepDate         DateTime
+  // The date the customer is SUPPOSED to pick up this pack.
   dueDate          DateTime
-  // Null = pending (not yet picked up). Set by the checkout dispense action.
+  // The date the customer ACTUALLY picked it up. Null = still pending (not
+  // yet picked up). Set by the checkout dispense action.
   pickupDate       DateTime?
   // Free-text initials, manually entered — not tied to the logged-in session
   preparedBy       String

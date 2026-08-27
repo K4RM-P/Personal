@@ -103,6 +103,51 @@ export async function updateCustomer(db: PrismaClient, id: number, input: Custom
 }
 
 /**
+ * Bulk import from a patient-list CSV. Validation is intentionally looser
+ * than createCustomer (phone/address are frequently blank in these exports)
+ * — only a name is required. Skips rows that already match an existing
+ * customer by first+last name and address (case-insensitive) to make the
+ * import safely re-runnable.
+ */
+export async function importCustomers(
+  db: PrismaClient,
+  customers: CustomerInput[]
+): Promise<{ imported: number; skippedDuplicates: number }> {
+  const createdByUserId = getSession()?.userId ?? null
+  const existing = await db.customer.findMany({
+    select: { firstName: true, lastName: true, address: true }
+  })
+  const existingKeys = new Set(
+    existing.map((c) => `${c.firstName.toLowerCase()}|${c.lastName.toLowerCase()}|${c.address.toLowerCase()}`)
+  )
+
+  let imported = 0
+  let skippedDuplicates = 0
+  for (const input of customers) {
+    const key = `${input.firstName.toLowerCase()}|${input.lastName.toLowerCase()}|${input.address.toLowerCase()}`
+    if (existingKeys.has(key)) {
+      skippedDuplicates++
+      continue
+    }
+    existingKeys.add(key)
+    await db.customer.create({
+      data: {
+        firstName: input.firstName.trim(),
+        lastName: input.lastName.trim(),
+        phone: input.phone.trim() || null,
+        phoneNormalized: input.phone.trim() ? normalizePhone(input.phone) : null,
+        address: input.address.trim(),
+        email: input.email?.trim() || null,
+        notes: input.notes?.trim() || null,
+        createdByUserId
+      }
+    })
+    imported++
+  }
+  return { imported, skippedDuplicates }
+}
+
+/**
  * B7 (PIPEDA) — a full export of everything held about a customer, for a
  * data-access request. Includes ledger/loyalty/transaction history since
  * that's personal information too, not just the profile fields.
