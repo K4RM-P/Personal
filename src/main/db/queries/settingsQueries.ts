@@ -30,6 +30,9 @@ const DEFAULTS = {
   // Payment configuration
   'payment.allowCreditCardSurcharge': 'false',
   'payment.cardSurchargePercent': '2',
+  // RX/Non-RX custom items added from Checkout are transaction-only by default —
+  // they don't get persisted into the Products catalog listing.
+  'checkout.saveCustomItemsToCatalog': 'false',
   'backup.promptOnLogout': 'true',
   'backup.drivePath': '',
   'backup.driveName': '',
@@ -237,6 +240,17 @@ export async function saveAllowCreditCardSurcharge(
 
 export async function saveCardSurchargePercent(db: PrismaClient, percent: number): Promise<void> {
   await setSetting(db, 'payment.cardSurchargePercent', String(percent))
+}
+
+export async function getSaveCustomItemsToCatalog(db: PrismaClient): Promise<boolean> {
+  return (await getSetting(db, 'checkout.saveCustomItemsToCatalog')) === 'true'
+}
+
+export async function saveSaveCustomItemsToCatalog(
+  db: PrismaClient,
+  enabled: boolean
+): Promise<void> {
+  await setSetting(db, 'checkout.saveCustomItemsToCatalog', String(enabled))
 }
 
 export async function getBackupPromptOnLogout(db: PrismaClient): Promise<boolean> {

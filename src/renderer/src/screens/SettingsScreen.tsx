@@ -237,6 +237,7 @@ export function SettingsScreen() {
   })
   const [lastBackup, setLastBackup] = React.useState<BackupLogSummary | null>(null)
   const [promptOnLogout, setPromptOnLogout] = React.useState(true)
+  const [saveCustomItemsToCatalog, setSaveCustomItemsToCatalog] = React.useState(false)
   const [showBackupModal, setShowBackupModal] = React.useState(false)
   const [showRestoreModal, setShowRestoreModal] = React.useState(false)
   const [showDeleteAllDataModal, setShowDeleteAllDataModal] = React.useState(false)
@@ -314,6 +315,30 @@ export function SettingsScreen() {
     }
   }
 
+  const loadCheckoutSettings = async () => {
+    try {
+      if (window.api?.settings?.getCheckout) {
+        const checkout = await window.api.settings.getCheckout()
+        setSaveCustomItemsToCatalog(checkout.saveCustomItemsToCatalog)
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to load checkout settings.'
+      setError(msg)
+    }
+  }
+
+  const handleToggleSaveCustomItemsToCatalog = async (enabled: boolean) => {
+    const previous = saveCustomItemsToCatalog
+    setSaveCustomItemsToCatalog(enabled)
+    try {
+      const current = await window.api.settings.getCheckout()
+      await window.api.settings.saveCheckout({ ...current, saveCustomItemsToCatalog: enabled })
+    } catch (err: unknown) {
+      setSaveCustomItemsToCatalog(previous)
+      setError(err instanceof Error ? err.message : 'Failed to save checkout setting.')
+    }
+  }
+
   const loadFlags = async () => {
     try {
       if (window.api?.featureFlag) {
@@ -353,6 +378,7 @@ export function SettingsScreen() {
   React.useEffect(() => {
     loadFlags()
     loadHardwareSettings()
+    loadCheckoutSettings()
     loadBackupSettings()
     loadSystemPrinters()
     window.api.customer
@@ -633,6 +659,27 @@ export function SettingsScreen() {
           {sectionVisible('payment') && (
             <Card>
               <PaymentSettingsCard />
+            </Card>
+          )}
+
+          {sectionVisible('payment') && (
+            <Card>
+              <div className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] p-3">
+                <div>
+                  <p className="font-semibold text-[var(--foreground)]">
+                    Save checkout custom items to product catalog
+                  </p>
+                  <p className="text-[var(--muted-foreground)]">
+                    Off by default — Rx/Non-Rx items added from the Checkout screen stay on that
+                    sale only and won&apos;t appear on the Products screen. Custom items meant to
+                    be reused should be added from the Products page instead.
+                  </p>
+                </div>
+                <Switch
+                  checked={saveCustomItemsToCatalog}
+                  onCheckedChange={(v) => void handleToggleSaveCustomItemsToCatalog(v)}
+                />
+              </div>
             </Card>
           )}
 

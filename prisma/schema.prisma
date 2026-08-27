@@ -86,6 +86,12 @@ model Product {
 
   inventoryAdjustments InventoryAdjustment[]
 
+  // True for RX/Non-RX custom items added from the Checkout screen when the
+  // "save custom items to catalog" setting is off. Keeps the row fully
+  // functional (receipts, reports, refunds) while hiding it from the
+  // Products catalog listing.
+  excludeFromCatalog Boolean @default(false)
+
   @@index([origin])
   @@index([sourceItemNumber])
   @@index([discontinued])

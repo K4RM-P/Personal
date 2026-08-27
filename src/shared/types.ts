@@ -495,6 +495,7 @@ export interface InventoryValuation {
 export interface CheckoutSettings {
   allowCreditCardSurcharge: boolean
   cardSurchargePercent: number
+  saveCustomItemsToCatalog: boolean
 }
 
 export interface CreditHealthSummary {

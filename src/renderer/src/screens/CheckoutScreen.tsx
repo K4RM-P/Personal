@@ -153,7 +153,8 @@ export function CheckoutScreen(): React.JSX.Element {
   const [reversingCancel, setReversingCancel] = React.useState(false)
   const [checkoutSettings, setCheckoutSettings] = React.useState({
     allowCreditCardSurcharge: false,
-    cardSurchargePercent: 2
+    cardSurchargePercent: 2,
+    saveCustomItemsToCatalog: false
   })
 
   const [showAddCustomer, setShowAddCustomer] = React.useState(false)
@@ -515,7 +516,8 @@ export function CheckoutScreen(): React.JSX.Element {
         name: data.name,
         costCents: data.priceCents,
         priceCents: data.priceCents,
-        isPinned: true
+        isPinned: true,
+        excludeFromCatalog: !checkoutSettings.saveCustomItemsToCatalog
       })
       setCart((prev) => [
         ...prev,

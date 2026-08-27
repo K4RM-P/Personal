@@ -24,6 +24,8 @@ import {
   getCardSurchargePercent,
   saveAllowCreditCardSurcharge,
   saveCardSurchargePercent,
+  getSaveCustomItemsToCatalog,
+  saveSaveCustomItemsToCatalog,
   getIdleTimeoutMinutes,
   saveIdleTimeoutMinutes,
   getDisplayDensityLevel,
@@ -90,7 +92,8 @@ function buildSampleProduct(
     discontinuedAt: null,
     nameOverridden: false,
     costOverridden: false,
-    barcodeOverridden: false
+    barcodeOverridden: false,
+    excludeFromCatalog: false
   }
 }
 
@@ -350,13 +353,15 @@ export function registerReceiptHandlers(db: PrismaClient): void {
   )
 
   ipcMain.handle(IPC.SETTINGS_GET_CHECKOUT, async (): Promise<CheckoutSettings> => {
-    const [allowSurcharge, surchargePercent] = await Promise.all([
+    const [allowSurcharge, surchargePercent, saveCustomItems] = await Promise.all([
       getAllowCreditCardSurcharge(db),
-      getCardSurchargePercent(db)
+      getCardSurchargePercent(db),
+      getSaveCustomItemsToCatalog(db)
     ])
     return {
       allowCreditCardSurcharge: allowSurcharge,
-      cardSurchargePercent: surchargePercent
+      cardSurchargePercent: surchargePercent,
+      saveCustomItemsToCatalog: saveCustomItems
     }
   })
 
@@ -365,7 +370,8 @@ export function registerReceiptHandlers(db: PrismaClient): void {
     requireManager()
     await Promise.all([
       saveAllowCreditCardSurcharge(db, input.allowCreditCardSurcharge),
-      saveCardSurchargePercent(db, input.cardSurchargePercent)
+      saveCardSurchargePercent(db, input.cardSurchargePercent),
+      saveSaveCustomItemsToCatalog(db, input.saveCustomItemsToCatalog)
     ])
     return input
   })

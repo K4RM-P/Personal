@@ -31,7 +31,7 @@ import { gtinNorm } from '../../catalog/webcatParser'
  */
 export async function getAllProducts(db: PrismaClient): Promise<Product[]> {
   return db.product.findMany({
-    where: { origin: 'MANUAL' },
+    where: { origin: 'MANUAL', excludeFromCatalog: false },
     orderBy: { name: 'asc' }
   })
 }
@@ -120,6 +120,7 @@ export async function createProduct(
     priceCents?: number
     barcode?: string
     isPinned?: boolean
+    excludeFromCatalog?: boolean
   }
 ): Promise<Product> {
   let priceCents = data.priceCents
@@ -138,7 +139,8 @@ export async function createProduct(
       costCents: data.costCents,
       priceCents,
       barcode: data.barcode || null,
-      isPinned: data.isPinned || false
+      isPinned: data.isPinned || false,
+      excludeFromCatalog: data.excludeFromCatalog || false
     }
   })
 }

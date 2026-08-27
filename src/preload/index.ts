@@ -106,6 +106,7 @@ const api = {
       priceCents?: number
       barcode?: string
       isPinned?: boolean
+      excludeFromCatalog?: boolean
     }): Promise<Product> => ipcRenderer.invoke(IPC.PRODUCT_CREATE, data),
     update: (
       id: number,
